@@ -5,7 +5,11 @@ import { AuthPage } from "./pages/AuthPage";
 import { DealCard } from "./components/DealCard";
 import { DealDetailPage } from "./pages/DealDetailPage";
 import { MerchantPage } from "./pages/MerchantPage";
+import { VerifyEmailPage } from "./pages/VerifyEmailPage";
+import { ProfilePage } from "./pages/ProfilePage";
+import { SavedPage } from "./pages/SavedPage";
 import { api } from "./lib/api";
+import { useAuth } from "./context/AuthContext";
 import type { Deal } from "./types";
 
 type Category = "Restaurants" | "Bars" | "Pubs" | "Lounges";
@@ -141,19 +145,20 @@ function SearchBox({ value, onChange, mobile = false }: { value: string; onChang
   </label>;
 }
 
-function Navigation({ query, setQuery, onLocationClick }: { query: string; setQuery: (value: string) => void; onLocationClick: () => void }) {
+function Navigation({ query, setQuery, onLocationClick, locationLabel }: { query: string; setQuery: (value: string) => void; onLocationClick: () => void; locationLabel: string }) {
+  const { user, logout } = useAuth();
+  const [menuOpen, setMenuOpen] = useState(false);
   return <header className="sticky top-0 z-50 border-b border-white/[0.07] bg-night/80 backdrop-blur-2xl">
     <div className="mx-auto flex h-[72px] max-w-[1400px] items-center gap-7 px-5 sm:px-8">
       <a href="#top" className="flex shrink-0 items-center gap-3" aria-label="BakuNights home">
         <span className="grid h-10 w-10 place-items-center rounded-xl bg-gold text-night shadow-[0_0_28px_rgba(245,158,11,.25)]"><MoonMark /></span>
-        <span className="text-lg font-bold tracking-tight sm:text-xl">Baku<span className="text-gold">Nights</span></span>
+        <span className="hidden text-lg font-bold tracking-tight sm:inline sm:text-xl">Baku<span className="text-gold">Nights</span></span>
       </a>
       <div className="flex flex-1 justify-center"><SearchBox value={query} onChange={setQuery} /></div>
       <div className="ml-auto flex items-center gap-2 sm:gap-3">
-        <Link to="/login?next=/" className="hidden rounded-full border border-white/10 bg-white/[0.055] px-3.5 py-2 text-xs font-semibold text-white transition hover:border-gold/40 hover:text-gold md:inline-flex">Customer login</Link>
-        <Link to="/login?next=/merchant" className="hidden rounded-full border border-gold/25 bg-gold/10 px-3.5 py-2 text-xs font-semibold text-gold transition hover:bg-gold hover:text-night lg:inline-flex">Merchant login</Link>
-        <button type="button" onClick={onLocationClick} className="hidden items-center gap-2 rounded-full border border-white/10 bg-white/[0.055] px-3.5 py-2 text-xs font-semibold text-white transition hover:border-gold/40 hover:text-gold sm:flex" title="Show Baku map and refresh your location"><Icon name="location" size={15} className="text-gold" />Baku, AZ<Icon name="chevron" size={14} className="text-muted" /></button>
-        <Link to="/login?next=/" className="grid h-10 w-10 place-items-center rounded-full border border-gold/30 bg-gradient-to-br from-gold to-amber-700 text-sm font-bold text-night shadow-[0_0_20px_rgba(245,158,11,.18)]" aria-label="Log in as customer">BN</Link>
+        {!user && <><Link to="/login/customer" className="inline-flex rounded-full border border-white/10 bg-white/[0.055] px-2.5 py-2 text-[10px] font-semibold text-white transition hover:border-gold/40 hover:text-gold sm:px-3.5 sm:text-xs"><span className="sm:hidden">Customer</span><span className="hidden sm:inline">Customer login</span></Link><Link to="/login/merchant" className="inline-flex rounded-full border border-gold/25 bg-gold/10 px-2.5 py-2 text-[10px] font-semibold text-gold transition hover:bg-gold hover:text-night sm:px-3.5 sm:text-xs"><span className="sm:hidden">Merchant</span><span className="hidden sm:inline">Merchant login</span></Link></>}
+        <button type="button" onClick={onLocationClick} className="flex h-10 w-10 shrink-0 items-center justify-center gap-2 rounded-full border border-white/10 bg-white/[0.055] text-xs font-semibold text-white transition hover:border-gold/40 hover:text-gold sm:h-auto sm:w-auto sm:max-w-44 sm:px-3.5 sm:py-2" title={`Choose your location (${locationLabel})`} aria-label={`Choose your location. Current: ${locationLabel}`}><Icon name="location" size={15} className="shrink-0 text-gold" /><span className="hidden truncate sm:block">{locationLabel}</span><Icon name="chevron" size={14} className="hidden shrink-0 text-muted sm:block" /></button>
+        {user && <div className="relative"><button type="button" onClick={() => setMenuOpen((open) => !open)} className="grid h-10 w-10 place-items-center rounded-full border border-gold/30 bg-gradient-to-br from-gold to-amber-700 text-sm font-bold text-night shadow-[0_0_20px_rgba(245,158,11,.18)]" aria-label="Open account menu" aria-expanded={menuOpen}>{user.name.split(/\s+/).map((part) => part[0]).join("").slice(0, 2).toUpperCase()}</button>{menuOpen && <div className="absolute right-0 top-12 w-52 rounded-2xl border border-white/10 bg-[#15151e] p-2 shadow-2xl"><p className="px-3 py-2 text-xs text-white/45">{user.email}</p>{user.role === "CONSUMER" && <><Link to="/profile" className="block rounded-xl px-3 py-2 text-sm text-white/75 hover:bg-white/10 hover:text-white">Profile</Link><Link to="/saved" className="block rounded-xl px-3 py-2 text-sm text-white/75 hover:bg-white/10 hover:text-white">Saved deals</Link></>}{user.role === "MERCHANT" && <Link to="/merchant" className="block rounded-xl px-3 py-2 text-sm text-white/75 hover:bg-white/10 hover:text-white">Merchant dashboard</Link>}{user.role === "ADMIN" && <Link to="/admin" className="block rounded-xl px-3 py-2 text-sm text-white/75 hover:bg-white/10 hover:text-white">Admin dashboard</Link>}<button type="button" onClick={() => void logout()} className="mt-1 w-full rounded-xl px-3 py-2 text-left text-sm text-red-200 hover:bg-red-500/10">Log out</button></div>}</div>}
       </div>
     </div>
   </header>;
@@ -242,7 +247,7 @@ function VenueCard({ venue, saved, onToggleSave, onNavigate }: { venue: Venue; s
   </article>;
 }
 
-function VenueDirectory({ query, setQuery, onNavigate }: { query: string; setQuery: (value: string) => void; onNavigate: (venue: Venue) => void }) {
+function VenueDirectory({ query, setQuery, onNavigate, origin }: { query: string; setQuery: (value: string) => void; onNavigate: (venue: Venue) => void; origin: UserPosition | null }) {
   const [category, setCategory] = useState<CategoryFilter>("All");
   const [saved, setSaved] = useState<Set<number>>(() => {
     try { return new Set<number>(JSON.parse(localStorage.getItem("bakunights-saved") || "[]")); }
@@ -250,8 +255,11 @@ function VenueDirectory({ query, setQuery, onNavigate }: { query: string; setQue
   });
   const filtered = useMemo(() => {
     const search = query.trim().toLowerCase();
-    return VENUES.filter((venue) => (category === "All" || venue.category === category) && (!search || [venue.name, venue.category, venue.address, venue.deal, ...venue.tags].join(" ").toLowerCase().includes(search)));
-  }, [category, query]);
+    return VENUES
+      .filter((venue) => (category === "All" || venue.category === category) && (!search || [venue.name, venue.category, venue.address, venue.deal, ...venue.tags].join(" ").toLowerCase().includes(search)))
+      .map((venue) => origin ? { ...venue, distance: `${distanceKm(origin, venue).toFixed(1)} km` } : venue)
+      .sort((a, b) => origin ? distanceKm(origin, a) - distanceKm(origin, b) : a.id - b.id);
+  }, [category, origin, query]);
   function toggleSaved(id: number) {
     setSaved((current) => {
       const next = new Set(current);
@@ -546,6 +554,7 @@ function TaxiSheet({ venue, onClose }: { venue: Venue; onClose: () => void }) {
   const [copyState, setCopyState] = useState<"idle" | "copied" | "failed">("idle");
   const destination = `${venue.name}, ${venue.address}`;
   const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${venue.lat},${venue.lng}&travelmode=driving`;
+  const wazeUrl = `https://waze.com/ul?ll=${venue.lat}%2C${venue.lng}&navigate=yes&zoom=17&utm_source=bakunights`;
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => { if (event.key === "Escape") onClose(); };
@@ -567,6 +576,30 @@ function TaxiSheet({ venue, onClose }: { venue: Venue; onClose: () => void }) {
     }
   }
 
+  async function openBoltApp() {
+    try {
+      await navigator.clipboard.writeText(destination);
+      setCopyState("copied");
+    } catch {
+      setCopyState("failed");
+    }
+
+    const isAndroid = /Android/i.test(navigator.userAgent);
+    const fallbackUrl = isAndroid
+      ? "https://play.google.com/store/apps/details?id=ee.mtakso.client"
+      : "https://apps.apple.com/app/bolt-request-a-ride/id675033630";
+    let leftPage = false;
+    const markHidden = () => {
+      if (document.visibilityState === "hidden") leftPage = true;
+    };
+    document.addEventListener("visibilitychange", markHidden, { once: true });
+    window.location.href = "bolt://";
+    window.setTimeout(() => {
+      document.removeEventListener("visibilitychange", markHidden);
+      if (!leftPage && document.visibilityState === "visible") window.location.href = fallbackUrl;
+    }, 1600);
+  }
+
   return <div className="fixed inset-0 z-[80] flex items-end justify-center bg-black/70 p-0 backdrop-blur-sm sm:items-center sm:p-5" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
     <section role="dialog" aria-modal="true" aria-labelledby="taxi-title" className="w-full max-w-lg rounded-t-3xl border border-white/10 bg-[#12121a] p-5 shadow-2xl sm:rounded-3xl sm:p-7">
       <div className="flex items-start justify-between gap-4">
@@ -579,15 +612,19 @@ function TaxiSheet({ venue, onClose }: { venue: Venue; onClose: () => void }) {
       </div>
       <div className="mt-4 rounded-2xl border border-[#2fdf84]/25 bg-[#2fdf84]/[0.07] p-4">
         <div className="flex items-center gap-3"><span className="grid h-11 w-11 place-items-center rounded-xl bg-[#2fdf84] text-lg font-black tracking-[-.08em] text-[#07150d]">bolt</span><div><p className="font-semibold text-white">Bolt</p><p className="text-xs text-white/50">Ride-hailing partner app</p></div></div>
-        <p className="mt-4 text-xs leading-5 text-white/55">Copy the destination, then open Bolt and paste it into the destination field.</p>
+        <p className="mt-4 text-xs leading-5 text-white/55">We copy the destination and open the Bolt app. Paste it into Bolt&apos;s destination field to continue.</p>
         <div className="mt-4 grid grid-cols-2 gap-2">
           <button type="button" onClick={copyDestination} className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 px-3 py-3 text-xs font-bold text-white transition hover:border-white/25"><Icon name="copy" size={15} />{copyState === "copied" ? "Copied" : copyState === "failed" ? "Copy failed" : "Copy destination"}</button>
-          <a href="https://bolt.eu/" target="_blank" rel="noreferrer" className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#2fdf84] px-3 py-3 text-xs font-bold text-[#07150d] transition hover:bg-[#5bed9b]">Open Bolt<Icon name="arrow" size={15} /></a>
+          <button type="button" onClick={() => void openBoltApp()} className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#2fdf84] px-3 py-3 text-xs font-bold text-[#07150d] transition hover:bg-[#5bed9b]">Open Bolt app<Icon name="arrow" size={15} /></button>
         </div>
       </div>
       <div className="mt-3 rounded-2xl border border-[#4285f4]/25 bg-[#4285f4]/[0.07] p-4">
         <div className="flex items-center gap-3"><span className="grid h-11 w-11 place-items-center rounded-xl bg-[#4285f4] text-white"><Icon name="pin" size={21} /></span><div><p className="font-semibold text-white">Google Maps</p><p className="text-xs text-white/50">Turn-by-turn driving directions</p></div></div>
         <a href={googleMapsUrl} target="_blank" rel="noreferrer" className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#4285f4] px-3 py-3 text-xs font-bold text-white transition hover:bg-[#5a95f5]">Open Google Maps<Icon name="arrow" size={15} /></a>
+      </div>
+      <div className="mt-3 rounded-2xl border border-[#33ccff]/25 bg-[#33ccff]/[0.07] p-4">
+        <div className="flex items-center gap-3"><span className="grid h-11 w-11 place-items-center rounded-xl bg-[#33ccff] text-[#07151a]"><Icon name="car" size={21} /></span><div><p className="font-semibold text-white">Waze</p><p className="text-xs text-white/50">Destination ready in the Waze app</p></div></div>
+        <a href={wazeUrl} className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#33ccff] px-3 py-3 text-xs font-bold text-[#07151a] transition hover:bg-[#66dcff]">Open destination in Waze<Icon name="arrow" size={15} /></a>
       </div>
       <p className="mt-4 text-center text-[10px] leading-4 text-white/35">Your route stays in Haragedek unless you choose one of these external apps.</p>
     </section>
@@ -638,11 +675,67 @@ function useUserLocation() {
   };
 }
 
+function distanceKm(origin: Pick<UserPosition, "lat" | "lng">, venue: Pick<Venue, "lat" | "lng">) {
+  const radians = (degrees: number) => degrees * Math.PI / 180;
+  const latDelta = radians(venue.lat - origin.lat);
+  const lngDelta = radians(venue.lng - origin.lng);
+  const value = Math.sin(latDelta / 2) ** 2 + Math.cos(radians(origin.lat)) * Math.cos(radians(venue.lat)) * Math.sin(lngDelta / 2) ** 2;
+  return 6371 * 2 * Math.atan2(Math.sqrt(value), Math.sqrt(1 - value));
+}
+
+function LocationPickerModal({ apiKey, detectedPosition, currentPosition, onConfirm, onClose }: { apiKey: string; detectedPosition: UserPosition | null; currentPosition: UserPosition | null; onConfirm: (position: UserPosition, label: string) => void; onClose: () => void }) {
+  const initialPosition = useRef<UserPosition>(currentPosition || detectedPosition || { lat: 40.3719, lng: 49.8412, accuracy: 0 }).current;
+  const [draft, setDraft] = useState<UserPosition>(initialPosition);
+  const [status, setStatus] = useState(apiKey ? "Loading map…" : "Google Maps key is not configured.");
+  const mapContainer = useRef<HTMLDivElement | null>(null);
+  const pickerMarker = useRef<google.maps.marker.AdvancedMarkerElement | null>(null);
+
+  useEffect(() => {
+    if (!apiKey || !mapContainer.current) return;
+    let active = true;
+    let marker: google.maps.marker.AdvancedMarkerElement | null = null;
+    void loadGoogleMaps(apiKey).then(async () => {
+      if (!active || !mapContainer.current) return;
+      const { Map } = await google.maps.importLibrary("maps") as google.maps.MapsLibrary;
+      const { AdvancedMarkerElement } = await google.maps.importLibrary("marker") as google.maps.MarkerLibrary;
+      const map = new Map(mapContainer.current, { center: initialPosition, zoom: 14, mapId: (import.meta.env.VITE_GOOGLE_MAPS_MAP_ID as string | undefined)?.trim() || "DEMO_MAP_ID", disableDefaultUI: false, gestureHandling: "greedy" });
+      marker = new AdvancedMarkerElement({ map, position: initialPosition, gmpDraggable: true, title: "Selected location" });
+      pickerMarker.current = marker;
+      const update = (lat: number, lng: number) => { const next = { lat, lng, accuracy: 0 }; setDraft(next); marker!.position = next; };
+      map.addListener("click", (event: google.maps.MapMouseEvent) => { if (event.latLng) update(event.latLng.lat(), event.latLng.lng()); });
+      marker.addListener("dragend", () => { const position = marker?.position; if (position && "lat" in position) update(typeof position.lat === "function" ? position.lat() : position.lat, typeof position.lng === "function" ? position.lng() : position.lng); });
+      setStatus("Click the map or drag the pin to choose a location.");
+    }).catch(() => setStatus("Google Maps could not load. Check the API key and allowed localhost origin."));
+    return () => { active = false; if (marker) marker.map = null; pickerMarker.current = null; };
+  }, [apiKey, initialPosition]);
+
+  useEffect(() => {
+    if (pickerMarker.current) pickerMarker.current.position = draft;
+  }, [draft]);
+
+  async function confirm() {
+    let label = "Custom location";
+    if (apiKey && window.google?.maps) {
+      try {
+        const result = await new google.maps.Geocoder().geocode({ location: draft });
+        const components = result.results[0]?.address_components ?? [];
+        label = components.find((item) => item.types.includes("sublocality") || item.types.includes("neighborhood"))?.long_name || components.find((item) => item.types.includes("route"))?.long_name || "Custom location";
+      } catch { /* Coordinates still work when reverse geocoding is unavailable. */ }
+    }
+    onConfirm(draft, label);
+  }
+
+  return <div className="fixed inset-0 z-[90] grid place-items-center bg-black/75 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label="Choose location"><section className="w-full max-w-3xl overflow-hidden rounded-3xl border border-white/10 bg-[#12121a] shadow-2xl"><div className="flex items-start justify-between border-b border-white/10 p-5"><div><p className="text-[10px] font-bold uppercase tracking-[.2em] text-gold">Deals near you</p><h2 className="mt-1 font-display text-3xl text-white">Choose your location</h2><p className="mt-1 text-sm text-white/50">{status}</p></div><button type="button" onClick={onClose} className="grid h-10 w-10 place-items-center rounded-full border border-white/10 text-white/60 hover:text-white"><Icon name="close" /></button></div><div ref={mapContainer} className="h-[420px] w-full bg-[#0c0c14]" /> <div className="flex flex-col gap-3 border-t border-white/10 p-5 sm:flex-row sm:items-center"><button type="button" disabled={!detectedPosition} onClick={() => detectedPosition && setDraft(detectedPosition)} className="rounded-xl border border-white/10 px-4 py-3 text-sm font-semibold text-white/70 hover:bg-white/10 disabled:opacity-40">Use detected location</button><p className="text-xs text-white/40 sm:mr-auto">{draft.lat.toFixed(5)}, {draft.lng.toFixed(5)}</p><button type="button" onClick={() => void confirm()} className="panel-button justify-center">Confirm location</button></div></section></div>;
+}
+
 export default function App() {
   const { pathname: path } = useLocation();
+  if (path.startsWith("/verify-email")) return <VerifyEmailPage />;
   if (path.startsWith("/admin")) return <AdminPage />;
   if (path.startsWith("/merchant")) return <MerchantPage />;
-  if (path.startsWith("/login")) return <AuthPage />;
+  if (path.startsWith("/login") || path.startsWith("/register")) return <AuthPage />;
+  if (path.startsWith("/profile")) return <ProfilePage />;
+  if (path.startsWith("/saved")) return <SavedPage />;
   if (path.startsWith("/deals/")) return <DealDetailPage />;
   return <ConsumerApp />;
 }
@@ -654,6 +747,11 @@ function ConsumerApp() {
   const [routeRequest, setRouteRequest] = useState(0);
   const [routeMode, setRouteMode] = useState<TravelMode>("driving");
   const { userPosition, locationStatus, locationMessage, requestLocation } = useUserLocation();
+  const [locationPickerOpen, setLocationPickerOpen] = useState(false);
+  const [manualPosition, setManualPosition] = useState<UserPosition | null>(null);
+  const [locationLabel, setLocationLabel] = useState("Baku, AZ");
+  const feedPosition = manualPosition || userPosition;
+  const mapsApiKey = (import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined)?.trim() || "";
 
   function navigateInApp(venue: Venue) {
     setSelectedVenue(venue);
@@ -666,14 +764,15 @@ function ConsumerApp() {
   }
 
   return <div className="min-h-screen overflow-x-hidden bg-night text-white">
-    <Navigation query={query} setQuery={setQuery} onLocationClick={() => { requestLocation(); document.getElementById("map")?.scrollIntoView({ behavior: "smooth", block: "start" }); }} />
-    <main><Hero /><LiveOffers /><FlashDeals /><VenueDirectory query={query} setQuery={setQuery} onNavigate={navigateInApp} /><MapSection selected={selectedVenue} onSelect={setSelectedVenue} onTaxi={setTaxiVenue} userPosition={userPosition} locationStatus={locationStatus} locationMessage={locationMessage} onRequestLocation={requestLocation} routeRequest={routeRequest} routeMode={routeMode} onStartRoute={startRoute} /></main>
+    <Navigation query={query} setQuery={setQuery} locationLabel={locationLabel} onLocationClick={() => { requestLocation(); setLocationPickerOpen(true); }} />
+    <main><Hero /><LiveOffers origin={feedPosition} /><FlashDeals /><VenueDirectory query={query} setQuery={setQuery} onNavigate={navigateInApp} origin={feedPosition} /><MapSection selected={selectedVenue} onSelect={setSelectedVenue} onTaxi={setTaxiVenue} userPosition={feedPosition} locationStatus={locationStatus} locationMessage={locationMessage} onRequestLocation={requestLocation} routeRequest={routeRequest} routeMode={routeMode} onStartRoute={startRoute} /></main>
     <footer className="px-5 py-9 text-center text-[11px] text-muted"><p>© {new Date().getFullYear()} BakuNights · All offers valid for today only</p></footer>
     {taxiVenue && <TaxiSheet venue={taxiVenue} onClose={() => setTaxiVenue(null)} />}
+    {locationPickerOpen && <LocationPickerModal apiKey={mapsApiKey} detectedPosition={userPosition} currentPosition={feedPosition} onClose={() => setLocationPickerOpen(false)} onConfirm={(position, label) => { setManualPosition(position); setLocationLabel(label); setLocationPickerOpen(false); }} />}
   </div>;
 }
 
-function LiveOffers() {
+function LiveOffers({ origin }: { origin: UserPosition | null }) {
   const [deals, setDeals] = useState<Deal[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -681,12 +780,14 @@ function LiveOffers() {
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    api<{ deals: Deal[] }>("/deals?lat=30.2672&lng=-97.7431&radius=100&all=true&sort=ending")
+    const lat = origin?.lat ?? 40.3719;
+    const lng = origin?.lng ?? 49.8412;
+    api<{ deals: Deal[] }>(`/deals?lat=${lat}&lng=${lng}&radius=100&all=true&sort=distance`)
       .then((result) => { if (!cancelled) { setDeals(result.deals); setError(""); } })
       .catch((reason) => { if (!cancelled) setError(reason instanceof Error ? reason.message : "Could not load live offers"); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, []);
+  }, [origin?.lat, origin?.lng]);
 
   return <section className="mx-auto max-w-[1400px] px-5 py-16 sm:px-8">
     <SectionHeading eyebrow="Approved by admin" title="Live offers from restaurants" action={<span className="hidden text-xs text-muted sm:block">{loading ? "Loading..." : `${deals.length} live offer${deals.length === 1 ? "" : "s"}`}</span>} />

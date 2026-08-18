@@ -4,6 +4,7 @@ import { StatusBar } from "expo-status-bar";
 import "react-native-reanimated";
 
 import { LocationProvider } from "@/src/LocationContext";
+import { AuthProvider } from "@/src/AuthContext";
 
 const haragedekTheme = {
   ...DarkTheme,
@@ -13,12 +14,16 @@ const haragedekTheme = {
 export default function RootLayout() {
   return (
     <ThemeProvider value={haragedekTheme}>
-      <LocationProvider>
-        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: "#1f2937" } }}>
-          <Stack.Screen name="(tabs)" />
-        </Stack>
-        <StatusBar style="light" />
-      </LocationProvider>
+      <AuthProvider>
+        <LocationProvider>
+          <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: "#1f2937" } }}>
+            <Stack.Screen name="(tabs)" />
+            <Stack.Screen name="login/[accountType]" options={{ presentation: "modal" }} />
+            <Stack.Screen name="register/[accountType]" options={{ presentation: "modal" }} />
+          </Stack>
+          <StatusBar style="light" />
+        </LocationProvider>
+      </AuthProvider>
     </ThemeProvider>
   );
 }

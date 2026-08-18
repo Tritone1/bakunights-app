@@ -16,7 +16,8 @@
         "usesNonExemptEncryption": false
       },
       "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "Haragedek uses your location to show nearby restaurants and deals."
+        "NSLocationWhenInUseUsageDescription": "Haragedek uses your location to show nearby restaurants and deals.",
+        "LSApplicationQueriesSchemes": ["bolt", "waze"]
       }
     },
     "android": {
@@ -40,6 +41,13 @@
         "expo-location",
         {
           "locationWhenInUsePermission": "Allow Haragedek to show nearby venues and your position on the map."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow Haragedek to choose a venue logo or photo for merchant registration.",
+          "cameraPermission": false
         }
       ],
       [

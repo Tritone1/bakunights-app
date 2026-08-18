@@ -5,6 +5,8 @@ import cors from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
 import pg from "pg";
+import { existsSync } from "node:fs";
+import { resolve } from "node:path";
 import { env } from "./env.js";
 import { passport } from "./auth/passport.js";
 import { prisma } from "./db.js";
@@ -18,6 +20,7 @@ import { pushRouter } from "./routes/push.js";
 import { placesRouter } from "./routes/places.js";
 import { errorHandler, notFound } from "./lib/http.js";
 import { sendSavedDealExpiryNotifications } from "./lib/push.js";
+import { recomputeAllVenueTrust } from "./lib/trust.js";
 
 const app = express();
 const PgSession = connectPgSimple(session);
@@ -41,7 +44,8 @@ app.use(cors({
   },
   credentials: true,
 }));
-app.use(express.json({ limit: "250kb" }));
+// Offer/menu photos are sent as validated data URLs (client limit: 2 MB).
+app.use(express.json({ limit: "4mb" }));
 app.use(morgan(env.NODE_ENV === "production" ? "combined" : "dev"));
 app.use(session({
   store: new PgSession({ pool, createTableIfMissing: true }),
@@ -68,6 +72,16 @@ app.use("/api/merchant", merchantRouter);
 app.use("/api/admin", adminRouter);
 app.use("/api/push", pushRouter);
 app.use("/api/places", placesRouter);
+if (env.NODE_ENV === "production") {
+  const webDist = resolve(process.cwd(), "apps/web/dist");
+  if (existsSync(webDist)) {
+    app.use(express.static(webDist));
+    app.use((req, res, next) => {
+      if (req.method !== "GET" || req.path.startsWith("/api/")) return next();
+      res.sendFile(resolve(webDist, "index.html"));
+    });
+  }
+}
 app.use(notFound);
 app.use(errorHandler);
 
@@ -83,9 +97,12 @@ async function expireStaleDeals() {
 }
 void expireStaleDeals().catch(console.error);
 const expiryTimer = setInterval(() => void expireStaleDeals().catch(console.error), 15 * 60 * 1000);
+void recomputeAllVenueTrust().catch(console.error);
+const trustTimer = setInterval(() => void recomputeAllVenueTrust().catch(console.error), 24 * 60 * 60 * 1000);
 
 async function shutdown() {
   clearInterval(expiryTimer);
+  clearInterval(trustTimer);
   server.close(async () => {
     await prisma.$disconnect();
     await pool.end();

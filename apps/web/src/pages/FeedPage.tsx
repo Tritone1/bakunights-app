@@ -83,7 +83,7 @@ export function FeedPage() {
     if (user) void api("/users/me/location", { method: "PATCH", body: JSON.stringify({ lat: next.lat, lng: next.lng }) });
   }
   async function save(deal: Deal) {
-    if (!user) { navigate(`/login?next=/deals/${deal.id}`); return; }
+    if (!user) { navigate("/login/customer"); return; }
     const wasSaved = savedIds.has(deal.id);
     setSavedIds((current) => { const next = new Set(current); if (wasSaved) next.delete(deal.id); else next.add(deal.id); return next; });
     try { await api(`/deals/${deal.id}/save`, { method: wasSaved ? "DELETE" : "PUT" }); }

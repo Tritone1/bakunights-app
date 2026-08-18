@@ -17,6 +17,8 @@ export type Restaurant = {
   photoUrl?: string;
   phone?: string;
   hoursJson?: string;
+  isVerifiedTrusted?: boolean;
+  honestyRate?: number | null;
 };
 
 export type Deal = {
@@ -24,6 +26,10 @@ export type Deal = {
   title: string;
   description: string;
   menuItem?: string | null;
+  photoUrl?: string | null;
+  scope?: "WHOLE_MENU" | "CATEGORY" | "SPECIFIC_ITEMS";
+  scopeCategory?: { id: string; name: string } | null;
+  offerMenuItems?: { menuItemId: string; menuItem: { id: string; name: string; photoUrl?: string | null; priceAzn: string | number; category?: { name: string } } }[];
   offerType?: "discount" | "combo" | "set_menu" | "perk" | "event" | "bundle" | "other";
   discountPct?: number | null;
   tag?: string;
@@ -36,6 +42,10 @@ export type Deal = {
 };
 
 export type Redemption = {
+  id: string;
   redemptionCode: string;
   qrDataUrl?: string;
+  redeemedAt?: string | null;
+  feedbackSkippedAt?: string | null;
+  feedback?: { id: string; wasHonored: boolean; comment?: string | null } | null;
 };

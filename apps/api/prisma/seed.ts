@@ -63,6 +63,8 @@ const photos = [
   "photo-1557872943-16a5ac26437e", "photo-1544148103-0773bf10d330", "photo-1514933651103-005eec06c04b",
 ];
 
+const menuCategories = ["Breakfast", "Appetizers", "Mains", "Sides", "Desserts", "Drinks", "Alcohol"];
+
 async function main() {
   await prisma.auditLog.deleteMany();
   await prisma.notificationLog.deleteMany();
@@ -74,6 +76,12 @@ async function main() {
   await prisma.deal.deleteMany();
   await prisma.venueClaimRequest.deleteMany();
   await prisma.restaurant.deleteMany();
+
+  const seededCategories = new Map<string, string>();
+  for (const [sortOrder, name] of menuCategories.entries()) {
+    const category = await prisma.menuCategory.upsert({ where: { name }, update: { sortOrder }, create: { name, sortOrder } });
+    seededCategories.set(name, category.id);
+  }
 
   const admin = await prisma.user.upsert({
     where: { email: "admin@bakunights.test" },
@@ -107,6 +115,13 @@ async function main() {
       ownerUserId: index < 3 ? merchant.id : null,
       claimStatus: index < 3 ? "verified" : "unclaimed",
     } });
+    if (index === 0) {
+      await prisma.menuItem.createMany({ data: [
+        { venueId: restaurant.id, categoryId: seededCategories.get("Breakfast")!, name: "Baku Breakfast", priceAzn: 14, description: "Eggs, cheese, olives, bread, and tea." },
+        { venueId: restaurant.id, categoryId: seededCategories.get("Mains")!, name: "Lule Kebab", priceAzn: 12, description: "Charcoal-grilled kebab with onion and lavash." },
+        { venueId: restaurant.id, categoryId: seededCategories.get("Drinks")!, name: "Azerbaijani Tea", priceAzn: 4, description: "Black tea served in an armudu glass." },
+      ] });
+    }
     await prisma.deal.create({ data: {
       restaurantId: restaurant.id,
       title: titles[index]!, description: descriptions[index]!, discountPct: discounts[index]!, tag: tags[index]!,

@@ -12,7 +12,6 @@ type User = {
 interface AuthContextType {
   user: User | null;
   loading: boolean;
-  googleAuthEnabled: boolean;
   refresh: () => Promise<void>;
   logout: () => Promise<void>;
 }
@@ -22,13 +21,10 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const [googleAuthEnabled, setGoogleAuthEnabled] = useState(false);
-
   async function refresh() {
       try {
-        const data = await api<{ user: User | null; googleAuthEnabled: boolean }>("/auth/me");
+        const data = await api<{ user: User | null }>("/auth/me");
         setUser(data.user);
-        setGoogleAuthEnabled(data.googleAuthEnabled);
       } catch {
         setUser(null);
       } finally {
@@ -49,7 +45,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
   }
 
-  return <AuthContext.Provider value={{ user, loading, googleAuthEnabled, refresh, logout }}>{children}</AuthContext.Provider>;
+  return <AuthContext.Provider value={{ user, loading, refresh, logout }}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth() {

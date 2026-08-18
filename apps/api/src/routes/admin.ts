@@ -3,8 +3,10 @@ import { z } from "zod";
 import { prisma } from "../db.js";
 import { asyncRoute, HttpError } from "../lib/http.js";
 import { requireAdmin } from "../middleware/auth.js";
+import { recomputeVenueTrust } from "../lib/trust.js";
 
 export const adminRouter = Router();
+const imageValue = z.string().trim().max(3_000_000).refine((value) => /^https?:\/\//i.test(value) || /^data:image\/(jpeg|png|webp);base64,/i.test(value), "Use an image URL or uploaded image");
 
 adminRouter.use(requireAdmin);
 
@@ -28,6 +30,7 @@ const dealInput = z.object({
   title: z.string().trim().min(3).max(100),
   description: z.string().trim().min(10).max(1000),
   menuItem: z.string().trim().min(2).max(120).nullable().optional(),
+  photoUrl: imageValue.nullable().optional(),
   offerType: z.enum(["discount", "combo", "set_menu", "perk", "event", "bundle", "other"]).default("discount"),
   discountPct: z.number().int().min(1).max(100).nullable().optional(),
   tag: z.enum(["breakfast", "lunch", "dinner", "happy hour", "all day"]),
@@ -57,9 +60,71 @@ adminRouter.get("/dashboard", asyncRoute(async (_req, res) => {
 adminRouter.get("/venues", asyncRoute(async (_req, res) => {
   const venues = await prisma.restaurant.findMany({
     orderBy: { name: "asc" },
-    include: { owner: { select: { id: true, name: true, email: true } }, _count: { select: { deals: true } } },
+    include: { owner: { select: { id: true, name: true, email: true } }, trustFlags: { where: { status: "OPEN" }, orderBy: { createdAt: "desc" } }, _count: { select: { deals: true } } },
   });
   res.json({ venues });
+}));
+
+adminRouter.get("/trust-flags", asyncRoute(async (_req, res) => {
+  const flags = await prisma.venueTrustFlag.findMany({
+    where: { status: "OPEN" }, orderBy: { createdAt: "asc" },
+    include: { venue: { select: { id: true, name: true, honestyRate: true, isVerifiedTrusted: true } } },
+  });
+  res.json({ flags });
+}));
+
+adminRouter.post("/trust-flags/:id/resolve", asyncRoute(async (req, res) => {
+  const id = z.string().parse(req.params.id);
+  const flag = await prisma.venueTrustFlag.update({ where: { id }, data: { status: "RESOLVED", resolvedAt: new Date(), resolvedByUserId: req.user!.id } });
+  await audit(req.user!.id, "venue_trust_flag_resolved", "venue", flag.venueId, flag.reason);
+  await recomputeVenueTrust(flag.venueId);
+  res.json({ flag });
+}));
+
+adminRouter.post("/venues/:id/trusted-badge/revoke", asyncRoute(async (req, res) => {
+  const venueId = z.string().parse(req.params.id);
+  const venue = await prisma.restaurant.update({ where: { id: venueId }, data: { trustedBadgeRevoked: true, isVerifiedTrusted: false } });
+  await audit(req.user!.id, "trusted_badge_revoked", "venue", venueId, "Manual admin revocation");
+  res.json({ venue });
+}));
+
+adminRouter.post("/venues/:id/trusted-badge/restore", asyncRoute(async (req, res) => {
+  const venueId = z.string().parse(req.params.id);
+  await prisma.restaurant.update({ where: { id: venueId }, data: { trustedBadgeRevoked: false } });
+  const trust = await recomputeVenueTrust(venueId);
+  await audit(req.user!.id, "trusted_badge_restored", "venue", venueId, "Manual revocation removed; automatic rules reapplied");
+  res.json({ trust });
+}));
+
+adminRouter.get("/menu/categories", asyncRoute(async (_req, res) => {
+  res.json({ categories: await prisma.menuCategory.findMany({ orderBy: [{ sortOrder: "asc" }, { name: "asc" }] }) });
+}));
+
+adminRouter.post("/menu/categories", asyncRoute(async (req, res) => {
+  const input = z.object({ name: z.string().trim().min(2).max(60), sortOrder: z.number().int().min(0).max(1000) }).parse(req.body);
+  const category = await prisma.menuCategory.create({ data: input });
+  res.status(201).json({ category });
+}));
+
+adminRouter.patch("/menu/categories/:id", asyncRoute(async (req, res) => {
+  const id = z.string().parse(req.params.id);
+  const input = z.object({ name: z.string().trim().min(2).max(60).optional(), sortOrder: z.number().int().min(0).max(1000).optional() }).parse(req.body);
+  res.json({ category: await prisma.menuCategory.update({ where: { id }, data: input }) });
+}));
+
+adminRouter.get("/menu/catalog", asyncRoute(async (_req, res) => {
+  res.json({ items: await prisma.catalogItem.findMany({ include: { category: true }, orderBy: { name: "asc" } }) });
+}));
+
+adminRouter.post("/menu/catalog", asyncRoute(async (req, res) => {
+  const input = z.object({ name: z.string().trim().min(2).max(120), categoryId: z.string().min(1), photoUrl: imageValue.nullable().optional() }).parse(req.body);
+  res.status(201).json({ item: await prisma.catalogItem.create({ data: input }) });
+}));
+
+adminRouter.patch("/menu/catalog/:id", asyncRoute(async (req, res) => {
+  const id = z.string().parse(req.params.id);
+  const input = z.object({ name: z.string().trim().min(2).max(120).optional(), categoryId: z.string().min(1).optional(), photoUrl: imageValue.nullable().optional(), isActive: z.boolean().optional() }).parse(req.body);
+  res.json({ item: await prisma.catalogItem.update({ where: { id }, data: input }) });
 }));
 
 adminRouter.post("/venues", asyncRoute(async (req, res) => {
@@ -92,6 +157,7 @@ adminRouter.get("/deals", asyncRoute(async (_req, res) => {
 
 adminRouter.post("/deals", asyncRoute(async (req, res) => {
   const input = dealInput.parse(req.body);
+  if (!input.photoUrl) throw new HttpError(400, "Add an offer photo before publishing.", "OFFER_PHOTO_REQUIRED");
   const now = new Date();
   const deal = await prisma.deal.create({
     data: {

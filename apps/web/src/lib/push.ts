@@ -1,4 +1,4 @@
-import { api, apiUrl } from "./api";
+import { api } from "./api";
 
 export async function setupPushNotifications() {
   if ("serviceWorker" in navigator) {

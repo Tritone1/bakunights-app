@@ -11,14 +11,14 @@ const schema = z.object({
   DATABASE_URL: z.string().min(1),
   WEB_ORIGIN: z.string().url().default("http://localhost:5173"),
   SESSION_SECRET: z.string().min(16),
-  GOOGLE_CLIENT_ID: z.string().optional(),
-  GOOGLE_CLIENT_SECRET: z.string().optional(),
-  GOOGLE_CALLBACK_URL: z.string().url().default("http://localhost:4000/api/auth/google/callback"),
   GOOGLE_MAPS_API_KEY: z.string().optional(),
   VAPID_PUBLIC_KEY: z.string().optional(),
   VAPID_PRIVATE_KEY: z.string().optional(),
   VAPID_SUBJECT: z.string().default("mailto:hello@example.com"),
-  VERIFICATION_EMAIL_FROM: z.string().email().optional(),
+  GMAIL_SENDER_EMAIL: z.string().email().optional(),
+  GMAIL_APP_PASSWORD: z.string().optional(),
+  OPENAI_API_KEY: z.string().optional(),
+  OPENAI_VISION_MODEL: z.string().default("gpt-4o"),
 });
 
 export const env = schema.parse(process.env);

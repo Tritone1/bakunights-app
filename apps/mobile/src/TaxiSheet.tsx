@@ -1,7 +1,7 @@
 import * as Clipboard from "expo-clipboard";
 import { Ionicons } from "@expo/vector-icons";
 import { useState } from "react";
-import { Linking, Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { Linking, Modal, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 
 import type { Venue } from "./venues";
 
@@ -20,12 +20,28 @@ export function TaxiSheet({ venue, onClose }: Props) {
   }
 
   async function openBolt() {
-    await Linking.openURL("https://bolt.eu/");
+    await Clipboard.setStringAsync(`${venue?.name}, ${venue?.address}`);
+    setCopied(true);
+    try {
+      await Linking.openURL("bolt://");
+    } catch {
+      const storeUrl = Platform.select({
+        ios: "https://apps.apple.com/app/bolt-request-a-ride/id675033630",
+        android: "https://play.google.com/store/apps/details?id=ee.mtakso.client",
+        default: "https://bolt.eu/",
+      });
+      await Linking.openURL(storeUrl);
+    }
   }
 
   async function openGoogleMaps() {
     const destination = `${venue?.latitude},${venue?.longitude}`;
     await Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(destination)}&travelmode=driving`);
+  }
+
+  async function openWaze() {
+    const destination = `${venue?.latitude},${venue?.longitude}`;
+    await Linking.openURL(`https://waze.com/ul?ll=${encodeURIComponent(destination)}&navigate=yes&zoom=17&utm_source=bakunights`);
   }
 
   return (
@@ -54,14 +70,14 @@ export function TaxiSheet({ venue, onClose }: Props) {
               <View style={styles.boltLogo}><Text style={styles.boltText}>bolt</Text></View>
               <View><Text style={styles.providerName}>Bolt</Text><Text style={styles.providerCaption}>Ride-hailing app</Text></View>
             </View>
-            <Text style={styles.help}>Copy the destination, then open Bolt and paste it into the destination field.</Text>
+            <Text style={styles.help}>We copy the destination and open the Bolt app. Paste it into Bolt&apos;s destination field to continue.</Text>
             <View style={styles.actions}>
               <Pressable onPress={copyDestination} style={styles.copyButton} accessibilityRole="button">
                 <Ionicons name={copied ? "checkmark" : "copy-outline"} color="#ffffff" size={16} />
                 <Text style={styles.copyText}>{copied ? "Copied" : "Copy destination"}</Text>
               </Pressable>
               <Pressable onPress={openBolt} style={styles.boltButton} accessibilityRole="button">
-                <Text style={styles.boltButtonText}>Open Bolt</Text>
+                <Text style={styles.boltButtonText}>Open Bolt app</Text>
                 <Ionicons name="arrow-forward" color="#07150d" size={16} />
               </Pressable>
             </View>
@@ -76,6 +92,16 @@ export function TaxiSheet({ venue, onClose }: Props) {
             <Pressable onPress={openGoogleMaps} style={styles.mapsButton} accessibilityRole="button">
               <Text style={styles.mapsButtonText}>Open Google Maps</Text>
               <Ionicons name="arrow-forward" color="#ffffff" size={16} />
+            </Pressable>
+          </View>
+          <View style={styles.wazeProvider}>
+            <View style={styles.providerRow}>
+              <View style={styles.wazeLogo}><Ionicons name="navigate" color="#07151a" size={23} /></View>
+              <View><Text style={styles.providerName}>Waze</Text><Text style={styles.providerCaption}>Destination ready in the Waze app</Text></View>
+            </View>
+            <Pressable onPress={openWaze} style={styles.wazeButton} accessibilityRole="button">
+              <Text style={styles.wazeButtonText}>Open destination in Waze</Text>
+              <Ionicons name="arrow-forward" color="#07151a" size={16} />
             </Pressable>
           </View>
           <Text style={styles.disclaimer}>Your route stays in Haragedek unless you choose one of these external apps. Haragedek is not affiliated with either service.</Text>
@@ -99,10 +125,12 @@ const styles = StyleSheet.create({
   address: { color: "#8f8f9d", fontSize: 13, marginTop: 4 },
   provider: { marginTop: 14, padding: 16, borderRadius: 18, backgroundColor: "rgba(47,223,132,0.07)", borderWidth: 1, borderColor: "rgba(47,223,132,0.25)" },
   mapsProvider: { marginTop: 10, padding: 16, borderRadius: 18, backgroundColor: "rgba(66,133,244,0.08)", borderWidth: 1, borderColor: "rgba(66,133,244,0.3)" },
+  wazeProvider: { marginTop: 10, padding: 16, borderRadius: 18, backgroundColor: "rgba(51,204,255,0.08)", borderWidth: 1, borderColor: "rgba(51,204,255,0.3)" },
   providerRow: { flexDirection: "row", alignItems: "center", gap: 12 },
   boltLogo: { width: 46, height: 46, borderRadius: 13, backgroundColor: "#2fdf84", alignItems: "center", justifyContent: "center" },
   boltText: { color: "#07150d", fontSize: 18, fontWeight: "900", letterSpacing: -1.5 },
   mapsLogo: { width: 46, height: 46, borderRadius: 13, backgroundColor: "#4285f4", alignItems: "center", justifyContent: "center" },
+  wazeLogo: { width: 46, height: 46, borderRadius: 13, backgroundColor: "#33ccff", alignItems: "center", justifyContent: "center" },
   providerName: { color: "#ffffff", fontSize: 16, fontWeight: "700" },
   providerCaption: { color: "#8f8f9d", fontSize: 12, marginTop: 2 },
   help: { color: "#9a9aa7", fontSize: 12, lineHeight: 18, marginTop: 14 },
@@ -113,5 +141,7 @@ const styles = StyleSheet.create({
   boltButtonText: { color: "#07150d", fontWeight: "800", fontSize: 12 },
   mapsButton: { minHeight: 48, borderRadius: 14, backgroundColor: "#4285f4", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7, marginTop: 14 },
   mapsButtonText: { color: "#ffffff", fontWeight: "800", fontSize: 12 },
+  wazeButton: { minHeight: 48, borderRadius: 14, backgroundColor: "#33ccff", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7, marginTop: 14 },
+  wazeButtonText: { color: "#07151a", fontWeight: "800", fontSize: 12 },
   disclaimer: { color: "#5f5f6c", fontSize: 10, lineHeight: 15, textAlign: "center", marginTop: 14 },
 });

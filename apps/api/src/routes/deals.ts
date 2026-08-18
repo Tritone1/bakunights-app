@@ -6,6 +6,7 @@ import { milesBetween } from "../lib/distance.js";
 import { requireAuth } from "../middleware/auth.js";
 import QRCode from "qrcode";
 import type { Prisma } from "@prisma/client";
+import { recomputeVenueTrust } from "../lib/trust.js";
 
 export const dealsRouter = Router();
 
@@ -25,6 +26,8 @@ const include = {
   restaurant: true,
   ratings: { select: { value: true } },
   _count: { select: { savedBy: true, redemptions: true } },
+  scopeCategory: true,
+  offerMenuItems: { include: { menuItem: { include: { category: true } } } },
 } as const;
 
 type IncludedDeal = Prisma.DealGetPayload<{ include: typeof include }>;
@@ -94,6 +97,7 @@ dealsRouter.get("/:id", asyncRoute(async (req, res) => {
   })) : false;
   const redemption = req.user ? await prisma.redemption.findUnique({
     where: { userId_dealId: { userId: req.user.id, dealId: deal.id } },
+    include: { feedback: true },
   }) : null;
   const redemptionWithQr = redemption ? { ...redemption, qrDataUrl: await QRCode.toDataURL(redemption.redemptionCode, { width: 320, margin: 2 }) } : null;
   res.json({ deal: serializeDeal(deal), saved, followed, redemption: redemptionWithQr });
@@ -129,6 +133,31 @@ dealsRouter.post("/:id/claim", requireAuth, asyncRoute(async (req, res) => {
   });
   const qrDataUrl = await QRCode.toDataURL(redemption.redemptionCode, { width: 320, margin: 2 });
   res.status(201).json({ redemption: { ...redemption, qrDataUrl } });
+}));
+
+dealsRouter.post("/:id/feedback", requireAuth, asyncRoute(async (req, res) => {
+  const dealId = z.string().parse(req.params.id);
+  const input = z.object({ wasHonored: z.boolean(), comment: z.string().trim().max(500).nullable().optional() }).parse(req.body);
+  const redemption = await prisma.redemption.findUnique({
+    where: { userId_dealId: { userId: req.user!.id, dealId } },
+    include: { deal: { select: { restaurantId: true } } },
+  });
+  if (!redemption?.redeemedAt) throw new HttpError(403, "Feedback becomes available after the venue verifies your QR/code.");
+  const feedback = await prisma.redemptionFeedback.upsert({
+    where: { redemptionId: redemption.id },
+    create: { redemptionId: redemption.id, wasHonored: input.wasHonored, comment: input.wasHonored ? null : input.comment || null },
+    update: { wasHonored: input.wasHonored, comment: input.wasHonored ? null : input.comment || null },
+  });
+  await recomputeVenueTrust(redemption.deal.restaurantId);
+  res.json({ feedback });
+}));
+
+dealsRouter.post("/:id/feedback/skip", requireAuth, asyncRoute(async (req, res) => {
+  const dealId = z.string().parse(req.params.id);
+  const redemption = await prisma.redemption.findUnique({ where: { userId_dealId: { userId: req.user!.id, dealId } } });
+  if (!redemption?.redeemedAt) throw new HttpError(403, "There is no completed redemption to dismiss.");
+  await prisma.redemption.update({ where: { id: redemption.id }, data: { feedbackSkippedAt: new Date() } });
+  res.status(204).end();
 }));
 
 dealsRouter.put("/:id/rating", requireAuth, asyncRoute(async (req, res) => {

@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import { Alert, Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { useAuth } from "@/src/AuthContext";
 import { useUserLocation } from "@/src/LocationContext";
 import { VENUES, type Venue } from "@/src/venues";
 
@@ -24,6 +25,7 @@ export default function DiscoverScreen() {
   const [category, setCategory] = useState<(typeof CATEGORIES)[number]>("All");
   const [query, setQuery] = useState("");
   const [saved, setSaved] = useState<Set<number>>(new Set());
+  const { user, loading: authLoading, logout } = useAuth();
   const { coords: location, loading: locating, error: locationError, requestLocation } = useUserLocation();
 
   const venues = useMemo(() => {
@@ -45,6 +47,13 @@ export default function DiscoverScreen() {
     });
   }
 
+  function openAccountMenu() {
+    Alert.alert(user?.name || "Your account", user?.email, [
+      { text: "Cancel", style: "cancel" },
+      { text: "Log out", style: "destructive", onPress: () => void logout() },
+    ]);
+  }
+
   return (
     <SafeAreaView style={styles.safeArea} edges={["top"]}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
@@ -55,6 +64,21 @@ export default function DiscoverScreen() {
             <Text style={[styles.locationText, location && styles.locationTextActive]}>{locating ? "Finding…" : location ? "Location active" : "Find me"}</Text>
           </Pressable>
         </View>
+        {!authLoading && !user && <View style={styles.authActions}>
+          <Pressable onPress={() => router.push("/login/customer" as never)} style={styles.customerLogin} accessibilityRole="button">
+            <Ionicons name="person-outline" color="#ffffff" size={16} />
+            <Text style={styles.customerLoginText}>Customer login</Text>
+          </Pressable>
+          <Pressable onPress={() => router.push("/login/merchant" as never)} style={styles.merchantLogin} accessibilityRole="button">
+            <Ionicons name="storefront-outline" color="#09090e" size={16} />
+            <Text style={styles.merchantLoginText}>Merchant login</Text>
+          </Pressable>
+        </View>}
+        {!authLoading && user && <Pressable onPress={openAccountMenu} style={styles.accountBar} accessibilityRole="button">
+          <View style={styles.accountAvatar}><Text style={styles.accountAvatarText}>{user.name.slice(0, 1).toUpperCase()}</Text></View>
+          <View style={styles.accountCopy}><Text style={styles.accountName}>{user.name}</Text><Text style={styles.accountRole}>{user.role === "MERCHANT" ? "Merchant account" : "Customer account"}</Text></View>
+          <Ionicons name="chevron-down" color="#8f8f9d" size={18} />
+        </Pressable>}
         {locationError && <Pressable onPress={findMe} style={styles.locationError} accessibilityRole="button"><Ionicons name="warning-outline" color="#f59e0b" size={17} /><Text style={styles.locationErrorText}>{locationError} Tap to retry.</Text></Pressable>}
 
         <View style={styles.hero}>
@@ -104,6 +128,17 @@ const styles = StyleSheet.create({
   locationActive: { backgroundColor: "#f59e0b", borderColor: "#f59e0b" },
   locationText: { color: "#f59e0b", fontWeight: "700", fontSize: 11 },
   locationTextActive: { color: "#09090e" },
+  authActions: { marginHorizontal: 18, marginBottom: 8, flexDirection: "row", gap: 9 },
+  customerLogin: { flex: 1, height: 44, borderRadius: 14, borderWidth: 1, borderColor: "rgba(255,255,255,0.14)", backgroundColor: "#15151e", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7 },
+  customerLoginText: { color: "#ffffff", fontSize: 12, fontWeight: "800" },
+  merchantLogin: { flex: 1, height: 44, borderRadius: 14, backgroundColor: "#f59e0b", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7 },
+  merchantLoginText: { color: "#09090e", fontSize: 12, fontWeight: "900" },
+  accountBar: { marginHorizontal: 18, marginBottom: 8, minHeight: 52, borderRadius: 15, borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", backgroundColor: "#15151e", paddingHorizontal: 11, flexDirection: "row", alignItems: "center", gap: 10 },
+  accountAvatar: { width: 34, height: 34, borderRadius: 11, backgroundColor: "#f59e0b", alignItems: "center", justifyContent: "center" },
+  accountAvatarText: { color: "#09090e", fontSize: 14, fontWeight: "900" },
+  accountCopy: { flex: 1 },
+  accountName: { color: "#ffffff", fontSize: 13, fontWeight: "800" },
+  accountRole: { color: "#777785", fontSize: 10, marginTop: 2 },
   locationError: { marginHorizontal: 18, marginBottom: 8, borderRadius: 14, borderWidth: 1, borderColor: "rgba(245,158,11,0.3)", backgroundColor: "rgba(245,158,11,0.08)", paddingHorizontal: 12, paddingVertical: 10, flexDirection: "row", alignItems: "center", gap: 8 },
   locationErrorText: { color: "#f8cf83", fontSize: 11, lineHeight: 16, flex: 1 },
   hero: { marginHorizontal: 18, marginTop: 10, borderRadius: 24, padding: 22, overflow: "hidden", backgroundColor: "#15151e", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)" },

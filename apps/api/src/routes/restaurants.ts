@@ -6,6 +6,18 @@ import { requireAuth } from "../middleware/auth.js";
 
 export const restaurantsRouter = Router();
 
+restaurantsRouter.get("/:id/photo", asyncRoute(async (req, res) => {
+  const restaurantId = z.string().parse(req.params.id);
+  const restaurant = await prisma.restaurant.findUnique({
+    where: { id: restaurantId },
+    select: { owner: { select: { merchantVenueImage: true, merchantVenueImageMime: true } } },
+  });
+  if (!restaurant?.owner?.merchantVenueImage || !restaurant.owner.merchantVenueImageMime) throw new HttpError(404, "Venue image not found.");
+  res.setHeader("Content-Type", restaurant.owner.merchantVenueImageMime);
+  res.setHeader("Cache-Control", "public, max-age=3600");
+  res.send(Buffer.from(restaurant.owner.merchantVenueImage));
+}));
+
 restaurantsRouter.get("/", asyncRoute(async (req, res) => {
   const { query } = z.object({ query: z.string().trim().max(100).default("") }).parse(req.query);
   const restaurants = await prisma.restaurant.findMany({
