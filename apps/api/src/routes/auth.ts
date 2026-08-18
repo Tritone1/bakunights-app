@@ -98,7 +98,10 @@ authRouter.post("/signup", merchantImageUpload, asyncRoute(async (req, res) => {
 
   assertRateLimit([`signup:ip:${clientIp(req)}`, `signup:email:${input.email}`], 5, 15 * 60 * 1000);
   const existing = await prisma.user.findUnique({ where: { email: input.email } });
-  if (existing) throw new HttpError(409, "An account with that email already exists.", "EMAIL_EXISTS");
+  if (existing?.emailVerifiedAt) throw new HttpError(409, "An account with that email already exists.", "EMAIL_EXISTS");
+  // A previous SMTP failure must not permanently reserve an email address.
+  // Unverified accounts cannot log in and are safe to replace on a fresh signup.
+  if (existing) await prisma.user.delete({ where: { id: existing.id } });
 
   const storedVenueImageUrl = input.accountType === "MERCHANT" && req.file
     ? await persistImageBuffer(req.file.buffer, req.file.mimetype, "venues")
@@ -128,7 +131,8 @@ authRouter.post("/signup", merchantImageUpload, asyncRoute(async (req, res) => {
     ({ verificationUrl, delivered: emailDelivered } = await issueVerificationToken(user));
   } catch (error) {
     console.error("Verification email delivery failed", error);
-    throw new HttpError(502, "Your account was created, but the verification email could not be sent. Use resend verification to try again.", "EMAIL_SEND_FAILED");
+    await prisma.user.deleteMany({ where: { id: user.id, emailVerifiedAt: null } });
+    throw new HttpError(502, "The verification email could not be sent, so no account was saved. Please try again in a moment.", "EMAIL_SEND_FAILED");
   }
 
   res.status(201).json({
