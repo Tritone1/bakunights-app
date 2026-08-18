@@ -6,7 +6,8 @@ import helmet from "helmet";
 import morgan from "morgan";
 import pg from "pg";
 import { existsSync } from "node:fs";
-import { resolve } from "node:path";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { env } from "./env.js";
 import { passport } from "./auth/passport.js";
 import { prisma } from "./db.js";
@@ -73,7 +74,7 @@ app.use("/api/admin", adminRouter);
 app.use("/api/push", pushRouter);
 app.use("/api/places", placesRouter);
 if (env.NODE_ENV === "production") {
-  const webDist = resolve(process.cwd(), "apps/web/dist");
+  const webDist = resolve(dirname(fileURLToPath(import.meta.url)), "../../web/dist");
   if (existsSync(webDist)) {
     app.use(express.static(webDist));
     app.use((req, res, next) => {
