@@ -108,12 +108,14 @@ CLOUDINARY_PUBLIC_BASE_URL="https://res.cloudinary.com/your-cloud-name/image/upl
 ### Google Maps
 
 ```dotenv
-GOOGLE_MAPS_API_KEY="server-key-for-place-search"
+GOOGLE_MAPS_SERVER_API_KEY="server-key-for-place-search"
 VITE_GOOGLE_MAPS_API_KEY="browser-key-for-maps-javascript-api"
 VITE_GOOGLE_MAPS_MAP_ID="optional-cloud-map-id"
 ```
 
-For a small setup, the same restricted key can be used for both key variables if it has the required APIs enabled. In Google Cloud Console, manually:
+`VITE_GOOGLE_MAPS_API_KEY` is the only source of truth for browser map rendering and the visible configured/fallback state. `GOOGLE_MAPS_SERVER_API_KEY` is only used by the backend `/api/places` autocomplete and place-details requests.
+
+Use separate restricted keys for browser and server contexts. In Google Cloud Console, manually:
 
 1. Enable billing for the Google Cloud project.
 2. Enable **Maps JavaScript API**, **Places API (New)**, **Geocoding API**, and **Directions API** as used by the application.

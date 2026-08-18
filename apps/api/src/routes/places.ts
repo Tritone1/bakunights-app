@@ -6,7 +6,7 @@ import { asyncRoute, HttpError } from "../lib/http.js";
 export const placesRouter = Router();
 
 function assertConfigured() {
-  if (!env.GOOGLE_MAPS_API_KEY) throw new HttpError(503, "Location search is not configured. Enter coordinates instead.");
+  if (!env.GOOGLE_MAPS_SERVER_API_KEY) throw new HttpError(503, "Location search is not configured. Enter coordinates instead.");
 }
 
 placesRouter.get("/autocomplete", asyncRoute(async (req, res) => {
@@ -16,7 +16,7 @@ placesRouter.get("/autocomplete", asyncRoute(async (req, res) => {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "X-Goog-Api-Key": env.GOOGLE_MAPS_API_KEY!,
+      "X-Goog-Api-Key": env.GOOGLE_MAPS_SERVER_API_KEY!,
       "X-Goog-FieldMask": "suggestions.placePrediction.placeId,suggestions.placePrediction.text.text",
     },
     body: JSON.stringify({ input: query.input }),
@@ -33,7 +33,7 @@ placesRouter.get("/:placeId", asyncRoute(async (req, res) => {
   const placeId = encodeURIComponent(z.string().min(1).parse(req.params.placeId));
   const response = await fetch(`https://places.googleapis.com/v1/places/${placeId}`, {
     headers: {
-      "X-Goog-Api-Key": env.GOOGLE_MAPS_API_KEY!,
+      "X-Goog-Api-Key": env.GOOGLE_MAPS_SERVER_API_KEY!,
       "X-Goog-FieldMask": "id,displayName,formattedAddress,location",
     },
   });

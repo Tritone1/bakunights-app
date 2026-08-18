@@ -108,8 +108,7 @@ app.use(errorHandler);
 
 const server = app.listen(env.PORT, env.API_HOST, () => {
   console.log(`Grub Stub API listening on http://${env.API_HOST}:${env.PORT}`);
-  if (!env.GOOGLE_MAPS_API_KEY) console.warn("[configuration] GOOGLE_MAPS_API_KEY is unset; server-side place search is disabled.");
-  if (!env.VITE_GOOGLE_MAPS_API_KEY) console.warn("[configuration] VITE_GOOGLE_MAPS_API_KEY was unset at build/runtime; the web app will use OpenStreetMap.");
+  if (!env.GOOGLE_MAPS_SERVER_API_KEY) console.warn("[configuration] GOOGLE_MAPS_SERVER_API_KEY is unset; server-side place search is disabled.");
   if (!isImageStorageConfigured()) console.warn("[configuration] Cloudinary is unset; uploaded images use the persistent PostgreSQL fallback.");
 });
 
