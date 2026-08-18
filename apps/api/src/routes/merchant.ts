@@ -5,6 +5,7 @@ import { asyncRoute, HttpError } from "../lib/http.js";
 import { requireAuth, requireMerchant } from "../middleware/auth.js";
 import multer from "multer";
 import { env } from "../env.js";
+import { persistImage } from "../lib/image-storage.js";
 
 export const merchantRouter = Router();
 const menuUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
@@ -125,7 +126,7 @@ merchantRouter.post("/venues/:venueId/menu", asyncRoute(async (req, res) => {
   const input = menuItemInput.parse(req.body);
   const category = await prisma.menuCategory.findUnique({ where: { id: input.categoryId } });
   if (!category) throw new HttpError(400, "Menu category not found.");
-  const item = await prisma.menuItem.create({ data: { ...input, venueId } });
+  const item = await prisma.menuItem.create({ data: { ...input, photoUrl: await persistImage(input.photoUrl, "menu-items"), venueId } });
   res.status(201).json({ item: { ...item, priceAzn: Number(item.priceAzn) } });
 }));
 
@@ -136,7 +137,7 @@ merchantRouter.patch("/menu/items/:id", asyncRoute(async (req, res) => {
   await assertOwner(req.user!.id, existing.venueId);
   const input = menuItemInput.partial().parse(req.body);
   if (input.categoryId && !await prisma.menuCategory.findUnique({ where: { id: input.categoryId } })) throw new HttpError(400, "Menu category not found.");
-  const item = await prisma.menuItem.update({ where: { id }, data: input });
+  const item = await prisma.menuItem.update({ where: { id }, data: { ...input, photoUrl: input.photoUrl === undefined ? undefined : await persistImage(input.photoUrl, "menu-items") } });
   res.json({ item: { ...item, priceAzn: Number(item.priceAzn) } });
 }));
 
@@ -146,7 +147,8 @@ merchantRouter.post("/venues/:venueId/menu/bulk", asyncRoute(async (req, res) =>
   const { items } = z.object({ items: z.array(menuItemInput).min(1).max(200) }).parse(req.body);
   const categoryIds = [...new Set(items.map((item) => item.categoryId))];
   if (await prisma.menuCategory.count({ where: { id: { in: categoryIds } } }) !== categoryIds.length) throw new HttpError(400, "One or more menu categories are invalid.");
-  const result = await prisma.menuItem.createMany({ data: items.map((item) => ({ ...item, venueId })) });
+  const storedItems = await Promise.all(items.map(async (item) => ({ ...item, photoUrl: await persistImage(item.photoUrl, "menu-items"), venueId })));
+  const result = await prisma.menuItem.createMany({ data: storedItems });
   res.status(201).json({ created: result.count });
 }));
 
@@ -253,6 +255,7 @@ merchantRouter.get("/dashboard", asyncRoute(async (req, res) => {
         merchantVenueLat: true,
         merchantVenueLng: true,
         merchantVenueImage: true,
+        merchantVenueImageUrl: true,
       },
     });
     if (profile?.merchantVenueName && profile.merchantVenueAddress && profile.merchantVenueLat != null && profile.merchantVenueLng != null) {
@@ -267,9 +270,10 @@ merchantRouter.get("/dashboard", asyncRoute(async (req, res) => {
           claimStatus: "verified",
           isActive: true,
           verificationNotes: "Created from verified merchant registration.",
+          photoUrl: profile.merchantVenueImageUrl,
         },
       });
-      if (profile.merchantVenueImage) {
+      if (!profile.merchantVenueImageUrl && profile.merchantVenueImage) {
         venue = await prisma.restaurant.update({ where: { id: venue.id }, data: { photoUrl: `/api/restaurants/${venue.id}/photo` } });
       }
       restaurants = await prisma.restaurant.findMany({ where: { id: venue.id }, include: includeDashboard });
@@ -282,7 +286,8 @@ merchantRouter.post("/deals", asyncRoute(async (req, res) => {
   const input = dealInput.parse(req.body);
   await assertOwner(req.user!.id, input.restaurantId);
   await assertOfferScope(input.restaurantId, input);
-  const resolvedPhotoUrl = await assertOfferPhoto(input.restaurantId, input);
+  const storedPhotoUrl = await persistImage(input.photoUrl, "offers");
+  const resolvedPhotoUrl = await assertOfferPhoto(input.restaurantId, { ...input, photoUrl: storedPhotoUrl });
   const now = new Date();
   const { menuItemIds, menuItemOverrides, ...dealData } = input;
   const deal = await prisma.deal.create({
@@ -313,7 +318,8 @@ merchantRouter.patch("/deals/:id", asyncRoute(async (req, res) => {
   const nextCategoryId = input.scopeCategoryId === undefined ? existing.scopeCategoryId : input.scopeCategoryId;
   const nextItemIds = input.menuItemIds ?? (await prisma.offerMenuItem.findMany({ where: { offerId: existing.id }, select: { menuItemId: true } })).map((item) => item.menuItemId);
   await assertOfferScope(input.restaurantId ?? existing.restaurantId, { scope: nextScope, scopeCategoryId: nextCategoryId, menuItemIds: nextItemIds });
-  const resolvedPhotoUrl = await assertOfferPhoto(input.restaurantId ?? existing.restaurantId, { photoUrl: input.photoUrl === undefined ? existing.photoUrl : input.photoUrl, scope: nextScope, scopeCategoryId: nextCategoryId, menuItemIds: nextItemIds });
+  const storedPhotoUrl = input.photoUrl === undefined ? existing.photoUrl : await persistImage(input.photoUrl, "offers");
+  const resolvedPhotoUrl = await assertOfferPhoto(input.restaurantId ?? existing.restaurantId, { photoUrl: storedPhotoUrl, scope: nextScope, scopeCategoryId: nextCategoryId, menuItemIds: nextItemIds });
   const now = new Date();
   const { menuItemIds: _menuItemIds, menuItemOverrides, ...dealChanges } = input;
   const deal = await prisma.$transaction(async (tx) => {

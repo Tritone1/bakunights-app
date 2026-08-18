@@ -65,6 +65,7 @@ model User {
   merchantVenueImage Bytes?          @map("merchant_venue_image")
   merchantVenueImageMime String?     @map("merchant_venue_image_mime")
   merchantVenueImageName String?     @map("merchant_venue_image_name")
+  merchantVenueImageUrl String?      @map("merchant_venue_image_url") @db.Text
   merchantVenueAddress String?       @map("merchant_venue_address")
   merchantVenueLat Float?            @map("merchant_venue_lat")
   merchantVenueLng Float?            @map("merchant_venue_lng")

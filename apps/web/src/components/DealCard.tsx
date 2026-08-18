@@ -2,13 +2,14 @@ import { Bookmark, CheckCircle2, Clock3, MapPin, Star } from "lucide-react";
 import { Link } from "react-router-dom";
 import { formatDistanceToNowStrict } from "date-fns";
 import type { Deal } from "../types";
+import { SafeImage } from "./SafeImage";
 
 export function DealCard({ deal, onSave, saved = false }: { deal: Deal; onSave?: (deal: Deal) => void; saved?: boolean }) {
   const badge = offerBadge(deal);
   return <article className="ticket group overflow-hidden rounded-xl transition hover:-translate-y-1">
     <Link to={`/deals/${deal.id}`} className="block">
       <div className="relative h-44 overflow-hidden bg-primary-50 sm:h-48">
-        {deal.photoUrl || deal.restaurant.photoUrl ? <img src={deal.photoUrl || deal.restaurant.photoUrl} alt="" className="h-full w-full object-cover transition duration-500 group-hover:scale-105" /> : <div className="map-grid h-full" />}
+        <SafeImage src={deal.photoUrl || deal.restaurant.photoUrl || undefined} alt={`${deal.restaurant.name} offer`} className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />
         <span className="absolute left-3 top-3 border-2 border-ink bg-accent-500 px-2 py-1 font-mono text-[10px] font-semibold uppercase text-white">{deal.tag}</span>
         <div className="stamp absolute -right-1 -top-2 flex h-[92px] w-[92px] items-center justify-center rounded-full text-center text-white drop-shadow-md">
           <span className="relative px-2 font-display text-[22px] font-bold uppercase leading-none">{badge.main}<small className="block text-[10px] tracking-widest">{badge.sub}</small></span>

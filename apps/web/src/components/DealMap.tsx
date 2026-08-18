@@ -1,12 +1,14 @@
 import { AdvancedMarker, APIProvider, Map as GoogleMap } from "@vis.gl/react-google-maps";
 import { Link } from "react-router-dom";
 import type { Deal } from "../types";
+import { useState } from "react";
 
 export function DealMap({ deals, center }: { deals: Deal[]; center: { lat: number; lng: number } }) {
   const key = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined;
-  if (!key) return <FallbackMap deals={deals} center={center} />;
+  const [googleFailed, setGoogleFailed] = useState(false);
+  if (!key || googleFailed) return <FallbackMap deals={deals} center={center} reason={key ? "Google Maps failed to load. OpenStreetMap-style preview is active." : "Google Maps is not configured. Map preview is active."} />;
   return <div className="relative h-[62vh] min-h-[430px] overflow-hidden rounded-xl border-2 border-ink shadow-ticket">
-    <APIProvider apiKey={key}>
+    <APIProvider apiKey={key} onError={(error) => { console.error("BakuNights deal map Google Maps failed:", error); setGoogleFailed(true); }}>
       <GoogleMap defaultCenter={center} defaultZoom={13} mapId="DEMO_MAP_ID" gestureHandling="greedy" disableDefaultUI={false}>
         <AdvancedMarker position={center} title="Your location">
           <div className="flex h-6 w-6 items-center justify-center rounded-full border-2 border-white bg-primary-500 shadow-lg">
@@ -21,7 +23,7 @@ export function DealMap({ deals, center }: { deals: Deal[]; center: { lat: numbe
   </div>;
 }
 
-function FallbackMap({ deals, center }: { deals: Deal[]; center: { lat: number; lng: number } }) {
+function FallbackMap({ deals, center, reason }: { deals: Deal[]; center: { lat: number; lng: number }; reason: string }) {
   if (!deals.length) return null;
   const lats = deals.map((deal) => deal.restaurant.lat); 
   const lngs = deals.map((deal) => deal.restaurant.lng);
@@ -34,7 +36,7 @@ function FallbackMap({ deals, center }: { deals: Deal[]; center: { lat: number; 
   const userTop = minLat === maxLat ? 50 : 12 + (1 - (center.lat - minLat) / (maxLat - minLat)) * 76;
   
   return <div className="map-grid relative h-[62vh] min-h-[430px] overflow-hidden rounded-xl border-2 border-ink shadow-ticket" aria-label="Map preview">
-    <div className="absolute left-3 top-3 z-10 border-2 border-ink bg-cream p-2 font-mono text-[10px] font-semibold uppercase">Add a Google Maps key for street detail</div>
+    <div className="absolute left-3 top-3 z-10 max-w-72 border-2 border-ink bg-cream p-2 font-mono text-[10px] font-semibold uppercase">{reason}</div>
     <div style={{ left: `${userLeft}%`, top: `${userTop}%` }} className="absolute flex h-6 w-6 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-2 border-white bg-primary-500 shadow-md z-10" aria-label="Your location">
       <div className="h-3 w-3 rounded-full bg-white"></div>
     </div>

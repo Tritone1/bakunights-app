@@ -22,13 +22,33 @@ import { placesRouter } from "./routes/places.js";
 import { errorHandler, notFound } from "./lib/http.js";
 import { sendSavedDealExpiryNotifications } from "./lib/push.js";
 import { recomputeAllVenueTrust } from "./lib/trust.js";
+import { isImageStorageConfigured } from "./lib/image-storage.js";
 
 const app = express();
 const PgSession = connectPgSimple(session);
 const pool = new pg.Pool({ connectionString: env.DATABASE_URL });
 
 app.set("trust proxy", 1);
-app.use(helmet({ crossOriginResourcePolicy: { policy: "cross-origin" } }));
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" },
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      baseUri: ["'self'"],
+      fontSrc: ["'self'", "data:", "https://fonts.gstatic.com"],
+      formAction: ["'self'"],
+      frameAncestors: ["'self'"],
+      frameSrc: ["'self'", "https://www.openstreetmap.org", "https://www.google.com"],
+      imgSrc: ["'self'", "data:", "blob:", "https:"],
+      objectSrc: ["'none'"],
+      scriptSrc: ["'self'", "https://maps.googleapis.com", "https://maps.gstatic.com"],
+      scriptSrcAttr: ["'none'"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      connectSrc: ["'self'", "https://maps.googleapis.com", "https://maps.gstatic.com", "https://router.project-osrm.org", "https://routing.openstreetmap.de"],
+      workerSrc: ["'self'", "blob:"],
+    },
+  },
+}));
 app.use(cors({
   origin(origin, callback) {
     const allowedOrigins = new Set([
@@ -88,6 +108,9 @@ app.use(errorHandler);
 
 const server = app.listen(env.PORT, env.API_HOST, () => {
   console.log(`Grub Stub API listening on http://${env.API_HOST}:${env.PORT}`);
+  if (!env.GOOGLE_MAPS_API_KEY) console.warn("[configuration] GOOGLE_MAPS_API_KEY is unset; server-side place search is disabled.");
+  if (!env.VITE_GOOGLE_MAPS_API_KEY) console.warn("[configuration] VITE_GOOGLE_MAPS_API_KEY was unset at build/runtime; the web app will use OpenStreetMap.");
+  if (!isImageStorageConfigured()) console.warn("[configuration] Cloudinary is unset; uploaded images use the persistent PostgreSQL fallback.");
 });
 
 async function expireStaleDeals() {

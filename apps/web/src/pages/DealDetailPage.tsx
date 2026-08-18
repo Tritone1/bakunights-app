@@ -7,6 +7,7 @@ import type { Deal, Redemption } from "../types";
 import { DealMap } from "../components/DealMap";
 import { ErrorState, LoadingState } from "../components/States";
 import { useAuth } from "../context/AuthContext";
+import { SafeImage } from "../components/SafeImage";
 
 type DetailResponse = { deal: Deal; saved: boolean; followed: boolean; redemption: Redemption | null };
 
@@ -73,7 +74,7 @@ export function DealDetailPage() {
 
   return <div className="pb-8">
     <div className="relative h-64 border-b-2 border-ink bg-primary-50 sm:h-80 md:mx-8 md:mt-6 md:overflow-hidden md:rounded-xl md:border-2">
-      {(deal.photoUrl || restaurant.photoUrl) && <img src={deal.photoUrl || restaurant.photoUrl} alt={`${restaurant.name} offer`} className="h-full w-full object-cover" />}
+      <SafeImage src={deal.photoUrl || restaurant.photoUrl || undefined} alt={`${restaurant.name} offer`} className="h-full w-full object-cover" />
       <div className="absolute inset-0 bg-gradient-to-t from-ink/70 via-transparent to-transparent" />
       <Link to="/" className="absolute left-4 top-4 flex h-11 w-11 items-center justify-center rounded-full border-2 border-ink bg-cream shadow-ticket-sm" aria-label="Back to offers"><ArrowLeft /></Link>
       <div className="stamp absolute right-4 top-4 flex h-28 w-28 items-center justify-center rounded-full text-center text-white"><span className="relative px-2 font-display text-3xl font-bold uppercase leading-none">{badge.main}<small className="block text-xs tracking-widest">{badge.sub}</small></span></div>
@@ -100,7 +101,7 @@ export function DealDetailPage() {
       </div>
 
       <aside className="md:sticky md:top-24 md:self-start">
-        <div className="ticket rounded-xl p-5 text-center"><p className="eyebrow text-primary-500">Your app proof</p>{data.redemption ? <div className="mt-3"><Check className="mx-auto text-primary-500" size={30} /><h2 className="font-display text-2xl font-bold uppercase">Ready to show</h2>{data.redemption.qrDataUrl && <img src={data.redemption.qrDataUrl} alt={`QR code for ${data.redemption.redemptionCode}`} className="mx-auto my-3 w-52 border-2 border-ink" />}<p className="font-mono text-xl font-semibold tracking-wider">{data.redemption.redemptionCode}</p><p className="mt-2 text-xs text-ink/55">Show this QR/code to the restaurant so they can confirm you came from BakuNights.</p></div> : <div className="mt-3"><h2 className="font-display text-2xl font-bold uppercase">Get your QR proof</h2><p className="mt-2 text-sm text-ink/65">Claim this offer in the app, then show the QR/code at the venue.</p><button onClick={() => void claim()} disabled={busy === "claim"} className="btn-primary mt-5 w-full">{busy === "claim" ? "Claiming..." : "Claim offer"}</button></div>}<a href={mapsUrl} target="_blank" rel="noreferrer" className="btn-mustard mt-4 w-full"><Navigation size={18} />Navigate <ExternalLink size={14} /></a></div>
+        <div className="ticket rounded-xl p-5 text-center"><p className="eyebrow text-primary-500">Your app proof</p>{data.redemption ? <div className="mt-3"><Check className="mx-auto text-primary-500" size={30} /><h2 className="font-display text-2xl font-bold uppercase">Ready to show</h2>{data.redemption.qrDataUrl && <SafeImage src={data.redemption.qrDataUrl} alt={`QR code for ${data.redemption.redemptionCode}`} className="mx-auto my-3 w-52 border-2 border-ink" />}<p className="font-mono text-xl font-semibold tracking-wider">{data.redemption.redemptionCode}</p><p className="mt-2 text-xs text-ink/55">Show this QR/code to the restaurant so they can confirm you came from BakuNights.</p></div> : <div className="mt-3"><h2 className="font-display text-2xl font-bold uppercase">Get your QR proof</h2><p className="mt-2 text-sm text-ink/65">Claim this offer in the app, then show the QR/code at the venue.</p><button onClick={() => void claim()} disabled={busy === "claim"} className="btn-primary mt-5 w-full">{busy === "claim" ? "Claiming..." : "Claim offer"}</button></div>}<a href={mapsUrl} target="_blank" rel="noreferrer" className="btn-mustard mt-4 w-full"><Navigation size={18} />Navigate <ExternalLink size={14} /></a></div>
         <p className="mt-4 text-center font-mono text-[10px] uppercase text-ink/50">Always confirm offer details with the restaurant</p>
       </aside>
     </div>

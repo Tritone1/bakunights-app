@@ -7,6 +7,7 @@ import { prisma } from "../db.js";
 import { env } from "../env.js";
 import { asyncRoute, HttpError } from "../lib/http.js";
 import { sendVerificationEmail } from "../lib/email.js";
+import { persistImageBuffer } from "../lib/image-storage.js";
 
 export const authRouter = Router();
 const merchantImageUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 2 * 1024 * 1024, files: 1 } }).single("venueImage");
@@ -99,6 +100,10 @@ authRouter.post("/signup", merchantImageUpload, asyncRoute(async (req, res) => {
   const existing = await prisma.user.findUnique({ where: { email: input.email } });
   if (existing) throw new HttpError(409, "An account with that email already exists.", "EMAIL_EXISTS");
 
+  const storedVenueImageUrl = input.accountType === "MERCHANT" && req.file
+    ? await persistImageBuffer(req.file.buffer, req.file.mimetype, "venues")
+    : null;
+
   const user = await prisma.user.create({
     data: {
       email: input.email,
@@ -106,8 +111,9 @@ authRouter.post("/signup", merchantImageUpload, asyncRoute(async (req, res) => {
       passwordHash: await bcrypt.hash(input.password, 12),
       role: input.accountType,
       merchantVenueName: input.accountType === "MERCHANT" ? input.venueName : null,
-      merchantVenueImage: input.accountType === "MERCHANT" && req.file ? Uint8Array.from(req.file.buffer) : null,
-      merchantVenueImageMime: input.accountType === "MERCHANT" && req.file ? req.file.mimetype : null,
+      merchantVenueImageUrl: storedVenueImageUrl,
+      merchantVenueImage: input.accountType === "MERCHANT" && req.file && !storedVenueImageUrl ? Uint8Array.from(req.file.buffer) : null,
+      merchantVenueImageMime: input.accountType === "MERCHANT" && req.file && !storedVenueImageUrl ? req.file.mimetype : null,
       merchantVenueImageName: input.accountType === "MERCHANT" && req.file ? req.file.originalname.slice(0, 180) : null,
       merchantVenueAddress: input.accountType === "MERCHANT" ? input.venueAddress : null,
       merchantVenueLat: input.accountType === "MERCHANT" ? input.venueLat : null,

@@ -4,6 +4,7 @@ import { prisma } from "../db.js";
 import { asyncRoute, HttpError } from "../lib/http.js";
 import { requireAdmin } from "../middleware/auth.js";
 import { recomputeVenueTrust } from "../lib/trust.js";
+import { persistImage } from "../lib/image-storage.js";
 
 export const adminRouter = Router();
 const imageValue = z.string().trim().max(3_000_000).refine((value) => /^https?:\/\//i.test(value) || /^data:image\/(jpeg|png|webp);base64,/i.test(value), "Use an image URL or uploaded image");
@@ -118,18 +119,18 @@ adminRouter.get("/menu/catalog", asyncRoute(async (_req, res) => {
 
 adminRouter.post("/menu/catalog", asyncRoute(async (req, res) => {
   const input = z.object({ name: z.string().trim().min(2).max(120), categoryId: z.string().min(1), photoUrl: imageValue.nullable().optional() }).parse(req.body);
-  res.status(201).json({ item: await prisma.catalogItem.create({ data: input }) });
+  res.status(201).json({ item: await prisma.catalogItem.create({ data: { ...input, photoUrl: await persistImage(input.photoUrl, "catalog") } }) });
 }));
 
 adminRouter.patch("/menu/catalog/:id", asyncRoute(async (req, res) => {
   const id = z.string().parse(req.params.id);
   const input = z.object({ name: z.string().trim().min(2).max(120).optional(), categoryId: z.string().min(1).optional(), photoUrl: imageValue.nullable().optional(), isActive: z.boolean().optional() }).parse(req.body);
-  res.json({ item: await prisma.catalogItem.update({ where: { id }, data: input }) });
+  res.json({ item: await prisma.catalogItem.update({ where: { id }, data: { ...input, photoUrl: input.photoUrl === undefined ? undefined : await persistImage(input.photoUrl, "catalog") } }) });
 }));
 
 adminRouter.post("/venues", asyncRoute(async (req, res) => {
   const input = venueInput.parse(req.body);
-  const venue = await prisma.restaurant.create({ data: { ...input, claimStatus: "unclaimed" } });
+  const venue = await prisma.restaurant.create({ data: { ...input, photoUrl: await persistImage(input.photoUrl, "venues"), claimStatus: "unclaimed" } });
   await audit(req.user!.id, "venue_created", "venue", venue.id, "Admin-created venue");
   res.status(201).json({ venue });
 }));
@@ -137,7 +138,7 @@ adminRouter.post("/venues", asyncRoute(async (req, res) => {
 adminRouter.patch("/venues/:id", asyncRoute(async (req, res) => {
   const venueId = z.string().parse(req.params.id);
   const input = venueInput.partial().parse(req.body);
-  const venue = await prisma.restaurant.update({ where: { id: venueId }, data: input });
+  const venue = await prisma.restaurant.update({ where: { id: venueId }, data: { ...input, photoUrl: input.photoUrl === undefined ? undefined : await persistImage(input.photoUrl, "venues") } });
   await audit(req.user!.id, input.isActive === false ? "venue_deactivated" : "venue_updated", "venue", venue.id, input.verificationNotes);
   res.json({ venue });
 }));
@@ -158,10 +159,12 @@ adminRouter.get("/deals", asyncRoute(async (_req, res) => {
 adminRouter.post("/deals", asyncRoute(async (req, res) => {
   const input = dealInput.parse(req.body);
   if (!input.photoUrl) throw new HttpError(400, "Add an offer photo before publishing.", "OFFER_PHOTO_REQUIRED");
+  const storedPhotoUrl = await persistImage(input.photoUrl, "offers");
   const now = new Date();
   const deal = await prisma.deal.create({
     data: {
       ...input,
+      photoUrl: storedPhotoUrl,
       status: "approved",
       isActive: true,
       submittedByUserId: req.user!.id,
@@ -179,7 +182,7 @@ adminRouter.patch("/deals/:id", asyncRoute(async (req, res) => {
   const input = dealInput.partial().parse(req.body);
   const deal = await prisma.deal.update({
     where: { id: dealId },
-    data: { ...input, status: "approved", isActive: true, reviewedByUserId: req.user!.id, reviewedAt: new Date(), reviewNotes: null },
+    data: { ...input, photoUrl: input.photoUrl === undefined ? undefined : await persistImage(input.photoUrl, "offers"), status: "approved", isActive: true, reviewedByUserId: req.user!.id, reviewedAt: new Date(), reviewNotes: null },
   });
   await audit(req.user!.id, "deal_auto_approved", "deal", deal.id, "Admin saved deal");
   res.json({ deal });

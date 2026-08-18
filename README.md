@@ -87,6 +87,41 @@ When Gmail variables are empty in development, the API prints the branded verifi
 
 The web client uses the API workspace for authentication, menus, offers, redemptions, and trust data. Run `npm.cmd run dev:fullstack` when testing those flows.
 
+## Production images and maps
+
+Railway does not load the repository's local `.env` file. Add production variables in **Railway → bakunights-app → Variables** and redeploy after changing any `VITE_*` value, because Vite embeds those values during the build.
+
+### Image storage (Cloudinary)
+
+Merchant venue photos, menu-item photos, catalog photos, and offer photos are uploaded to Cloudinary when these variables are configured:
+
+```dotenv
+CLOUDINARY_CLOUD_NAME="your-cloud-name"
+CLOUDINARY_API_KEY="your-api-key"
+CLOUDINARY_API_SECRET="your-api-secret"
+CLOUDINARY_FOLDER="bakunights"
+CLOUDINARY_PUBLIC_BASE_URL="https://res.cloudinary.com/your-cloud-name/image/upload"
+```
+
+`CLOUDINARY_API_SECRET` must only exist in local `.env` and Railway Variables; never expose it through a `VITE_*` variable or commit it. Existing HTTPS image URLs continue to work. If Cloudinary is not configured, the current PostgreSQL-backed image fallback remains persistent, but Cloudinary is recommended to avoid large database rows and provide CDN delivery. Every web image surface displays a placeholder if its source fails.
+
+### Google Maps
+
+```dotenv
+GOOGLE_MAPS_API_KEY="server-key-for-place-search"
+VITE_GOOGLE_MAPS_API_KEY="browser-key-for-maps-javascript-api"
+VITE_GOOGLE_MAPS_MAP_ID="optional-cloud-map-id"
+```
+
+For a small setup, the same restricted key can be used for both key variables if it has the required APIs enabled. In Google Cloud Console, manually:
+
+1. Enable billing for the Google Cloud project.
+2. Enable **Maps JavaScript API**, **Places API (New)**, **Geocoding API**, and **Directions API** as used by the application.
+3. Add `https://bakunights-app-production.up.railway.app/*` to the browser key's allowed HTTP referrers. Add the custom production domain too if one is introduced.
+4. Redeploy Railway after setting `VITE_GOOGLE_MAPS_API_KEY`.
+
+The API logs configuration warnings during startup. The web interface also reports missing, rejected, or failed Google Maps loading and retains the OpenStreetMap fallback.
+
 ## Venue onboarding and moderation
 
 The API includes merchant publishing and admin monitoring tools for getting real venue offers onto BakuNights.
