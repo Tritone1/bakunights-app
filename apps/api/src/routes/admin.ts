@@ -262,3 +262,73 @@ adminRouter.post("/claim-requests/:id/reject", asyncRoute(async (req, res) => {
   await audit(req.user!.id, "venue_claim_rejected", "venue_claim_request", claim.id, notes);
   res.json({ claim });
 }));
+
+adminRouter.get("/merchant-enrollment-requests", asyncRoute(async (_req, res) => {
+  const enrollments = await prisma.merchantEnrollmentRequest.findMany({
+    where: { status: "pending" },
+    orderBy: { createdAt: "asc" },
+    include: { requestingUser: { select: { id: true, name: true, email: true, role: true } } },
+  });
+  res.json({ enrollments });
+}));
+
+adminRouter.post("/merchant-enrollment-requests/:id/approve", asyncRoute(async (req, res) => {
+  const enrollmentId = z.string().parse(req.params.id);
+  const { notes } = z.object({ notes: z.string().trim().max(2000).optional() }).parse(req.body ?? {});
+  const result = await prisma.$transaction(async (transaction) => {
+    const enrollment = await transaction.merchantEnrollmentRequest.findUnique({
+      where: { id: enrollmentId },
+      include: { requestingUser: true },
+    });
+    if (!enrollment) throw new HttpError(404, "Merchant application not found.");
+    if (enrollment.status !== "pending") throw new HttpError(409, "This merchant application has already been reviewed.");
+    if (enrollment.requestingUser.role !== "CONSUMER") throw new HttpError(409, "The applicant is no longer a customer account.");
+    const venue = await transaction.restaurant.create({
+      data: {
+        name: enrollment.venueName,
+        cuisine: "Restaurant",
+        address: enrollment.venueAddress,
+        lat: enrollment.venueLat,
+        lng: enrollment.venueLng,
+        phone: enrollment.contactPhone,
+        ownerUserId: enrollment.requestingUserId,
+        claimStatus: "verified",
+        verificationNotes: notes || enrollment.proofNotes,
+        isActive: true,
+      },
+    });
+    await transaction.user.update({
+      where: { id: enrollment.requestingUserId },
+      data: {
+        role: "MERCHANT",
+        merchantVenueName: enrollment.venueName,
+        merchantVenueAddress: enrollment.venueAddress,
+        merchantVenueLat: enrollment.venueLat,
+        merchantVenueLng: enrollment.venueLng,
+      },
+    });
+    const reviewed = await transaction.merchantEnrollmentRequest.update({
+      where: { id: enrollment.id },
+      data: { status: "approved", reviewedAt: new Date(), reviewNotes: notes || null },
+    });
+    await transaction.auditLog.create({
+      data: { actorUserId: req.user!.id, action: "merchant_enrollment_approved", targetType: "venue", targetId: venue.id, notes: notes || enrollment.proofNotes },
+    });
+    return { enrollment: reviewed, venue };
+  });
+  res.json(result);
+}));
+
+adminRouter.post("/merchant-enrollment-requests/:id/reject", asyncRoute(async (req, res) => {
+  const enrollmentId = z.string().parse(req.params.id);
+  const { notes } = z.object({ notes: z.string().trim().min(3).max(2000) }).parse(req.body);
+  const existing = await prisma.merchantEnrollmentRequest.findUnique({ where: { id: enrollmentId } });
+  if (!existing) throw new HttpError(404, "Merchant application not found.");
+  if (existing.status !== "pending") throw new HttpError(409, "This merchant application has already been reviewed.");
+  const enrollment = await prisma.merchantEnrollmentRequest.update({
+    where: { id: enrollmentId },
+    data: { status: "rejected", reviewedAt: new Date(), reviewNotes: notes },
+  });
+  await audit(req.user!.id, "merchant_enrollment_rejected", "merchant_enrollment_request", enrollment.id, notes);
+  res.json({ enrollment });
+}));

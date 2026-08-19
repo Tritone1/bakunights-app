@@ -23,6 +23,7 @@ import { errorHandler, notFound } from "./lib/http.js";
 import { sendSavedDealExpiryNotifications } from "./lib/push.js";
 import { recomputeAllVenueTrust } from "./lib/trust.js";
 import { isImageStorageConfigured } from "./lib/image-storage.js";
+import { isEmailDeliveryConfigured } from "./lib/email.js";
 
 const app = express();
 const PgSession = connectPgSimple(session);
@@ -110,7 +111,7 @@ const server = app.listen(env.PORT, env.API_HOST, () => {
   console.log(`Grub Stub API listening on http://${env.API_HOST}:${env.PORT}`);
   if (!env.GOOGLE_MAPS_SERVER_API_KEY) console.warn("[configuration] GOOGLE_MAPS_SERVER_API_KEY is unset; server-side place search is disabled.");
   if (!isImageStorageConfigured()) console.warn("[configuration] Cloudinary is unset; uploaded images use the persistent PostgreSQL fallback.");
-  if (!env.GMAIL_SENDER_EMAIL || !env.GMAIL_APP_PASSWORD) console.warn("[configuration] Gmail verification delivery is disabled; set GMAIL_SENDER_EMAIL and GMAIL_APP_PASSWORD.");
+  if (!isEmailDeliveryConfigured()) console.warn("[configuration] Gmail verification delivery is disabled; configure the Gmail API OAuth variables.");
 });
 
 async function expireStaleDeals() {

@@ -34,8 +34,10 @@ export type Deal = {
   discountPct?: number | null;
   tag?: string;
   dietaryTags?: string[];
+  startsAt?: string;
   endsAt: string;
   dealRating?: number;
+  ratingCount?: number;
   distanceMiles?: number | null;
   status?: "draft" | "pending_review" | "approved" | "rejected" | "expired";
   restaurant: Restaurant;

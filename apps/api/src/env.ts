@@ -22,6 +22,9 @@ const schema = z.object({
   VAPID_SUBJECT: z.string().default("mailto:hello@example.com"),
   GMAIL_SENDER_EMAIL: z.string().email().optional(),
   GMAIL_APP_PASSWORD: z.string().optional(),
+  GMAIL_OAUTH_CLIENT_ID: z.string().optional(),
+  GMAIL_OAUTH_CLIENT_SECRET: z.string().optional(),
+  GMAIL_OAUTH_REFRESH_TOKEN: z.string().optional(),
   OPENAI_API_KEY: z.string().optional(),
   OPENAI_VISION_MODEL: z.string().default("gpt-4o"),
 });

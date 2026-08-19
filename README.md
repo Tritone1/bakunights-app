@@ -68,14 +68,9 @@ Customer and merchant registration use separate pages:
 
 Passwords must contain at least eight characters, one uppercase letter, and one lowercase letter. New accounts cannot log in until their email has been verified. Verification links are single-use and expire after 24 hours; resend requests are limited to one per 60 seconds.
 
-To send verification messages through Gmail:
+Production verification messages use the Gmail HTTPS API because Railway does not allow this app to reach Gmail's SMTP ports. Configure `GMAIL_SENDER_EMAIL`, `GMAIL_OAUTH_CLIENT_ID`, `GMAIL_OAUTH_CLIENT_SECRET`, and `GMAIL_OAUTH_REFRESH_TOKEN` as server-only Railway variables. The OAuth grant should request only `https://www.googleapis.com/auth/gmail.send` with offline access. Never commit OAuth credentials or refresh tokens.
 
-1. Open the Google Account used by `GMAIL_SENDER_EMAIL`.
-2. Go to **Security** and enable **2-Step Verification**.
-3. Open **App Passwords**, create an app password for BakuNights, and copy the generated 16-character password.
-4. In the local `.env` file, set `GMAIL_SENDER_EMAIL` and `GMAIL_APP_PASSWORD`. Never use the normal Gmail password and never commit `.env`.
-
-When Gmail variables are empty in development, the API prints the branded verification link to its terminal instead of sending mail. To test end-to-end, run `npm.cmd run dev:fullstack`, register an account, open the printed link, and then log in through the matching customer or merchant page.
+`GMAIL_APP_PASSWORD` remains an optional local SMTP fallback. When neither Gmail API nor SMTP variables are configured in development, the API prints the branded verification link to its terminal instead of sending mail. To test end-to-end, run `npm.cmd run dev:fullstack`, register an account, open the printed link, and then log in through the matching customer or merchant page.
 
 ## Frontend structure
 

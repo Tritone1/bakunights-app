@@ -80,7 +80,7 @@ export function MerchantPage() {
   return <Shell>
     <div className="flex flex-wrap items-end justify-between gap-4">
       <div><p className="text-xs font-bold uppercase tracking-[.2em] text-cyan-300"><BarChart3 className="mr-1 inline" size={14} />Merchant dashboard</p><h1 className="mt-1 text-3xl font-semibold">Today at a glance</h1><p className="mt-1 text-white/55">{venues.map((venue) => venue.name).join(" · ")}</p></div>
-      <button onClick={() => { setEditing(null); setShowForm(true); }} className="panel-button"><Plus size={16} />New offer</button>
+      <div className="flex gap-2"><Link to="/profile" className="rounded-xl border border-white/10 px-4 py-2 text-sm font-semibold text-white/70 hover:bg-white/5">Account</Link><button onClick={() => { setEditing(null); setShowForm(true); }} className="panel-button"><Plus size={16} />New offer</button></div>
     </div>
     <div className="mt-6 flex gap-2 border-b border-white/10 pb-3"><button onClick={() => setActiveTab("dashboard")} className={activeTab === "dashboard" ? "panel-button" : "rounded-xl px-4 py-2 text-sm font-semibold text-white/55 hover:bg-white/5"}><BarChart3 size={16} />Dashboard</button><button onClick={() => setActiveTab("menu")} className={activeTab === "menu" ? "panel-button" : "rounded-xl px-4 py-2 text-sm font-semibold text-white/55 hover:bg-white/5"}><List size={16} />Menu</button></div>
     {activeTab === "menu" ? <MenuManager venues={venues} categories={categories} items={menuItems} onChanged={load} /> : <>

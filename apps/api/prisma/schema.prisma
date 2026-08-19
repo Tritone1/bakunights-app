@@ -80,6 +80,7 @@ model User {
   ratings         DealRating[]
   subscriptions   PushSubscription[]
   claims          VenueClaimRequest[] @relation("VenueClaimRequester")
+  merchantEnrollmentRequest MerchantEnrollmentRequest? @relation("MerchantEnrollmentRequester")
   notificationLogs NotificationLog[]
   submittedDeals  Deal[]              @relation("DealSubmitter")
   reviewedDeals   Deal[]              @relation("DealReviewer")
@@ -333,6 +334,26 @@ model VenueClaimRequest {
 
   @@unique([requestingUserId, venueId])
   @@map("venue_claim_requests")
+}
+
+model MerchantEnrollmentRequest {
+  id               String             @id @default(cuid())
+  requestingUserId String             @unique @map("requesting_user_id")
+  venueName        String             @map("venue_name")
+  venueAddress     String             @map("venue_address")
+  venueLat         Float              @map("venue_lat")
+  venueLng         Float              @map("venue_lng")
+  contactPhone     String             @map("contact_phone")
+  contactEmail     String             @map("contact_email")
+  proofNotes       String             @map("proof_notes")
+  status           ClaimRequestStatus @default(pending)
+  reviewNotes      String?            @map("review_notes")
+  createdAt        DateTime           @default(now()) @map("created_at")
+  reviewedAt       DateTime?          @map("reviewed_at")
+  requestingUser   User               @relation("MerchantEnrollmentRequester", fields: [requestingUserId], references: [id], onDelete: Cascade)
+
+  @@index([status, createdAt])
+  @@map("merchant_enrollment_requests")
 }
 
 model DealView {

@@ -6,6 +6,20 @@ import { requireAuth } from "../middleware/auth.js";
 
 export const restaurantsRouter = Router();
 
+restaurantsRouter.get("/stats/home", asyncRoute(async (_req, res) => {
+  const now = new Date();
+  const [activeVenues, liveDeals, venueAddresses] = await Promise.all([
+    prisma.restaurant.count({ where: { isActive: true } }),
+    prisma.deal.count({ where: { isActive: true, status: "approved", startsAt: { lte: now }, endsAt: { gt: now }, restaurant: { isActive: true } } }),
+    prisma.restaurant.findMany({ where: { isActive: true }, select: { address: true } }),
+  ]);
+  const areas = new Set(venueAddresses.map(({ address }) => {
+    const parts = address.split(",").map((part) => part.trim()).filter(Boolean);
+    return [...parts].reverse().find((part) => !/^baku$/i.test(part))?.toLowerCase() || address.trim().toLowerCase();
+  }).filter(Boolean)).size;
+  res.json({ stats: { activeVenues, liveDeals, areas } });
+}));
+
 restaurantsRouter.get("/:id/photo", asyncRoute(async (req, res) => {
   const restaurantId = z.string().parse(req.params.id);
   const restaurant = await prisma.restaurant.findUnique({
@@ -20,15 +34,42 @@ restaurantsRouter.get("/:id/photo", asyncRoute(async (req, res) => {
 
 restaurantsRouter.get("/", asyncRoute(async (req, res) => {
   const { query } = z.object({ query: z.string().trim().max(100).default("") }).parse(req.query);
+  const now = new Date();
   const restaurants = await prisma.restaurant.findMany({
-    where: query ? { OR: [
-      { name: { contains: query, mode: "insensitive" } },
-      { address: { contains: query, mode: "insensitive" } },
-    ] } : undefined,
-    select: { id: true, name: true, address: true, cuisine: true, ownerUserId: true, claimStatus: true },
-    take: 20,
+    where: {
+      isActive: true,
+      ...(query ? { OR: [
+        { name: { contains: query, mode: "insensitive" as const } },
+        { address: { contains: query, mode: "insensitive" as const } },
+        { cuisine: { contains: query, mode: "insensitive" as const } },
+      ] } : {}),
+    },
+    select: {
+      id: true, name: true, address: true, cuisine: true, dietaryTags: true,
+      lat: true, lng: true, phone: true, photoUrl: true, rating: true,
+      isVerifiedTrusted: true, honestyRate: true,
+      deals: {
+        where: { isActive: true, status: "approved", startsAt: { lte: now }, endsAt: { gt: now } },
+        orderBy: { endsAt: "asc" },
+        take: 1,
+        include: { ratings: { select: { value: true } } },
+      },
+    },
+    orderBy: [{ rating: "desc" }, { name: "asc" }],
+    take: 100,
   });
-  res.json({ restaurants });
+  res.json({ restaurants: restaurants.map(({ deals, ...restaurant }) => {
+    const deal = deals[0];
+    return {
+      ...restaurant,
+      liveDeal: deal ? {
+        ...deal,
+        dealRating: deal.ratings.length ? deal.ratings.reduce((sum, rating) => sum + rating.value, 0) / deal.ratings.length : null,
+        ratingCount: deal.ratings.length,
+        ratings: undefined,
+      } : null,
+    };
+  }) });
 }));
 
 restaurantsRouter.put("/:id/follow", requireAuth, asyncRoute(async (req, res) => {

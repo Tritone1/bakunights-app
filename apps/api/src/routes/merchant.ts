@@ -11,13 +11,32 @@ export const merchantRouter = Router();
 const menuUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 const imageValue = z.string().trim().max(3_000_000).refine((value) => /^https?:\/\//i.test(value) || /^data:image\/(jpeg|png|webp);base64,/i.test(value), "Use an image URL or uploaded JPG, PNG, or WebP image");
 
-merchantRouter.post("/enroll", requireAuth, asyncRoute(async (req, res) => {
-  const user = await prisma.user.update({
-    where: { id: req.user!.id }, data: { role: "MERCHANT" },
-    select: { id: true, email: true, name: true, role: true },
+const enrollmentInput = z.object({
+  venueName: z.string().trim().min(2).max(120),
+  venueAddress: z.string().trim().min(5).max(240),
+  venueLat: z.coerce.number().min(-90).max(90),
+  venueLng: z.coerce.number().min(-180).max(180),
+  contactPhone: z.string().trim().min(5).max(40),
+  contactEmail: z.string().trim().email().transform((value) => value.toLowerCase()),
+  proofNotes: z.string().trim().min(20).max(2000),
+});
+
+merchantRouter.get("/enrollment", requireAuth, asyncRoute(async (req, res) => {
+  const enrollment = await prisma.merchantEnrollmentRequest.findUnique({
+    where: { requestingUserId: req.user!.id },
   });
-  req.user = user;
-  res.json({ user });
+  res.json({ enrollment });
+}));
+
+merchantRouter.post("/enroll", requireAuth, asyncRoute(async (req, res) => {
+  if (req.user!.role !== "CONSUMER") throw new HttpError(409, "Only customer accounts can apply for merchant access.");
+  const input = enrollmentInput.parse(req.body);
+  const enrollment = await prisma.merchantEnrollmentRequest.upsert({
+    where: { requestingUserId: req.user!.id },
+    create: { requestingUserId: req.user!.id, ...input },
+    update: { ...input, status: "pending", reviewNotes: null, reviewedAt: null },
+  });
+  res.status(201).json({ enrollment });
 }));
 
 merchantRouter.use(requireMerchant);

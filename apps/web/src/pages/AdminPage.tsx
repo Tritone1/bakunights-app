@@ -34,6 +34,11 @@ type ClaimRequest = {
   venue: { id: string; name: string; address: string; ownerUserId: string | null };
   requestingUser: { id: string; name: string; email: string };
 };
+type MerchantEnrollment = {
+  id: string; venueName: string; venueAddress: string; venueLat: number; venueLng: number;
+  contactPhone: string; contactEmail: string; proofNotes: string; createdAt: string;
+  requestingUser: { id: string; name: string; email: string; role: string };
+};
 
 export function AdminPage() {
   const { user, loading: authLoading } = useAuth();
@@ -41,6 +46,7 @@ export function AdminPage() {
   const [venues, setVenues] = useState<AdminVenue[]>([]);
   const [deals, setDeals] = useState<AdminDeal[]>([]);
   const [claims, setClaims] = useState<ClaimRequest[]>([]);
+  const [enrollments, setEnrollments] = useState<MerchantEnrollment[]>([]);
   const [flags, setFlags] = useState<TrustFlag[]>([]);
   const [categories, setCategories] = useState<MenuCategory[]>([]);
   const [catalogItems, setCatalogItems] = useState<CatalogItem[]>([]);
@@ -53,11 +59,12 @@ export function AdminPage() {
     if (user?.role !== "ADMIN") { setLoading(false); return; }
     try {
       setLoading(true);
-      const [dashboard, venueData, dealData, claimData, flagData, categoryData, catalogData] = await Promise.all([
+      const [dashboard, venueData, dealData, claimData, enrollmentData, flagData, categoryData, catalogData] = await Promise.all([
         api<{ metrics: MetricSet }>("/admin/dashboard"),
         api<{ venues: AdminVenue[] }>("/admin/venues"),
         api<{ deals: AdminDeal[] }>("/admin/deals"),
         api<{ claims: ClaimRequest[] }>("/admin/claim-requests"),
+        api<{ enrollments: MerchantEnrollment[] }>("/admin/merchant-enrollment-requests"),
         api<{ flags: TrustFlag[] }>("/admin/trust-flags"),
         api<{ categories: MenuCategory[] }>("/admin/menu/categories"),
         api<{ items: CatalogItem[] }>("/admin/menu/catalog"),
@@ -66,6 +73,7 @@ export function AdminPage() {
       setVenues(venueData.venues);
       setDeals(dealData.deals);
       setClaims(claimData.claims);
+      setEnrollments(enrollmentData.enrollments);
       setFlags(flagData.flags); setCategories(categoryData.categories);
       setCatalogItems(catalogData.items);
       setError("");
@@ -88,6 +96,13 @@ export function AdminPage() {
     const notes = approved ? claim.proofNotes : window.prompt(`Why reject ${claim.venue.name}'s claim?`);
     if (!notes?.trim()) return;
     await api(`/admin/claim-requests/${claim.id}/${approved ? "approve" : "reject"}`, { method: "POST", body: JSON.stringify({ notes }) });
+    void load();
+  }
+
+  async function reviewEnrollment(enrollment: MerchantEnrollment, approved: boolean) {
+    const notes = approved ? window.prompt(`Optional approval note for ${enrollment.venueName}`, "") ?? "" : window.prompt(`Why reject ${enrollment.venueName}?`);
+    if (!approved && !notes?.trim()) return;
+    await api(`/admin/merchant-enrollment-requests/${enrollment.id}/${approved ? "approve" : "reject"}`, { method: "POST", body: JSON.stringify({ notes: notes?.trim() || undefined }) });
     void load();
   }
 
@@ -117,6 +132,11 @@ export function AdminPage() {
     <Section title="Claim requests" subtitle={`${claims.length} pending`}>
       <DataTable columns={["Venue", "Requester", "Contact", "Proof", "Actions"]}>
         {claims.map((claim) => <tr key={claim.id} className="border-t border-white/10"><td className="p-3"><strong>{claim.venue.name}</strong><p className="text-xs text-white/45">{claim.venue.address}</p></td><td className="p-3 text-sm">{claim.requestingUser.email}</td><td className="p-3 text-sm">{claim.contactEmail}<br />{claim.contactPhone}</td><td className="max-w-md p-3 text-sm text-white/65">{claim.proofNotes}</td><td className="p-3"><button onClick={() => void reviewClaim(claim, true)} className="mr-2 text-cyan-300"><CheckCircle2 /></button><button onClick={() => void reviewClaim(claim, false)} className="text-red-300"><XCircle /></button></td></tr>)}
+      </DataTable>
+    </Section>
+    <Section title="New merchant applications" subtitle={`${enrollments.length} pending`}>
+      <DataTable columns={["Proposed venue", "Applicant", "Contact", "Verification", "Actions"]}>
+        {enrollments.map((enrollment) => <tr key={enrollment.id} className="border-t border-white/10"><td className="p-3"><strong>{enrollment.venueName}</strong><p className="text-xs text-white/45">{enrollment.venueAddress}</p><p className="text-xs text-white/35">{enrollment.venueLat.toFixed(5)}, {enrollment.venueLng.toFixed(5)}</p></td><td className="p-3 text-sm">{enrollment.requestingUser.name}<br /><span className="text-white/45">{enrollment.requestingUser.email}</span></td><td className="p-3 text-sm">{enrollment.contactEmail}<br />{enrollment.contactPhone}</td><td className="max-w-md p-3 text-sm text-white/65">{enrollment.proofNotes}</td><td className="p-3"><button onClick={() => void reviewEnrollment(enrollment, true)} className="mr-2 text-cyan-300" title="Approve and create venue"><CheckCircle2 /></button><button onClick={() => void reviewEnrollment(enrollment, false)} className="text-red-300" title="Reject"><XCircle /></button></td></tr>)}
       </DataTable>
     </Section>
     <Section title="Venues" subtitle="Create, edit, or deactivate">

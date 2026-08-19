@@ -1,4 +1,5 @@
 import nodemailer from "nodemailer";
+import { randomUUID } from "node:crypto";
 import { env } from "../env.js";
 
 type VerificationEmail = {
@@ -9,9 +10,21 @@ type VerificationEmail = {
 export async function sendVerificationEmail({ userEmail, verificationUrl }: VerificationEmail) {
   const subject = "Verify your BakuNights account";
   const html = verificationTemplate(verificationUrl);
+  const text = `Verify your BakuNights account: ${verificationUrl}`;
+
+  if (isGmailApiConfigured()) {
+    await sendWithGmailApi({ to: userEmail, subject, html, text });
+    return true;
+  }
+
   if (env.GMAIL_SENDER_EMAIL && env.GMAIL_APP_PASSWORD) {
     const transporter = nodemailer.createTransport({
-      service: "gmail",
+      // Match the working Bagimdan Railway service: keep the hostname so
+      // Nodemailer can retry Gmail's complete address set instead of pinning
+      // one resolved IP that may not be reachable from this container.
+      host: "smtp.gmail.com",
+      port: 587,
+      secure: false,
       connectionTimeout: 15_000,
       greetingTimeout: 10_000,
       socketTimeout: 20_000,
@@ -22,7 +35,7 @@ export async function sendVerificationEmail({ userEmail, verificationUrl }: Veri
       to: userEmail,
       subject,
       html,
-      text: `Verify your BakuNights account: ${verificationUrl}`,
+      text,
     });
     return true;
   }
@@ -41,6 +54,76 @@ export async function sendVerificationEmail({ userEmail, verificationUrl }: Veri
     "",
   ].join("\n"));
   return false;
+}
+
+export function isEmailDeliveryConfigured() {
+  return isGmailApiConfigured() || Boolean(env.GMAIL_SENDER_EMAIL && env.GMAIL_APP_PASSWORD);
+}
+
+function isGmailApiConfigured() {
+  return Boolean(
+    env.GMAIL_SENDER_EMAIL
+      && env.GMAIL_OAUTH_CLIENT_ID
+      && env.GMAIL_OAUTH_CLIENT_SECRET
+      && env.GMAIL_OAUTH_REFRESH_TOKEN,
+  );
+}
+
+async function sendWithGmailApi(message: { to: string; subject: string; html: string; text: string }) {
+  const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      client_id: env.GMAIL_OAUTH_CLIENT_ID!,
+      client_secret: env.GMAIL_OAUTH_CLIENT_SECRET!,
+      refresh_token: env.GMAIL_OAUTH_REFRESH_TOKEN!,
+      grant_type: "refresh_token",
+    }),
+  });
+  if (!tokenResponse.ok) {
+    throw new Error(`Gmail OAuth token refresh failed (${tokenResponse.status}).`);
+  }
+
+  const tokenPayload = await tokenResponse.json() as { access_token?: string };
+  if (!tokenPayload.access_token) throw new Error("Gmail OAuth did not return an access token.");
+
+  const raw = Buffer.from(buildMimeMessage(message), "utf8").toString("base64url");
+  const sendResponse = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${tokenPayload.access_token}`,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({ raw }),
+  });
+  if (!sendResponse.ok) {
+    throw new Error(`Gmail API message send failed (${sendResponse.status}).`);
+  }
+}
+
+function buildMimeMessage({ to, subject, html, text }: { to: string; subject: string; html: string; text: string }) {
+  const boundary = `bakunights-${randomUUID()}`;
+  const encodedSubject = Buffer.from(subject, "utf8").toString("base64");
+  return [
+    `From: BakuNights <${env.GMAIL_SENDER_EMAIL}>`,
+    `To: ${to}`,
+    `Subject: =?UTF-8?B?${encodedSubject}?=`,
+    "MIME-Version: 1.0",
+    `Content-Type: multipart/alternative; boundary="${boundary}"`,
+    "",
+    `--${boundary}`,
+    "Content-Type: text/plain; charset=UTF-8",
+    "Content-Transfer-Encoding: base64",
+    "",
+    Buffer.from(text, "utf8").toString("base64"),
+    `--${boundary}`,
+    "Content-Type: text/html; charset=UTF-8",
+    "Content-Transfer-Encoding: base64",
+    "",
+    Buffer.from(html, "utf8").toString("base64"),
+    `--${boundary}--`,
+    "",
+  ].join("\r\n");
 }
 
 function verificationTemplate(verificationUrl: string) {

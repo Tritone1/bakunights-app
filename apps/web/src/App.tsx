@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { AdminPage } from "./pages/AdminPage";
 import { AuthPage } from "./pages/AuthPage";
 import { DealCard } from "./components/DealCard";
@@ -16,7 +16,8 @@ import { SafeImage } from "./components/SafeImage";
 type Category = "Restaurants" | "Bars" | "Pubs" | "Lounges";
 
 type Venue = {
-  id: number;
+  id: string;
+  dealId?: string;
   name: string;
   category: Category;
   rating: number;
@@ -33,6 +34,14 @@ type Venue = {
   priceRange: string;
   image: string;
 };
+
+type HomepageRestaurant = {
+  id: string; name: string; address: string; cuisine: string; dietaryTags: string[];
+  lat: number; lng: number; phone?: string | null; photoUrl?: string | null; rating: number;
+  liveDeal?: Deal | null;
+};
+
+type HomepageStats = { activeVenues: number; liveDeals: number; areas: number };
 
 type UserPosition = {
   lat: number;
@@ -59,17 +68,48 @@ const IMAGES = {
   hero: "https://images.unsplash.com/photo-1674857977971-131936c7b5ea?w=1400&h=500&fit=crop",
 };
 
-const VENUES: Venue[] = [
-  { id: 1, name: "Chinar Restaurant", category: "Restaurants", rating: 4.8, reviews: 312, address: "Neftchilar Ave, Baku", distance: "0.4 km", deal: "20% off entire menu tonight", dealTag: "TODAY ONLY", dealColor: "#ef4444", open: "Open until 01:00", tags: ["Azerbaijani", "Fine Dining", "Riverside"], lat: 40.4093, lng: 49.8671, priceRange: "₼₼₼", image: IMAGES.restaurant },
-  { id: 2, name: "Sky Bar Baku", category: "Bars", rating: 4.6, reviews: 528, address: "JW Marriott, Baku Boulevard", distance: "0.8 km", deal: "2-for-1 signature cocktails", dealTag: "6PM – 10PM", dealColor: "#f59e0b", open: "Open until 02:00", tags: ["Rooftop", "Cocktails", "City Views"], lat: 40.4112, lng: 49.8702, priceRange: "₼₼₼₼", image: IMAGES.cocktail },
-  { id: 3, name: "Old City Pub", category: "Pubs", rating: 4.5, reviews: 194, address: "Icheri Sheher, Old City", distance: "1.2 km", deal: "Happy hour pints — 30% off", dealTag: "HAPPY HOUR", dealColor: "#10b981", open: "Open until 00:00", tags: ["British Pub", "Draft Beer", "Live Music"], lat: 40.366, lng: 49.8353, priceRange: "₼₼", image: IMAGES.pub },
-  { id: 4, name: "Flame Lounge", category: "Lounges", rating: 4.9, reviews: 441, address: "Flame Towers, Baku", distance: "1.5 km", deal: "VIP table package — save ₼80", dealTag: "VIP DEAL", dealColor: "#8b5cf6", open: "Open until 03:00", tags: ["Premium", "Rooftop", "Hookah"], lat: 40.3609, lng: 49.8373, priceRange: "₼₼₼₼", image: IMAGES.lounge },
-  { id: 5, name: "Caspian Bistro", category: "Restaurants", rating: 4.7, reviews: 267, address: "Rasul Rza St, Baku", distance: "0.6 km", deal: "Set dinner for 2 — 30% off", dealTag: "SET MENU", dealColor: "#f59e0b", open: "Open until 23:00", tags: ["Mediterranean", "Sea View", "Wine Bar"], lat: 40.405, lng: 49.86, priceRange: "₼₼₼", image: IMAGES.restaurant },
-  { id: 6, name: "Nargiz Cocktail Bar", category: "Bars", rating: 4.4, reviews: 183, address: "Nizami St 48, Baku", distance: "0.9 km", deal: "Ladies night — free entry + 1 drink", dealTag: "LADIES NIGHT", dealColor: "#ec4899", open: "Open until 02:00", tags: ["Cocktails", "DJ", "Dance Floor"], lat: 40.407, lng: 49.87, priceRange: "₼₼", image: IMAGES.cocktail },
-];
-
 const CATEGORIES = ["All", "Restaurants", "Bars", "Pubs", "Lounges"] as const;
 type CategoryFilter = (typeof CATEGORIES)[number];
+
+function venueCategory(cuisine: string): Category {
+  const value = cuisine.toLowerCase();
+  if (value.includes("lounge")) return "Lounges";
+  if (value.includes("pub")) return "Pubs";
+  if (value.includes("bar")) return "Bars";
+  return "Restaurants";
+}
+
+function fallbackImage(category: Category) {
+  if (category === "Bars") return IMAGES.cocktail;
+  if (category === "Pubs") return IMAGES.pub;
+  if (category === "Lounges") return IMAGES.lounge;
+  return IMAGES.restaurant;
+}
+
+function toVenue(restaurant: HomepageRestaurant, origin: UserPosition | null): Venue {
+  const category = venueCategory(restaurant.cuisine);
+  const deal = restaurant.liveDeal;
+  const endTime = deal?.endsAt ? new Intl.DateTimeFormat("en", { hour: "2-digit", minute: "2-digit" }).format(new Date(deal.endsAt)) : null;
+  return {
+    id: restaurant.id,
+    dealId: deal?.id,
+    name: restaurant.name,
+    category,
+    rating: restaurant.rating || deal?.dealRating || 0,
+    reviews: deal?.ratingCount ?? 0,
+    address: restaurant.address,
+    distance: origin ? `${distanceKm(origin, restaurant).toFixed(1)} km` : "Location needed",
+    deal: deal?.title ?? "No live offer right now",
+    dealTag: deal?.tag?.toUpperCase() ?? "VENUE",
+    dealColor: category === "Bars" ? "#ec4899" : category === "Pubs" ? "#10b981" : category === "Lounges" ? "#8b5cf6" : "#f59e0b",
+    open: endTime ? `Offer ends ${endTime}` : "No current offer",
+    tags: [restaurant.cuisine, ...(restaurant.dietaryTags ?? [])].filter(Boolean).slice(0, 4),
+    lat: restaurant.lat,
+    lng: restaurant.lng,
+    priceRange: "",
+    image: restaurant.photoUrl || deal?.photoUrl || fallbackImage(category),
+  };
+}
 
 let googleMapsPromise: Promise<void> | null = null;
 
@@ -120,11 +160,9 @@ function Icon({ name, size = 18, className = "" }: { name: IconName; size?: numb
   return <svg aria-hidden="true" className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">{paths[name]}</svg>;
 }
 
-function countdownToHour(targetHour: number) {
+function countdownToDate(targetDate: string) {
   const now = new Date();
-  const target = new Date(now);
-  target.setHours(targetHour, 0, 0, 0);
-  if (target.getTime() <= now.getTime()) target.setDate(target.getDate() + 1);
+  const target = new Date(targetDate);
   const seconds = Math.max(0, Math.floor((target.getTime() - now.getTime()) / 1000));
   const hours = Math.floor(seconds / 3600);
   const minutes = Math.floor((seconds % 3600) / 60);
@@ -132,12 +170,12 @@ function countdownToHour(targetHour: number) {
   return [hours, minutes, remainingSeconds].map((value) => String(value).padStart(2, "0")).join(":");
 }
 
-function useCountdown(targetHour = 22) {
-  const [countdown, setCountdown] = useState(() => countdownToHour(targetHour));
+function useCountdown(targetDate: string) {
+  const [countdown, setCountdown] = useState(() => countdownToDate(targetDate));
   useEffect(() => {
-    const interval = window.setInterval(() => setCountdown(countdownToHour(targetHour)), 1000);
+    const interval = window.setInterval(() => setCountdown(countdownToDate(targetDate)), 1000);
     return () => window.clearInterval(interval);
-  }, [targetHour]);
+  }, [targetDate]);
   return countdown;
 }
 
@@ -162,7 +200,7 @@ function Navigation({ query, setQuery, onLocationClick, locationLabel }: { query
       <div className="ml-auto flex items-center gap-2 sm:gap-3">
         {!user && <><Link to="/login/customer" className="inline-flex rounded-full border border-white/10 bg-white/[0.055] px-2.5 py-2 text-[10px] font-semibold text-white transition hover:border-gold/40 hover:text-gold sm:px-3.5 sm:text-xs"><span className="sm:hidden">Customer</span><span className="hidden sm:inline">Customer login</span></Link><Link to="/login/merchant" className="inline-flex rounded-full border border-gold/25 bg-gold/10 px-2.5 py-2 text-[10px] font-semibold text-gold transition hover:bg-gold hover:text-night sm:px-3.5 sm:text-xs"><span className="sm:hidden">Merchant</span><span className="hidden sm:inline">Merchant login</span></Link></>}
         <button type="button" onClick={onLocationClick} className="flex h-10 w-10 shrink-0 items-center justify-center gap-2 rounded-full border border-white/10 bg-white/[0.055] text-xs font-semibold text-white transition hover:border-gold/40 hover:text-gold sm:h-auto sm:w-auto sm:max-w-44 sm:px-3.5 sm:py-2" title={`Choose your location (${locationLabel})`} aria-label={`Choose your location. Current: ${locationLabel}`}><Icon name="location" size={15} className="shrink-0 text-gold" /><span className="hidden truncate sm:block">{locationLabel}</span><Icon name="chevron" size={14} className="hidden shrink-0 text-muted sm:block" /></button>
-        {user && <div className="relative"><button type="button" onClick={() => setMenuOpen((open) => !open)} className="grid h-10 w-10 place-items-center rounded-full border border-gold/30 bg-gradient-to-br from-gold to-amber-700 text-sm font-bold text-night shadow-[0_0_20px_rgba(245,158,11,.18)]" aria-label="Open account menu" aria-expanded={menuOpen}>{user.name.split(/\s+/).map((part) => part[0]).join("").slice(0, 2).toUpperCase()}</button>{menuOpen && <div className="absolute right-0 top-12 w-52 rounded-2xl border border-white/10 bg-[#15151e] p-2 shadow-2xl"><p className="px-3 py-2 text-xs text-white/45">{user.email}</p>{user.role === "CONSUMER" && <><Link to="/profile" className="block rounded-xl px-3 py-2 text-sm text-white/75 hover:bg-white/10 hover:text-white">Profile</Link><Link to="/saved" className="block rounded-xl px-3 py-2 text-sm text-white/75 hover:bg-white/10 hover:text-white">Saved deals</Link></>}{user.role === "MERCHANT" && <Link to="/merchant" className="block rounded-xl px-3 py-2 text-sm text-white/75 hover:bg-white/10 hover:text-white">Merchant dashboard</Link>}{user.role === "ADMIN" && <Link to="/admin" className="block rounded-xl px-3 py-2 text-sm text-white/75 hover:bg-white/10 hover:text-white">Admin dashboard</Link>}<button type="button" onClick={() => void logout()} className="mt-1 w-full rounded-xl px-3 py-2 text-left text-sm text-red-200 hover:bg-red-500/10">Log out</button></div>}</div>}
+        {user && <div className="relative"><button type="button" onClick={() => setMenuOpen((open) => !open)} className="grid h-10 w-10 place-items-center rounded-full border border-gold/30 bg-gradient-to-br from-gold to-amber-700 text-sm font-bold text-night shadow-[0_0_20px_rgba(245,158,11,.18)]" aria-label="Open account menu" aria-expanded={menuOpen}>{user.name.split(/\s+/).map((part) => part[0]).join("").slice(0, 2).toUpperCase()}</button>{menuOpen && <div className="absolute right-0 top-12 w-52 rounded-2xl border border-white/10 bg-[#15151e] p-2 shadow-2xl"><p className="px-3 py-2 text-xs text-white/45">{user.email}</p>{user.role === "CONSUMER" && <><Link to="/profile" className="block rounded-xl px-3 py-2 text-sm text-white/75 hover:bg-white/10 hover:text-white">Profile</Link><Link to="/saved" className="block rounded-xl px-3 py-2 text-sm text-white/75 hover:bg-white/10 hover:text-white">Saved deals</Link></>}{user.role === "MERCHANT" && <><Link to="/merchant" className="block rounded-xl px-3 py-2 text-sm text-white/75 hover:bg-white/10 hover:text-white">Merchant dashboard</Link><Link to="/profile" className="block rounded-xl px-3 py-2 text-sm text-white/75 hover:bg-white/10 hover:text-white">Account settings</Link></>}{user.role === "ADMIN" && <Link to="/admin" className="block rounded-xl px-3 py-2 text-sm text-white/75 hover:bg-white/10 hover:text-white">Admin dashboard</Link>}<button type="button" onClick={() => void logout()} className="mt-1 w-full rounded-xl px-3 py-2 text-left text-sm text-red-200 hover:bg-red-500/10">Log out</button></div>}</div>}
       </div>
     </div>
   </header>;
@@ -172,7 +210,7 @@ function MoonMark() {
   return <svg aria-hidden="true" viewBox="0 0 32 32" className="h-6 w-6" fill="none"><path d="M22.7 22.7A11 11 0 0 1 10.1 5.2 11.3 11.3 0 1 0 26.8 21a11 11 0 0 1-4.1 1.7Z" fill="currentColor" /><circle cx="23.5" cy="8.5" r="2" fill="currentColor" /><path d="m25 12 .6 1.7 1.7.6-1.7.6-.6 1.7-.6-1.7-1.7-.6 1.7-.6.6-1.7Z" fill="currentColor" /></svg>;
 }
 
-function Hero() {
+function Hero({ stats }: { stats: HomepageStats }) {
   const today = new Intl.DateTimeFormat("en-US", { weekday: "long", month: "long", day: "numeric" }).format(new Date());
   return <section id="top" className="relative isolate min-h-[500px] overflow-hidden border-b border-white/[0.07]">
     <SafeImage src={IMAGES.hero} alt="Baku illuminated at night" className="absolute inset-0 -z-20 h-full w-full object-cover object-center" />
@@ -184,9 +222,9 @@ function Hero() {
         <h1 className="font-display text-5xl font-semibold leading-[.95] tracking-[-.04em] text-white sm:text-6xl lg:text-[76px]">Tonight in <span className="italic text-gold">Baku</span></h1>
         <p className="mt-6 max-w-2xl text-base leading-7 text-white/65 sm:text-lg">Discover the city after dark—from candlelit restaurants to rooftop bars, old-city pubs, and velvet lounges. Tonight’s best tables and offers, all in one place.</p>
         <div className="mt-9 flex flex-wrap gap-3">
-          <Stat value="48" label="Active venues" />
-          <Stat value="12" label="Deals tonight" accent />
-          <Stat value="7" label="Districts" />
+          <Stat value={String(stats.activeVenues)} label="Active venues" />
+          <Stat value={String(stats.liveDeals)} label="Deals tonight" accent />
+          <Stat value={String(stats.areas)} label="Areas" />
         </div>
       </div>
     </div>
@@ -201,40 +239,35 @@ function SectionHeading({ eyebrow, title, action }: { eyebrow: string; title: st
   return <div className="mb-7 flex items-end justify-between gap-4"><div><p className="mb-2 text-[10px] font-bold uppercase tracking-[.24em] text-gold">{eyebrow}</p><h2 className="font-display text-3xl font-semibold tracking-tight text-white sm:text-4xl">{title}</h2></div>{action}</div>;
 }
 
-function FlashDeals() {
-  const countdown = useCountdown(22);
+function FlashDeals({ deals, loading }: { deals: Deal[]; loading: boolean }) {
   return <section className="mx-auto max-w-[1400px] px-5 py-16 sm:px-8">
     <SectionHeading eyebrow="Limited drops" title="Flash deals" action={<span className="hidden text-xs text-muted sm:block">Scroll to explore <span className="ml-1 text-gold">→</span></span>} />
-    <div className="no-scrollbar -mx-5 flex snap-x gap-4 overflow-x-auto px-5 pb-3 sm:-mx-8 sm:px-8 xl:mx-0 xl:px-0">
-      {VENUES.slice(0, 5).map((venue) => <article key={venue.id} className="group relative h-[310px] w-[280px] shrink-0 snap-start overflow-hidden rounded-2xl border border-white/[0.08] bg-card">
-        <SafeImage src={venue.image} alt={`${venue.name} atmosphere`} className="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-105" />
-        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/45 to-black/10" />
-        <div className="absolute inset-x-0 top-0 flex items-center justify-between p-4">
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-red-500/90 px-2.5 py-1 text-[9px] font-extrabold tracking-[.14em] text-white backdrop-blur"><span className="deal-pulse h-1.5 w-1.5 rounded-full bg-white" />FLASH DEAL</span>
-          <span className="rounded-lg border border-white/15 bg-black/45 px-2 py-1 font-mono text-xs font-semibold tabular-nums text-white backdrop-blur">{countdown}</span>
-        </div>
-        <div className="absolute inset-x-0 bottom-0 p-5">
-          <p className="mb-1.5 text-[10px] font-bold uppercase tracking-[.18em] text-gold">{venue.category}</p>
-          <h3 className="font-display text-2xl font-semibold text-white">{venue.name}</h3>
-          <p className="mt-1 text-sm text-white/70">{venue.deal}</p>
-          <div className="mt-4 flex items-center justify-between text-xs"><span className="flex items-center gap-1 text-amber-300"><Star filled />{venue.rating}</span><span className="text-white/55">{venue.distance}</span></div>
-        </div>
-      </article>)}
-    </div>
+    {loading ? <div className="rounded-2xl border border-white/[0.08] bg-card p-5 text-sm text-muted">Loading flash deals…</div> : deals.length === 0 ? <div className="rounded-2xl border border-white/[0.08] bg-card p-5 text-sm text-muted">No live flash deals right now.</div> : <div className="no-scrollbar -mx-5 flex snap-x gap-4 overflow-x-auto px-5 pb-3 sm:-mx-8 sm:px-8 xl:mx-0 xl:px-0">{deals.slice(0, 5).map((deal) => <FlashDealCard key={deal.id} deal={deal} />)}</div>}
   </section>;
+}
+
+function FlashDealCard({ deal }: { deal: Deal }) {
+  const countdown = useCountdown(deal.endsAt);
+  const category = venueCategory(deal.restaurant.cuisine);
+  return <Link to={`/deals/${deal.id}`} className="group relative h-[310px] w-[280px] shrink-0 snap-start overflow-hidden rounded-2xl border border-white/[0.08] bg-card">
+    <SafeImage src={deal.photoUrl || deal.restaurant.photoUrl || fallbackImage(category)} alt={`${deal.restaurant.name} offer`} className="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-105" />
+    <div className="absolute inset-0 bg-gradient-to-t from-black via-black/45 to-black/10" />
+    <div className="absolute inset-x-0 top-0 flex items-center justify-between p-4"><span className="inline-flex items-center gap-1.5 rounded-full bg-red-500/90 px-2.5 py-1 text-[9px] font-extrabold tracking-[.14em] text-white backdrop-blur"><span className="deal-pulse h-1.5 w-1.5 rounded-full bg-white" />FLASH DEAL</span><span className="rounded-lg border border-white/15 bg-black/45 px-2 py-1 font-mono text-xs font-semibold tabular-nums text-white backdrop-blur">{countdown}</span></div>
+    <div className="absolute inset-x-0 bottom-0 p-5"><p className="mb-1.5 text-[10px] font-bold uppercase tracking-[.18em] text-gold">{category}</p><h3 className="font-display text-2xl font-semibold text-white">{deal.restaurant.name}</h3><p className="mt-1 text-sm text-white/70">{deal.title}</p><div className="mt-4 flex items-center justify-between text-xs"><span className="flex items-center gap-1 text-amber-300"><Star filled />{deal.dealRating?.toFixed(1) ?? "New"}</span>{deal.distanceMiles != null && <span className="text-white/55">{(deal.distanceMiles * 1.60934).toFixed(1)} km</span>}</div></div>
+  </Link>;
 }
 
 function Star({ filled = true }: { filled?: boolean }) {
   return <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill={filled ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.6"><path d="m12 2.8 2.8 5.7 6.3.9-4.5 4.4 1 6.3-5.6-3-5.6 3 1-6.3-4.5-4.4 6.3-.9L12 2.8Z" /></svg>;
 }
 
-function VenueCard({ venue, saved, onToggleSave, onNavigate }: { venue: Venue; saved: boolean; onToggleSave: () => void; onNavigate: () => void }) {
+function VenueCard({ venue, saved, onToggleSave, onNavigate }: { venue: Venue; saved: boolean; onToggleSave?: () => void; onNavigate: () => void }) {
   return <article data-venue-card className="group overflow-hidden rounded-2xl border border-white/[0.07] bg-card transition-transform duration-200 hover:-translate-y-1 hover:border-white/[0.13]">
     <div className="relative h-44 overflow-hidden">
       <SafeImage src={venue.image} alt={`${venue.name} atmosphere`} loading="lazy" className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.04]" />
       <div className="absolute inset-0 bg-gradient-to-t from-card via-black/15 to-transparent" />
       <span className="absolute left-4 top-4 rounded-full px-2.5 py-1 text-[9px] font-extrabold tracking-[.14em] text-white shadow-lg" style={{ backgroundColor: venue.dealColor }}>{venue.dealTag}</span>
-      <button onClick={onToggleSave} aria-label={saved ? `Remove ${venue.name} from saved` : `Save ${venue.name}`} className={`absolute right-4 top-4 grid h-9 w-9 place-items-center rounded-full border backdrop-blur transition ${saved ? "border-gold bg-gold text-night" : "border-white/15 bg-black/35 text-white hover:border-gold hover:text-gold"}`}><Icon name="bookmark" size={16} /></button>
+      {onToggleSave && <button onClick={onToggleSave} aria-label={saved ? `Remove ${venue.name} from saved` : `Save ${venue.name}`} className={`absolute right-4 top-4 grid h-9 w-9 place-items-center rounded-full border backdrop-blur transition ${saved ? "border-gold bg-gold text-night" : "border-white/15 bg-black/35 text-white hover:border-gold hover:text-gold"}`}><Icon name="bookmark" size={16} /></button>}
       <div className="absolute inset-x-0 bottom-0 px-5 pb-4"><p className="mb-1 text-[9px] font-bold uppercase tracking-[.2em] text-gold">{venue.category}</p><h3 className="font-display text-[27px] font-semibold leading-tight text-white">{venue.name}</h3></div>
     </div>
     <div className="p-5 pt-3">
@@ -251,32 +284,38 @@ function VenueCard({ venue, saved, onToggleSave, onNavigate }: { venue: Venue; s
   </article>;
 }
 
-function VenueDirectory({ query, setQuery, onNavigate, origin }: { query: string; setQuery: (value: string) => void; onNavigate: (venue: Venue) => void; origin: UserPosition | null }) {
+function VenueDirectory({ venues, query, setQuery, onNavigate, origin }: { venues: Venue[]; query: string; setQuery: (value: string) => void; onNavigate: (venue: Venue) => void; origin: UserPosition | null }) {
+  const { user } = useAuth();
+  const navigate = useNavigate();
   const [category, setCategory] = useState<CategoryFilter>("All");
-  const [saved, setSaved] = useState<Set<number>>(() => {
-    try { return new Set<number>(JSON.parse(localStorage.getItem("bakunights-saved") || "[]")); }
-    catch { return new Set<number>(); }
-  });
+  const [saved, setSaved] = useState<Set<string>>(new Set());
+  const [saveNotice, setSaveNotice] = useState("");
+  useEffect(() => {
+    if (!user) { setSaved(new Set()); return; }
+    api<{ deals: Deal[] }>("/users/me/saved").then(({ deals }) => setSaved(new Set(deals.map((deal) => deal.id)))).catch(() => setSaveNotice("Saved deals could not be loaded."));
+  }, [user]);
   const filtered = useMemo(() => {
     const search = query.trim().toLowerCase();
-    return VENUES
+    return venues
       .filter((venue) => (category === "All" || venue.category === category) && (!search || [venue.name, venue.category, venue.address, venue.deal, ...venue.tags].join(" ").toLowerCase().includes(search)))
       .map((venue) => origin ? { ...venue, distance: `${distanceKm(origin, venue).toFixed(1)} km` } : venue)
-      .sort((a, b) => origin ? distanceKm(origin, a) - distanceKm(origin, b) : a.id - b.id);
-  }, [category, origin, query]);
-  function toggleSaved(id: number) {
-    setSaved((current) => {
-      const next = new Set(current);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      localStorage.setItem("bakunights-saved", JSON.stringify([...next]));
-      return next;
-    });
+      .sort((a, b) => origin ? distanceKm(origin, a) - distanceKm(origin, b) : a.name.localeCompare(b.name));
+  }, [category, origin, query, venues]);
+  async function toggleSaved(dealId: string) {
+    if (!user) { navigate("/login/customer?next=/"); return; }
+    const wasSaved = saved.has(dealId);
+    try {
+      await api(`/deals/${dealId}/save`, { method: wasSaved ? "DELETE" : "PUT" });
+      setSaved((current) => { const next = new Set(current); if (wasSaved) next.delete(dealId); else next.add(dealId); return next; });
+      setSaveNotice("");
+    } catch (reason) { setSaveNotice(reason instanceof Error ? reason.message : "Could not update saved deals"); }
   }
   return <section id="venues" className="mx-auto max-w-[1400px] px-5 pb-20 sm:px-8">
     <SectionHeading eyebrow="Curated for tonight" title="Find your next stop" action={<span className="hidden text-xs text-muted sm:block">{filtered.length} venues</span>} />
     <SearchBox value={query} onChange={setQuery} mobile />
+    {saveNotice && <p className="mb-3 rounded-xl border border-red-400/25 bg-red-500/10 p-3 text-sm text-red-100">{saveNotice}</p>}
     <div className="no-scrollbar mt-5 flex gap-2 overflow-x-auto pb-2 lg:mt-0">{CATEGORIES.map((item) => <button key={item} onClick={() => setCategory(item)} className={`shrink-0 rounded-full border px-4 py-2 text-xs font-semibold transition ${category === item ? "border-gold bg-gold text-night" : "border-white/[0.08] bg-white/[0.035] text-muted hover:border-white/20 hover:text-white"}`}>{item}</button>)}</div>
-    {filtered.length ? <div className="mt-7 grid gap-5 md:grid-cols-2 xl:grid-cols-3">{filtered.map((venue) => <VenueCard key={venue.id} venue={venue} saved={saved.has(venue.id)} onToggleSave={() => toggleSaved(venue.id)} onNavigate={() => onNavigate(venue)} />)}</div> : <div className="mt-8 grid min-h-64 place-items-center rounded-2xl border border-dashed border-white/10 bg-card/50 text-center"><div><Icon name="search" size={30} className="mx-auto text-gold" /><h3 className="mt-3 font-display text-2xl text-white">No late-night matches</h3><p className="mt-1 text-sm text-muted">Try another venue, vibe, or category.</p></div></div>}
+    {filtered.length ? <div className="mt-7 grid gap-5 md:grid-cols-2 xl:grid-cols-3">{filtered.map((venue) => <VenueCard key={venue.id} venue={venue} saved={Boolean(venue.dealId && saved.has(venue.dealId))} onToggleSave={venue.dealId ? () => void toggleSaved(venue.dealId!) : undefined} onNavigate={() => onNavigate(venue)} />)}</div> : <div className="mt-8 grid min-h-64 place-items-center rounded-2xl border border-dashed border-white/10 bg-card/50 text-center"><div><Icon name="search" size={30} className="mx-auto text-gold" /><h3 className="mt-3 font-display text-2xl text-white">No venues found</h3><p className="mt-1 text-sm text-muted">No active venue matches this search yet.</p></div></div>}
   </section>;
 }
 
@@ -298,7 +337,7 @@ function MapFallbackNotice({ reason }: { reason: string }) {
   return <p className="glass absolute right-3 top-12 z-10 max-w-64 rounded-lg px-3 py-2 text-[10px] leading-4 text-amber-200">{reason} OpenStreetMap is active.</p>;
 }
 
-function GoogleVenueMap({ selected, onSelect, apiKey, mapId, userPosition, routeRequest, routeMode, onRouteChange }: { selected: Venue; onSelect: (venue: Venue) => void; apiKey: string; mapId: string; userPosition: UserPosition | null; routeRequest: number; routeMode: TravelMode; onRouteChange: (state: InAppRouteState) => void }) {
+function GoogleVenueMap({ venues, selected, onSelect, apiKey, mapId, userPosition, routeRequest, routeMode, onRouteChange }: { venues: Venue[]; selected: Venue; onSelect: (venue: Venue) => void; apiKey: string; mapId: string; userPosition: UserPosition | null; routeRequest: number; routeMode: TravelMode; onRouteChange: (state: InAppRouteState) => void }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<google.maps.Map | null>(null);
   const markersRef = useRef<Array<{ marker: google.maps.marker.AdvancedMarkerElement; element: HTMLDivElement; venue: Venue }>>([]);
@@ -333,14 +372,14 @@ function GoogleVenueMap({ selected, onSelect, apiKey, mapId, userPosition, route
         gestureHandling: "greedy",
       });
       const bounds = new google.maps.LatLngBounds();
-      const markers = VENUES.map((venue) => {
+      const markers = venues.map((venue, index) => {
         bounds.extend({ lat: venue.lat, lng: venue.lng });
         const element = document.createElement("div");
         element.className = "google-venue-pin";
         element.dataset.selected = String(venue.id === selectedRef.current.id);
         element.style.setProperty("--pin-color", venue.dealColor);
         const label = document.createElement("span");
-        label.textContent = String(venue.id);
+        label.textContent = String(index + 1);
         element.appendChild(label);
         const marker = new AdvancedMarkerElement({ map, position: { lat: venue.lat, lng: venue.lng }, title: venue.name, content: element, zIndex: venue.id === selectedRef.current.id ? 10 : 1 });
         marker.addListener("click", () => onSelect(venue));
@@ -369,7 +408,7 @@ function GoogleVenueMap({ selected, onSelect, apiKey, mapId, userPosition, route
       routePolylineRef.current = null;
       mapRef.current = null;
     };
-  }, [apiKey, mapId, onRouteChange, onSelect]);
+  }, [apiKey, mapId, onRouteChange, onSelect, venues]);
 
   useEffect(() => {
     if (!mapRef.current) return;
@@ -495,7 +534,7 @@ function GoogleVenueMap({ selected, onSelect, apiKey, mapId, userPosition, route
   </>;
 }
 
-function MapSection({ selected, onSelect, onTaxi, userPosition, locationStatus, locationMessage, onRequestLocation, routeRequest, routeMode, onStartRoute }: { selected: Venue; onSelect: (venue: Venue) => void; onTaxi: (venue: Venue) => void; userPosition: UserPosition | null; locationStatus: LocationStatus; locationMessage: string; onRequestLocation: () => void; routeRequest: number; routeMode: TravelMode; onStartRoute: (mode: TravelMode) => void }) {
+function MapSection({ venues, selected, onSelect, onTaxi, userPosition, locationStatus, locationMessage, onRequestLocation, routeRequest, routeMode, onStartRoute }: { venues: Venue[]; selected: Venue; onSelect: (venue: Venue) => void; onTaxi: (venue: Venue) => void; userPosition: UserPosition | null; locationStatus: LocationStatus; locationMessage: string; onRequestLocation: () => void; routeRequest: number; routeMode: TravelMode; onStartRoute: (mode: TravelMode) => void }) {
   const apiKey = (import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined)?.trim() || "";
   const mapId = (import.meta.env.VITE_GOOGLE_MAPS_MAP_ID as string | undefined)?.trim() || "";
   const [routeState, setRouteState] = useState<InAppRouteState>({ status: "idle" });
@@ -524,13 +563,13 @@ function MapSection({ selected, onSelect, onTaxi, userPosition, locationStatus, 
     <div className="mx-auto max-w-[1400px] px-5 sm:px-8"><SectionHeading eyebrow="Haragedek navigation" title="Navigate without leaving the app" />
       <div className="grid overflow-hidden rounded-2xl border border-white/[0.08] bg-card lg:h-[610px] lg:grid-cols-[minmax(300px,1fr)_2fr]">
         <div className="no-scrollbar order-2 max-h-[420px] overflow-y-auto border-t border-white/[0.07] p-3 lg:order-1 lg:max-h-none lg:border-r lg:border-t-0">
-          <p className="px-2 pb-3 pt-1 text-[9px] font-bold uppercase tracking-[.2em] text-muted">All venues · {VENUES.length}</p>
-          <div className="space-y-2">{VENUES.map((venue) => <button key={venue.id} onClick={() => onSelect(venue)} className={`flex w-full items-center gap-3 rounded-xl border p-2.5 text-left transition ${selected.id === venue.id ? "border-gold/50 bg-gold/[0.09]" : "border-transparent hover:border-white/[0.07] hover:bg-white/[0.035]"}`}>
+          <p className="px-2 pb-3 pt-1 text-[9px] font-bold uppercase tracking-[.2em] text-muted">All venues · {venues.length}</p>
+          <div className="space-y-2">{venues.map((venue) => <button key={venue.id} onClick={() => onSelect(venue)} className={`flex w-full items-center gap-3 rounded-xl border p-2.5 text-left transition ${selected.id === venue.id ? "border-gold/50 bg-gold/[0.09]" : "border-transparent hover:border-white/[0.07] hover:bg-white/[0.035]"}`}>
             <SafeImage src={venue.image} alt={`${venue.name} atmosphere`} className="h-14 w-16 shrink-0 rounded-lg object-cover" /><span className="min-w-0 flex-1"><strong className="block truncate font-display text-[17px] font-semibold text-white">{venue.name}</strong><span className="mt-1 block truncate text-[10px] text-muted">{venue.address}</span></span><span className="shrink-0 text-[10px] font-bold text-gold">{venue.distance}</span>
           </button>)}</div>
         </div>
         <div className="relative order-1 h-[480px] bg-[#171720] lg:order-2 lg:h-auto">
-          {apiKey ? <GoogleVenueMap selected={selected} onSelect={onSelect} apiKey={apiKey} mapId={mapId} userPosition={userPosition} routeRequest={routeRequest} routeMode={routeMode} onRouteChange={handleRouteChange} /> : <><OpenStreetVenueMap venue={selected} /><MapProviderBadge>OpenStreetMap</MapProviderBadge><MapFallbackNotice reason="Google Maps is not configured." /></>}
+          {apiKey ? <GoogleVenueMap venues={venues} selected={selected} onSelect={onSelect} apiKey={apiKey} mapId={mapId} userPosition={userPosition} routeRequest={routeRequest} routeMode={routeMode} onRouteChange={handleRouteChange} /> : <><OpenStreetVenueMap venue={selected} /><MapProviderBadge>OpenStreetMap</MapProviderBadge><MapFallbackNotice reason="Google Maps is not configured." /></>}
           <button type="button" onClick={onRequestLocation} className={`glass absolute left-3 top-3 inline-flex items-center gap-2 rounded-full px-3 py-2 text-[10px] font-bold transition hover:text-white ${locationStatus === "ready" ? "text-cyan-300" : locationStatus === "denied" || locationStatus === "unavailable" ? "text-red-300" : "text-white/75"}`} title={locationMessage}>
             <Icon name="location" size={14} />{locationStatus === "ready" ? "Your location is live" : locationStatus === "locating" ? "Finding your location…" : "Enable your location"}
           </button>
@@ -756,7 +795,12 @@ export default function App() {
 
 function ConsumerApp() {
   const [query, setQuery] = useState("");
-  const [selectedVenue, setSelectedVenue] = useState<Venue>(VENUES[0]!);
+  const [restaurants, setRestaurants] = useState<HomepageRestaurant[]>([]);
+  const [deals, setDeals] = useState<Deal[]>([]);
+  const [stats, setStats] = useState<HomepageStats>({ activeVenues: 0, liveDeals: 0, areas: 0 });
+  const [dataLoading, setDataLoading] = useState(true);
+  const [dataError, setDataError] = useState("");
+  const [selectedVenue, setSelectedVenue] = useState<Venue | null>(null);
   const [taxiVenue, setTaxiVenue] = useState<Venue | null>(null);
   const [routeRequest, setRouteRequest] = useState(0);
   const [routeMode, setRouteMode] = useState<TravelMode>("driving");
@@ -766,6 +810,28 @@ function ConsumerApp() {
   const [locationLabel, setLocationLabel] = useState("Baku, AZ");
   const feedPosition = manualPosition || userPosition;
   const mapsApiKey = (import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined)?.trim() || "";
+  const venues = useMemo(() => restaurants.map((restaurant) => toVenue(restaurant, feedPosition)), [restaurants, feedPosition]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setDataLoading(true);
+    const lat = feedPosition?.lat ?? 40.3719;
+    const lng = feedPosition?.lng ?? 49.8412;
+    Promise.all([
+      api<{ restaurants: HomepageRestaurant[] }>("/restaurants"),
+      api<{ stats: HomepageStats }>("/restaurants/stats/home"),
+      api<{ deals: Deal[] }>(`/deals?lat=${lat}&lng=${lng}&radius=100&all=true&sort=ending`),
+    ]).then(([venueData, statsData, dealData]) => {
+      if (cancelled) return;
+      setRestaurants(venueData.restaurants); setStats(statsData.stats); setDeals(dealData.deals); setDataError("");
+    }).catch((reason) => { if (!cancelled) setDataError(reason instanceof Error ? reason.message : "Could not load homepage data"); })
+      .finally(() => { if (!cancelled) setDataLoading(false); });
+    return () => { cancelled = true; };
+  }, [feedPosition?.lat, feedPosition?.lng]);
+
+  useEffect(() => {
+    setSelectedVenue((current) => venues.find((venue) => venue.id === current?.id) ?? venues[0] ?? null);
+  }, [venues]);
 
   function navigateInApp(venue: Venue) {
     setSelectedVenue(venue);
@@ -779,35 +845,19 @@ function ConsumerApp() {
 
   return <div className="min-h-screen overflow-x-hidden bg-night text-white">
     <Navigation query={query} setQuery={setQuery} locationLabel={locationLabel} onLocationClick={() => { requestLocation(); setLocationPickerOpen(true); }} />
-    <main><Hero /><LiveOffers origin={feedPosition} /><FlashDeals /><VenueDirectory query={query} setQuery={setQuery} onNavigate={navigateInApp} origin={feedPosition} /><MapSection selected={selectedVenue} onSelect={setSelectedVenue} onTaxi={setTaxiVenue} userPosition={feedPosition} locationStatus={locationStatus} locationMessage={locationMessage} onRequestLocation={requestLocation} routeRequest={routeRequest} routeMode={routeMode} onStartRoute={startRoute} /></main>
+    <main><Hero stats={stats} />{dataError && <div className="mx-auto mt-6 max-w-[1340px] rounded-2xl border border-red-400/30 bg-red-500/10 p-4 text-sm text-red-100">{dataError}</div>}<LiveOffers deals={deals} loading={dataLoading} error={dataError} /><FlashDeals deals={deals} loading={dataLoading} /><VenueDirectory venues={venues} query={query} setQuery={setQuery} onNavigate={navigateInApp} origin={feedPosition} />{selectedVenue ? <MapSection venues={venues} selected={selectedVenue} onSelect={setSelectedVenue} onTaxi={setTaxiVenue} userPosition={feedPosition} locationStatus={locationStatus} locationMessage={locationMessage} onRequestLocation={requestLocation} routeRequest={routeRequest} routeMode={routeMode} onStartRoute={startRoute} /> : <section id="map" className="border-y border-white/[0.07] bg-[#0c0c14] py-20"><div className="mx-auto max-w-[1400px] px-5 text-center text-muted">No active venues are available to show on the map.</div></section>}</main>
     <footer className="px-5 py-9 text-center text-[11px] text-muted"><p>© {new Date().getFullYear()} BakuNights · All offers valid for today only</p></footer>
     {taxiVenue && <TaxiSheet venue={taxiVenue} onClose={() => setTaxiVenue(null)} />}
     {locationPickerOpen && <LocationPickerModal apiKey={mapsApiKey} detectedPosition={userPosition} currentPosition={feedPosition} onClose={() => setLocationPickerOpen(false)} onConfirm={(position, label) => { setManualPosition(position); setLocationLabel(label); setLocationPickerOpen(false); }} />}
   </div>;
 }
 
-function LiveOffers({ origin }: { origin: UserPosition | null }) {
-  const [deals, setDeals] = useState<Deal[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    const lat = origin?.lat ?? 40.3719;
-    const lng = origin?.lng ?? 49.8412;
-    api<{ deals: Deal[] }>(`/deals?lat=${lat}&lng=${lng}&radius=100&all=true&sort=distance`)
-      .then((result) => { if (!cancelled) { setDeals(result.deals); setError(""); } })
-      .catch((reason) => { if (!cancelled) setError(reason instanceof Error ? reason.message : "Could not load live offers"); })
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
-  }, [origin?.lat, origin?.lng]);
-
+function LiveOffers({ deals, loading, error }: { deals: Deal[]; loading: boolean; error: string }) {
   return <section className="mx-auto max-w-[1400px] px-5 py-16 sm:px-8">
-    <SectionHeading eyebrow="Approved by admin" title="Live offers from restaurants" action={<span className="hidden text-xs text-muted sm:block">{loading ? "Loading..." : `${deals.length} live offer${deals.length === 1 ? "" : "s"}`}</span>} />
+    <SectionHeading eyebrow="Live now" title="Live offers from restaurants" action={<span className="hidden text-xs text-muted sm:block">{loading ? "Loading..." : `${deals.length} live offer${deals.length === 1 ? "" : "s"}`}</span>} />
     {error ? <div className="rounded-2xl border border-red-400/30 bg-red-500/10 p-5 text-sm text-red-100">{error}</div>
       : loading ? <div className="rounded-2xl border border-white/[0.08] bg-card p-5 text-sm text-muted">Loading approved offers...</div>
-        : deals.length === 0 ? <div className="rounded-2xl border border-white/[0.08] bg-card p-5 text-sm text-muted">No approved live offers yet. Approve an offer in the admin panel and make sure its end time is still in the future.</div>
+        : deals.length === 0 ? <div className="rounded-2xl border border-white/[0.08] bg-card p-5 text-sm text-muted">No live offers right now. New merchant offers will appear here when their scheduled start time arrives.</div>
           : <div className="grid gap-5 text-ink sm:grid-cols-2 lg:grid-cols-3">{deals.map((deal) => <DealCard key={deal.id} deal={deal} />)}</div>}
   </section>;
 }
