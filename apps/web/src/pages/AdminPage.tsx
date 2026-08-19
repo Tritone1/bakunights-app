@@ -7,7 +7,7 @@ import { useAuth } from "../context/AuthContext";
 
 type MetricSet = { activeVenues: number; dealsLiveToday: number; dealsPendingReview: number };
 type AdminVenue = {
-  id: string; name: string; cuisine: string; address: string; lat: number; lng: number; rating: number; phone?: string | null; photoUrl?: string | null; isActive: boolean; autoApproveOffers: boolean; claimStatus: string; verificationNotes?: string | null; isVerifiedTrusted: boolean; trustedBadgeRevoked: boolean; honestyRate?: number | null;
+  id: string; name: string; cuisine: string; address: string; lat: number; lng: number; rating: number; phone?: string | null; photoUrl?: string | null; googlePlaceId?: string | null; isActive: boolean; autoApproveOffers: boolean; claimStatus: string; verificationNotes?: string | null; isVerifiedTrusted: boolean; trustedBadgeRevoked: boolean; honestyRate?: number | null;
   owner?: { id: string; name: string; email: string } | null;
   _count: { deals: number };
 };
@@ -197,6 +197,7 @@ function VenueForm({ venue, onClose, onSaved }: { venue: AdminVenue | null; onCl
       rating: Number(form.get("rating") || 0),
       phone: String(form.get("phone") || "") || null,
       photoUrl: String(form.get("photoUrl") || "") || null,
+      googlePlaceId: String(form.get("googlePlaceId") || "") || null,
       isActive: form.get("isActive") === "on",
       verificationNotes: String(form.get("verificationNotes") || "") || null,
       dietaryTags: [],
@@ -204,7 +205,7 @@ function VenueForm({ venue, onClose, onSaved }: { venue: AdminVenue | null; onCl
     await api(venue ? `/admin/venues/${venue.id}` : "/admin/venues", { method: venue ? "PATCH" : "POST", body: JSON.stringify(body) });
     onSaved();
   }
-  return <Modal title={venue ? "Edit venue" : "Create venue"} onClose={onClose}><form onSubmit={submit} className="grid gap-3 md:grid-cols-2"><Input name="name" label="Name" defaultValue={venue?.name} /><Input name="cuisine" label="Category" defaultValue={venue?.cuisine ?? "Restaurant"} /><Input name="address" label="Address" defaultValue={venue?.address} wide /><Input name="lat" label="Latitude" type="number" step="any" defaultValue={venue?.lat ?? 40.4093} /><Input name="lng" label="Longitude" type="number" step="any" defaultValue={venue?.lng ?? 49.8671} /><Input name="rating" label="Rating" type="number" step="0.1" defaultValue={venue?.rating ?? 4.5} /><Input name="phone" label="Phone" defaultValue={venue?.phone ?? ""} /><Input name="photoUrl" label="Photo URL" defaultValue={venue?.photoUrl ?? ""} wide /><label className="md:col-span-2"><span className="form-label">Verification notes</span><textarea name="verificationNotes" className="form-field min-h-24" defaultValue={venue?.verificationNotes ?? ""} /></label><label className="flex items-center gap-2 text-sm"><input name="isActive" type="checkbox" defaultChecked={venue?.isActive ?? true} />Active</label><p className="md:col-span-2 text-xs text-white/45">Merchant offers publish automatically. This panel monitors offer activity.</p><Actions onClose={onClose} /></form></Modal>;
+  return <Modal title={venue ? "Edit venue" : "Create venue"} onClose={onClose}><form onSubmit={submit} className="grid gap-3 md:grid-cols-2"><Input name="name" label="Name" defaultValue={venue?.name} /><Input name="cuisine" label="Category" defaultValue={venue?.cuisine ?? "Restaurant"} /><Input name="address" label="Address" defaultValue={venue?.address} wide /><Input name="lat" label="Latitude" type="number" step="any" defaultValue={venue?.lat ?? 40.4093} /><Input name="lng" label="Longitude" type="number" step="any" defaultValue={venue?.lng ?? 49.8671} /><Input name="rating" label="Rating" type="number" step="0.1" defaultValue={venue?.rating ?? 4.5} /><Input name="phone" label="Phone" defaultValue={venue?.phone ?? ""} /><Input name="photoUrl" label="Photo URL" defaultValue={venue?.photoUrl ?? ""} wide /><label className="md:col-span-2"><span className="form-label">Google Place ID (optional)</span><input name="googlePlaceId" className="form-field" defaultValue={venue?.googlePlaceId ?? ""} placeholder="ChIJ…" /><span className="mt-1 block text-xs text-white/40">Link only after confirming this is the venue&apos;s exact Google listing.</span></label><label className="md:col-span-2"><span className="form-label">Verification notes</span><textarea name="verificationNotes" className="form-field min-h-24" defaultValue={venue?.verificationNotes ?? ""} /></label><label className="flex items-center gap-2 text-sm"><input name="isActive" type="checkbox" defaultChecked={venue?.isActive ?? true} />Active</label><p className="md:col-span-2 text-xs text-white/45">Merchant offers publish automatically. This panel monitors offer activity.</p><Actions onClose={onClose} /></form></Modal>;
 }
 
 function LogoutButton() {

@@ -12,6 +12,7 @@ const imageValue = z.string().trim().max(3_000_000).refine((value) => /^https?:\
 adminRouter.use(requireAdmin);
 
 const venueInput = z.object({
+  googlePlaceId: z.string().trim().min(1).max(255).nullable().optional(),
   name: z.string().trim().min(2).max(120),
   cuisine: z.string().trim().min(2).max(60),
   dietaryTags: z.array(z.string().trim().max(30)).max(10).default([]),

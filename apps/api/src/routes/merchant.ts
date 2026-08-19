@@ -108,6 +108,18 @@ async function assertOfferPhoto(restaurantId: string, input: { photoUrl?: string
   return itemWithPhoto.photoUrl!;
 }
 
+merchantRouter.patch("/venues/:venueId/google-place", asyncRoute(async (req, res) => {
+  const venueId = z.string().parse(req.params.venueId);
+  await assertOwner(req.user!.id, venueId);
+  const { googlePlaceId } = z.object({ googlePlaceId: z.string().trim().min(1).max(255).nullable() }).parse(req.body);
+  if (googlePlaceId) {
+    const existing = await prisma.restaurant.findUnique({ where: { googlePlaceId }, select: { id: true } });
+    if (existing && existing.id !== venueId) throw new HttpError(409, "That Google listing is already linked to another venue.");
+  }
+  const venue = await prisma.restaurant.update({ where: { id: venueId }, data: { googlePlaceId }, select: { id: true, googlePlaceId: true } });
+  res.json({ venue });
+}));
+
 merchantRouter.get("/menu/categories", asyncRoute(async (_req, res) => {
   const categories = await prisma.menuCategory.findMany({ orderBy: [{ sortOrder: "asc" }, { name: "asc" }] });
   res.json({ categories });

@@ -8,6 +8,7 @@ import { MerchantPage } from "./pages/MerchantPage";
 import { VerifyEmailPage } from "./pages/VerifyEmailPage";
 import { ProfilePage } from "./pages/ProfilePage";
 import { SavedPage } from "./pages/SavedPage";
+import { VenuePage } from "./pages/VenuePage";
 import { api } from "./lib/api";
 import { useAuth } from "./context/AuthContext";
 import type { Deal } from "./types";
@@ -262,12 +263,13 @@ function Star({ filled = true }: { filled?: boolean }) {
 }
 
 function VenueCard({ venue, saved, onToggleSave, onNavigate }: { venue: Venue; saved: boolean; onToggleSave?: () => void; onNavigate: () => void }) {
-  return <article data-venue-card className="group overflow-hidden rounded-2xl border border-white/[0.07] bg-card transition-transform duration-200 hover:-translate-y-1 hover:border-white/[0.13]">
+  const navigate = useNavigate();
+  return <article data-venue-card role="link" tabIndex={0} onClick={() => navigate(`/venues/${venue.id}`)} onKeyDown={(event) => { if (event.target === event.currentTarget && (event.key === "Enter" || event.key === " ")) navigate(`/venues/${venue.id}`); }} className="group cursor-pointer overflow-hidden rounded-2xl border border-white/[0.07] bg-card transition-transform duration-200 hover:-translate-y-1 hover:border-white/[0.13]">
     <div className="relative h-44 overflow-hidden">
       <SafeImage src={venue.image} alt={`${venue.name} atmosphere`} loading="lazy" className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.04]" />
       <div className="absolute inset-0 bg-gradient-to-t from-card via-black/15 to-transparent" />
       <span className="absolute left-4 top-4 rounded-full px-2.5 py-1 text-[9px] font-extrabold tracking-[.14em] text-white shadow-lg" style={{ backgroundColor: venue.dealColor }}>{venue.dealTag}</span>
-      {onToggleSave && <button onClick={onToggleSave} aria-label={saved ? `Remove ${venue.name} from saved` : `Save ${venue.name}`} className={`absolute right-4 top-4 grid h-9 w-9 place-items-center rounded-full border backdrop-blur transition ${saved ? "border-gold bg-gold text-night" : "border-white/15 bg-black/35 text-white hover:border-gold hover:text-gold"}`}><Icon name="bookmark" size={16} /></button>}
+      {onToggleSave && <button onClick={(event) => { event.stopPropagation(); onToggleSave(); }} aria-label={saved ? `Remove ${venue.name} from saved` : `Save ${venue.name}`} className={`absolute right-4 top-4 grid h-9 w-9 place-items-center rounded-full border backdrop-blur transition ${saved ? "border-gold bg-gold text-night" : "border-white/15 bg-black/35 text-white hover:border-gold hover:text-gold"}`}><Icon name="bookmark" size={16} /></button>}
       <div className="absolute inset-x-0 bottom-0 px-5 pb-4"><p className="mb-1 text-[9px] font-bold uppercase tracking-[.2em] text-gold">{venue.category}</p><h3 className="font-display text-[27px] font-semibold leading-tight text-white">{venue.name}</h3></div>
     </div>
     <div className="p-5 pt-3">
@@ -279,7 +281,7 @@ function VenueCard({ venue, saved, onToggleSave, onNavigate }: { venue: Venue; s
       <div className="mt-4 flex flex-wrap gap-1.5">{venue.tags.map((tag) => <span key={tag} className="rounded-full border border-white/[0.07] bg-white/[0.035] px-2.5 py-1 text-[10px] text-white/55">{tag}</span>)}</div>
       <div className="my-5 h-px bg-white/[0.07]" />
       <p className="text-sm font-semibold text-white">{venue.deal}</p>
-      <div className="mt-4 flex items-center gap-2"><span className="mr-auto flex items-center gap-1.5 text-[11px] text-muted"><Icon name="clock" size={14} />{venue.open}</span><button type="button" onClick={onNavigate} className="inline-flex items-center gap-2 rounded-full bg-gold px-4 py-2 text-xs font-bold text-night transition hover:bg-amber-300" aria-label={`Navigate to ${venue.name} in Haragedek`}>Navigate me<Icon name="location" size={14} /></button></div>
+      <div className="mt-4 flex items-center gap-2"><span className="mr-auto flex items-center gap-1.5 text-[11px] text-muted"><Icon name="clock" size={14} />{venue.open}</span><button type="button" onClick={(event) => { event.stopPropagation(); onNavigate(); }} className="inline-flex items-center gap-2 rounded-full bg-gold px-4 py-2 text-xs font-bold text-night transition hover:bg-amber-300" aria-label={`Navigate to ${venue.name} in Haragedek`}>Navigate me<Icon name="location" size={14} /></button></div>
     </div>
   </article>;
 }
@@ -535,6 +537,7 @@ function GoogleVenueMap({ venues, selected, onSelect, apiKey, mapId, userPositio
 }
 
 function MapSection({ venues, selected, onSelect, onTaxi, userPosition, locationStatus, locationMessage, onRequestLocation, routeRequest, routeMode, onStartRoute }: { venues: Venue[]; selected: Venue; onSelect: (venue: Venue) => void; onTaxi: (venue: Venue) => void; userPosition: UserPosition | null; locationStatus: LocationStatus; locationMessage: string; onRequestLocation: () => void; routeRequest: number; routeMode: TravelMode; onStartRoute: (mode: TravelMode) => void }) {
+  const navigate = useNavigate();
   const apiKey = (import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined)?.trim() || "";
   const mapId = (import.meta.env.VITE_GOOGLE_MAPS_MAP_ID as string | undefined)?.trim() || "";
   const [routeState, setRouteState] = useState<InAppRouteState>({ status: "idle" });
@@ -564,7 +567,7 @@ function MapSection({ venues, selected, onSelect, onTaxi, userPosition, location
       <div className="grid overflow-hidden rounded-2xl border border-white/[0.08] bg-card lg:h-[610px] lg:grid-cols-[minmax(300px,1fr)_2fr]">
         <div className="no-scrollbar order-2 max-h-[420px] overflow-y-auto border-t border-white/[0.07] p-3 lg:order-1 lg:max-h-none lg:border-r lg:border-t-0">
           <p className="px-2 pb-3 pt-1 text-[9px] font-bold uppercase tracking-[.2em] text-muted">All venues · {venues.length}</p>
-          <div className="space-y-2">{venues.map((venue) => <button key={venue.id} onClick={() => onSelect(venue)} className={`flex w-full items-center gap-3 rounded-xl border p-2.5 text-left transition ${selected.id === venue.id ? "border-gold/50 bg-gold/[0.09]" : "border-transparent hover:border-white/[0.07] hover:bg-white/[0.035]"}`}>
+          <div className="space-y-2">{venues.map((venue) => <button key={venue.id} onClick={() => navigate(`/venues/${venue.id}`)} className={`flex w-full items-center gap-3 rounded-xl border p-2.5 text-left transition ${selected.id === venue.id ? "border-gold/50 bg-gold/[0.09]" : "border-transparent hover:border-white/[0.07] hover:bg-white/[0.035]"}`}>
             <SafeImage src={venue.image} alt={`${venue.name} atmosphere`} className="h-14 w-16 shrink-0 rounded-lg object-cover" /><span className="min-w-0 flex-1"><strong className="block truncate font-display text-[17px] font-semibold text-white">{venue.name}</strong><span className="mt-1 block truncate text-[10px] text-muted">{venue.address}</span></span><span className="shrink-0 text-[10px] font-bold text-gold">{venue.distance}</span>
           </button>)}</div>
         </div>
@@ -790,6 +793,7 @@ export default function App() {
   if (path.startsWith("/profile")) return <ProfilePage />;
   if (path.startsWith("/saved")) return <SavedPage />;
   if (path.startsWith("/deals/")) return <DealDetailPage />;
+  if (path.startsWith("/venues/")) return <VenuePage />;
   return <ConsumerApp />;
 }
 

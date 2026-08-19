@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent, type InputHTMLAttributes, type ReactNode } from "react";
-import { BarChart3, Bookmark, Copy, Eye, List, MapPin, Pencil, Plus, QrCode, Store, TicketCheck, Upload, Users } from "lucide-react";
+import { BarChart3, Bookmark, Copy, Eye, Link2, List, MapPin, Pencil, Plus, QrCode, Search, Store, TicketCheck, Upload, Users } from "lucide-react";
 import { Link } from "react-router-dom";
 import { format } from "date-fns";
 import { api } from "../lib/api";
@@ -11,7 +11,7 @@ type MerchantDeal = {
   scope: OfferScope; scopeCategoryId?: string | null; offerMenuItems: { menuItemId: string; overridePriceAzn?: string | number | null; menuItem: MenuItem }[];
   _count: { views: number; savedBy: number; redemptions: number };
 };
-type ManagedVenue = { id: string; name: string; address: string; cuisine: string; lat: number; lng: number; photoUrl: string | null; deals: MerchantDeal[]; _count: { followers: number } };
+type ManagedVenue = { id: string; name: string; address: string; cuisine: string; lat: number; lng: number; photoUrl: string | null; googlePlaceId?: string | null; deals: MerchantDeal[]; _count: { followers: number } };
 type MenuCategory = { id: string; name: string; sortOrder: number };
 type MenuItem = { id: string; venueId: string; categoryId: string; name: string; priceAzn: number; description?: string | null; photoUrl?: string | null; isActive: boolean; category: MenuCategory };
 type CatalogItem = { id: string; name: string; categoryId: string; photoUrl?: string | null; category: MenuCategory };
@@ -85,7 +85,7 @@ export function MerchantPage() {
     <div className="mt-6 flex gap-2 border-b border-white/10 pb-3"><button onClick={() => setActiveTab("dashboard")} className={activeTab === "dashboard" ? "panel-button" : "rounded-xl px-4 py-2 text-sm font-semibold text-white/55 hover:bg-white/5"}><BarChart3 size={16} />Dashboard</button><button onClick={() => setActiveTab("menu")} className={activeTab === "menu" ? "panel-button" : "rounded-xl px-4 py-2 text-sm font-semibold text-white/55 hover:bg-white/5"}><List size={16} />Menu</button></div>
     {activeTab === "menu" ? <MenuManager venues={venues} categories={categories} items={menuItems} onChanged={load} /> : <>
     <section className="mt-6 grid gap-3 md:grid-cols-2">
-      {venues.map((venue) => <article key={venue.id} className="flex gap-4 rounded-xl border border-white/10 bg-white/[0.045] p-4">{venue.photoUrl ? <SafeImage src={venue.photoUrl} alt={`${venue.name} logo`} className="h-20 w-20 shrink-0 rounded-xl object-cover" /> : <span className="grid h-20 w-20 shrink-0 place-items-center rounded-xl bg-white/[0.06]"><Store className="text-cyan-300" /></span>}<div className="min-w-0"><p className="text-[10px] font-bold uppercase tracking-[.16em] text-gold">Your registered venue</p><h2 className="mt-1 truncate text-xl font-semibold">{venue.name}</h2><p className="mt-1 flex items-start gap-1 text-sm text-white/55"><MapPin className="mt-0.5 shrink-0 text-cyan-300" size={14} />{venue.address}</p><a href={`https://www.google.com/maps/search/?api=1&query=${venue.lat},${venue.lng}`} target="_blank" rel="noreferrer" className="mt-2 inline-flex text-xs font-semibold text-cyan-300 underline">View registered map location</a></div></article>)}
+      {venues.map((venue) => <article key={venue.id} className="rounded-xl border border-white/10 bg-white/[0.045] p-4"><div className="flex gap-4">{venue.photoUrl ? <SafeImage src={venue.photoUrl} alt={`${venue.name} logo`} className="h-20 w-20 shrink-0 rounded-xl object-cover" /> : <span className="grid h-20 w-20 shrink-0 place-items-center rounded-xl bg-white/[0.06]"><Store className="text-cyan-300" /></span>}<div className="min-w-0"><p className="text-[10px] font-bold uppercase tracking-[.16em] text-gold">Your registered venue</p><h2 className="mt-1 truncate text-xl font-semibold">{venue.name}</h2><p className="mt-1 flex items-start gap-1 text-sm text-white/55"><MapPin className="mt-0.5 shrink-0 text-cyan-300" size={14} />{venue.address}</p><a href={`https://www.google.com/maps/search/?api=1&query=${venue.lat},${venue.lng}`} target="_blank" rel="noreferrer" className="mt-2 inline-flex text-xs font-semibold text-cyan-300 underline">View registered map location</a></div></div><GooglePlaceLinker venue={venue} onChanged={load} /></article>)}
     </section>
     <div className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
       <Metric icon={Eye} label="Offer views" value={totals.views} />
@@ -106,6 +106,47 @@ export function MerchantPage() {
     {showForm && <DealForm venues={venues} categories={categories} menuItems={menuItems} editing={editing} onOpenMenu={() => { setShowForm(false); setActiveTab("menu"); }} onClose={() => setShowForm(false)} onSaved={() => { setShowForm(false); void load(); }} />}
     </>}
   </Shell>;
+}
+
+function GooglePlaceLinker({ venue, onChanged }: { venue: ManagedVenue; onChanged: () => Promise<void> }) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState(venue.name);
+  const [suggestions, setSuggestions] = useState<{ id: string; label: string }[]>([]);
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (!open || query.trim().length < 3) { setSuggestions([]); return; }
+    const timeout = window.setTimeout(() => {
+      setBusy(true);
+      api<{ suggestions: { id: string; label: string }[] }>(`/places/autocomplete?input=${encodeURIComponent(query)}`)
+        .then((result) => { setSuggestions(result.suggestions); setError(""); })
+        .catch((reason) => { setSuggestions([]); setError(reason instanceof Error ? reason.message : "Google search is unavailable"); })
+        .finally(() => setBusy(false));
+    }, 350);
+    return () => window.clearTimeout(timeout);
+  }, [open, query]);
+
+  async function choose(placeId: string) {
+    setBusy(true);
+    try {
+      const { place } = await api<{ place: { id: string; name?: string; address: string } }>(`/places/${placeId}`);
+      if (!window.confirm(`Link ${venue.name} to the Google listing “${place.name || place.address}”?`)) return;
+      await api(`/merchant/venues/${venue.id}/google-place`, { method: "PATCH", body: JSON.stringify({ googlePlaceId: place.id }) });
+      setOpen(false); await onChanged();
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "Could not link this Google listing"); }
+    finally { setBusy(false); }
+  }
+
+  async function unlink() {
+    if (!window.confirm("Remove this Google listing link? Google reviews will no longer appear.")) return;
+    setBusy(true);
+    try { await api(`/merchant/venues/${venue.id}/google-place`, { method: "PATCH", body: JSON.stringify({ googlePlaceId: null }) }); await onChanged(); }
+    catch (reason) { setError(reason instanceof Error ? reason.message : "Could not remove Google listing"); }
+    finally { setBusy(false); }
+  }
+
+  return <div className="mt-4 border-t border-white/10 pt-4">{venue.googlePlaceId ? <div className="flex flex-wrap items-center justify-between gap-2"><p className="flex items-center gap-2 text-sm text-emerald-300"><Link2 size={16} />Google listing linked</p><div className="flex gap-3"><button onClick={() => setOpen(true)} className="text-xs font-semibold text-cyan-300">Change</button><button onClick={() => void unlink()} disabled={busy} className="text-xs font-semibold text-red-300">Unlink</button></div></div> : <button onClick={() => setOpen(true)} className="inline-flex items-center gap-2 text-sm font-semibold text-cyan-300"><Link2 size={16} />Link Google listing for reviews</button>}{open && <div className="mt-3 rounded-xl border border-white/10 bg-black/20 p-3"><label className="relative block"><Search className="absolute left-3 top-3 text-white/35" size={17} /><input value={query} onChange={(event) => setQuery(event.target.value)} className="form-field pl-10" placeholder="Search exact venue name and address" /></label>{busy && <p className="mt-2 text-xs text-white/45">Searching…</p>}<div className="mt-2 divide-y divide-white/10">{suggestions.map((suggestion) => <button key={suggestion.id} onClick={() => void choose(suggestion.id)} className="block w-full py-2 text-left text-sm text-white/70 hover:text-cyan-300">{suggestion.label}</button>)}</div><button onClick={() => setOpen(false)} className="mt-2 text-xs text-white/45">Cancel</button></div>}{error && <p className="mt-2 text-xs text-red-300">{error}</p>}</div>;
 }
 
 function Shell({ children }: { children: ReactNode }) {
