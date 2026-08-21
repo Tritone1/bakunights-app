@@ -9,6 +9,46 @@ import { requireAuth } from "../middleware/auth.js";
 export const usersRouter = Router();
 usersRouter.use(requireAuth);
 
+const profileUpdateSchema = z.object({
+  name: z.string().trim().min(2).max(60),
+  homeLat: z.number().min(-90).max(90).nullable(),
+  homeLng: z.number().min(-180).max(180).nullable(),
+}).refine((value) => (value.homeLat == null) === (value.homeLng == null), {
+  message: "Enter both latitude and longitude, or leave both empty.",
+  path: ["homeLat"],
+});
+
+usersRouter.get("/me/profile", asyncRoute(async (req, res) => {
+  const profile = await prisma.user.findUnique({
+    where: { id: req.user!.id },
+    select: { id: true, email: true, name: true, role: true, homeLat: true, homeLng: true, preferencesJson: true, createdAt: true },
+  });
+  if (!profile) throw new HttpError(404, "Account not found.");
+  res.json({ profile });
+}));
+
+usersRouter.patch("/me/profile", asyncRoute(async (req, res) => {
+  const input = profileUpdateSchema.parse(req.body);
+  const user = await prisma.user.update({
+    where: { id: req.user!.id }, data: input,
+    select: { id: true, email: true, name: true, role: true, homeLat: true, homeLng: true, createdAt: true },
+  });
+  res.json({ user });
+}));
+
+const newPasswordSchema = z.string().min(8, "Password must be at least 8 characters.").max(128)
+  .regex(/[a-z]/, "Password must include a lowercase letter.")
+  .regex(/[A-Z]/, "Password must include an uppercase letter.");
+
+usersRouter.patch("/me/password", asyncRoute(async (req, res) => {
+  const input = z.object({ currentPassword: z.string().min(1).max(128), newPassword: newPasswordSchema }).parse(req.body);
+  const user = await prisma.user.findUnique({ where: { id: req.user!.id }, select: { passwordHash: true } });
+  if (!user?.passwordHash || !await bcrypt.compare(input.currentPassword, user.passwordHash)) throw new HttpError(401, "Current password is incorrect.");
+  if (await bcrypt.compare(input.newPassword, user.passwordHash)) throw new HttpError(400, "Choose a password you have not already used here.");
+  await prisma.user.update({ where: { id: req.user!.id }, data: { passwordHash: await bcrypt.hash(input.newPassword, 12) } });
+  res.status(204).end();
+}));
+
 usersRouter.patch("/me/location", asyncRoute(async (req, res) => {
   const input = z.object({
     lat: z.number().min(-90).max(90),

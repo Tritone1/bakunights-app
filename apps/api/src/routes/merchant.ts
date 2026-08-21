@@ -384,6 +384,19 @@ merchantRouter.post("/deals/:id/expire", asyncRoute(async (req, res) => {
   res.json({ deal });
 }));
 
+merchantRouter.post("/deals/:id/go-live", asyncRoute(async (req, res) => {
+  const dealId = z.string().parse(req.params.id);
+  const existing = await prisma.deal.findUnique({ where: { id: dealId } });
+  if (!existing) throw new HttpError(404, "Offer not found.");
+  await assertOwner(req.user!.id, existing.restaurantId);
+  const now = new Date();
+  const deal = await prisma.deal.update({
+    where: { id: existing.id },
+    data: { status: "approved", isActive: true, startsAt: now, endsAt: existing.endsAt > now ? existing.endsAt : new Date(now.getTime() + 24 * 60 * 60 * 1000) },
+  });
+  res.json({ deal, visibility: "live" });
+}));
+
 merchantRouter.post("/redemptions/redeem", asyncRoute(async (req, res) => {
   const { code } = z.object({ code: z.string().trim().min(4).max(30) }).parse(req.body);
   const redemption = await prisma.redemption.findUnique({

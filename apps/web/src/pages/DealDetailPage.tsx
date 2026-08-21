@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import { ArrowLeft, Bookmark, Check, CheckCircle2, Clock3, ExternalLink, Heart, MapPin, Navigation, Share2, Star } from "lucide-react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Bookmark, Check, CheckCircle2, Clock3, ExternalLink, Heart, MapPin, Navigation, Share2, Star } from "lucide-react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { format, formatDistanceToNowStrict } from "date-fns";
 import { api } from "../lib/api";
 import type { Deal, Redemption } from "../types";
@@ -76,7 +76,6 @@ export function DealDetailPage() {
     <div className="relative h-64 border-b-2 border-ink bg-primary-50 sm:h-80 md:mx-8 md:mt-6 md:overflow-hidden md:rounded-xl md:border-2">
       <SafeImage src={deal.photoUrl || restaurant.photoUrl || undefined} alt={`${restaurant.name} offer`} className="h-full w-full object-cover" />
       <div className="absolute inset-0 bg-gradient-to-t from-ink/70 via-transparent to-transparent" />
-      <Link to="/" className="absolute left-4 top-4 flex h-11 w-11 items-center justify-center rounded-full border-2 border-ink bg-cream shadow-ticket-sm" aria-label="Back to offers"><ArrowLeft /></Link>
       <div className="stamp absolute right-4 top-4 flex h-28 w-28 items-center justify-center rounded-full text-center text-white"><span className="relative px-2 font-display text-3xl font-bold uppercase leading-none">{badge.main}<small className="block text-xs tracking-widest">{badge.sub}</small></span></div>
       <div className="absolute bottom-5 left-5 text-white"><p className="eyebrow">{restaurant.cuisine} · {deal.tag}</p><p className="font-display text-xl font-semibold uppercase">{restaurant.name}</p></div>
     </div>

@@ -45,6 +45,8 @@ button { cursor: pointer; }
 .form-field { width: 100%; border-radius: .65rem; border: 1px solid rgba(255,255,255,.12); background: rgba(255,255,255,.06); padding: .7rem .85rem; color: #fff; outline: none; }
 .form-field:focus { border-color: rgba(103,232,249,.7); }
 .form-field option { color: #111827; }
+.profile-action { display: flex; width: 100%; align-items: center; gap: .65rem; border: 1px solid rgba(255,255,255,.1); border-radius: .75rem; padding: .75rem .9rem; color: rgba(255,255,255,.78); font-weight: 700; transition: background .18s ease, border-color .18s ease; }
+.profile-action:hover { border-color: rgba(103,232,249,.32); background: rgba(255,255,255,.06); color: #fff; }
 
 .google-venue-pin {
   display: grid;

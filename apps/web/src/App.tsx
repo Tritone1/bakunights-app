@@ -13,6 +13,8 @@ import { api } from "./lib/api";
 import { useAuth } from "./context/AuthContext";
 import type { Deal } from "./types";
 import { SafeImage } from "./components/SafeImage";
+import { DealRoulette } from "./components/DealRoulette";
+import { ArrowLeft, Home } from "lucide-react";
 
 type Category = "Restaurants" | "Bars" | "Pubs" | "Lounges";
 
@@ -786,15 +788,25 @@ function LocationPickerModal({ apiKey, detectedPosition, currentPosition, onConf
 
 export default function App() {
   const { pathname: path } = useLocation();
-  if (path.startsWith("/verify-email")) return <VerifyEmailPage />;
-  if (path.startsWith("/admin")) return <AdminPage />;
-  if (path.startsWith("/merchant")) return <MerchantPage />;
-  if (path.startsWith("/login") || path.startsWith("/register")) return <AuthPage />;
-  if (path.startsWith("/profile")) return <ProfilePage />;
-  if (path.startsWith("/saved")) return <SavedPage />;
-  if (path.startsWith("/deals/")) return <DealDetailPage />;
-  if (path.startsWith("/venues/")) return <VenuePage />;
+  const routedPage = path.startsWith("/verify-email") ? <VerifyEmailPage />
+    : path.startsWith("/admin") ? <AdminPage />
+      : path.startsWith("/merchant") ? <MerchantPage />
+        : path.startsWith("/login") || path.startsWith("/register") ? <AuthPage />
+          : path.startsWith("/profile") ? <ProfilePage />
+            : path.startsWith("/saved") ? <SavedPage />
+              : path.startsWith("/deals/") ? <DealDetailPage />
+                : path.startsWith("/venues/") ? <VenuePage />
+                  : null;
+  if (routedPage) return <><RouteNavigation />{routedPage}</>;
   return <ConsumerApp />;
+}
+
+function RouteNavigation() {
+  const navigate = useNavigate();
+  return <nav className="fixed left-3 top-3 z-[140] flex gap-2" aria-label="Page navigation">
+    <button type="button" onClick={() => window.history.length > 1 ? navigate(-1) : navigate("/")} className="glass inline-flex h-10 items-center gap-2 rounded-full px-3 text-xs font-bold text-white transition hover:border-gold/50 hover:text-gold" aria-label="Go back"><ArrowLeft size={16} />Back</button>
+    <Link to="/" className="glass inline-flex h-10 items-center gap-2 rounded-full px-3 text-xs font-bold text-white transition hover:border-gold/50 hover:text-gold" aria-label="Go to main page"><Home size={16} />Home</Link>
+  </nav>;
 }
 
 function ConsumerApp() {
@@ -849,7 +861,7 @@ function ConsumerApp() {
 
   return <div className="min-h-screen overflow-x-hidden bg-night text-white">
     <Navigation query={query} setQuery={setQuery} locationLabel={locationLabel} onLocationClick={() => { requestLocation(); setLocationPickerOpen(true); }} />
-    <main><Hero stats={stats} />{dataError && <div className="mx-auto mt-6 max-w-[1340px] rounded-2xl border border-red-400/30 bg-red-500/10 p-4 text-sm text-red-100">{dataError}</div>}<LiveOffers deals={deals} loading={dataLoading} error={dataError} /><FlashDeals deals={deals} loading={dataLoading} /><VenueDirectory venues={venues} query={query} setQuery={setQuery} onNavigate={navigateInApp} origin={feedPosition} />{selectedVenue ? <MapSection venues={venues} selected={selectedVenue} onSelect={setSelectedVenue} onTaxi={setTaxiVenue} userPosition={feedPosition} locationStatus={locationStatus} locationMessage={locationMessage} onRequestLocation={requestLocation} routeRequest={routeRequest} routeMode={routeMode} onStartRoute={startRoute} /> : <section id="map" className="border-y border-white/[0.07] bg-[#0c0c14] py-20"><div className="mx-auto max-w-[1400px] px-5 text-center text-muted">No active venues are available to show on the map.</div></section>}</main>
+    <main><Hero stats={stats} />{dataError && <div className="mx-auto mt-6 max-w-[1340px] rounded-2xl border border-red-400/30 bg-red-500/10 p-4 text-sm text-red-100">{dataError}</div>}<LiveOffers deals={deals} loading={dataLoading} error={dataError} /><DealRoulette deals={deals} /><FlashDeals deals={deals} loading={dataLoading} /><VenueDirectory venues={venues} query={query} setQuery={setQuery} onNavigate={navigateInApp} origin={feedPosition} />{selectedVenue ? <MapSection venues={venues} selected={selectedVenue} onSelect={setSelectedVenue} onTaxi={setTaxiVenue} userPosition={feedPosition} locationStatus={locationStatus} locationMessage={locationMessage} onRequestLocation={requestLocation} routeRequest={routeRequest} routeMode={routeMode} onStartRoute={startRoute} /> : <section id="map" className="border-y border-white/[0.07] bg-[#0c0c14] py-20"><div className="mx-auto max-w-[1400px] px-5 text-center text-muted">No active venues are available to show on the map.</div></section>}</main>
     <footer className="px-5 py-9 text-center text-[11px] text-muted"><p>© {new Date().getFullYear()} BakuNights · All offers valid for today only</p></footer>
     {taxiVenue && <TaxiSheet venue={taxiVenue} onClose={() => setTaxiVenue(null)} />}
     {locationPickerOpen && <LocationPickerModal apiKey={mapsApiKey} detectedPosition={userPosition} currentPosition={feedPosition} onClose={() => setLocationPickerOpen(false)} onConfirm={(position, label) => { setManualPosition(position); setLocationLabel(label); setLocationPickerOpen(false); }} />}

@@ -6,11 +6,9 @@ import { requireAuth } from "../middleware/auth.js";
 import { env } from "../env.js";
 
 export const restaurantsRouter = Router();
-const googleReviewsCache = new Map<string, { expiresAt: number; payload: GoogleReviewsResponse }>();
-const GOOGLE_REVIEWS_CACHE_MS = 12 * 60 * 60 * 1000;
 
-type GoogleReview = { reviewerName: string; rating: number; relativeTime: string; text: string };
-type GoogleReviewsResponse = { available: true; rating: number | null; reviewCount: number | null; reviews: GoogleReview[] };
+type GoogleReview = { reviewerName: string; reviewerUri: string | null; reviewerPhotoUri: string | null; reviewUri: string | null; rating: number; relativeTime: string; text: string };
+type GoogleReviewsResponse = { available: true; rating: number | null; reviewCount: number | null; googleMapsUri: string | null; reviews: GoogleReview[] };
 
 function assertGooglePlacesConfigured() {
   if (!env.GOOGLE_MAPS_SERVER_API_KEY) throw new HttpError(503, "Google reviews are not configured yet.");
@@ -58,35 +56,41 @@ restaurantsRouter.get("/:id/reviews", asyncRoute(async (req, res) => {
   if (!restaurant.googlePlaceId) return res.json({ available: false, reason: "not_linked" });
   assertGooglePlacesConfigured();
 
-  const cached = googleReviewsCache.get(restaurant.googlePlaceId);
-  if (cached && cached.expiresAt > Date.now()) return res.json(cached.payload);
-
   const placeId = encodeURIComponent(restaurant.googlePlaceId);
   const response = await fetch(`https://places.googleapis.com/v1/places/${placeId}`, {
     headers: {
       "X-Goog-Api-Key": env.GOOGLE_MAPS_SERVER_API_KEY!,
-      "X-Goog-FieldMask": "rating,userRatingCount,reviews.rating,reviews.relativePublishTimeDescription,reviews.text.text,reviews.authorAttribution.displayName",
+      "X-Goog-FieldMask": "googleMapsUri,rating,userRatingCount,reviews.rating,reviews.relativePublishTimeDescription,reviews.text.text,reviews.originalText.text,reviews.authorAttribution.displayName,reviews.authorAttribution.uri,reviews.authorAttribution.photoUri,reviews.googleMapsUri",
+      "Accept-Language": req.headers["accept-language"] || "en",
     },
   });
-  if (!response.ok) throw new HttpError(502, "Google reviews are temporarily unavailable.");
+  if (!response.ok) {
+    const failure = await response.json().catch(() => null) as { error?: { message?: string; status?: string } } | null;
+    console.error("Google Places reviews failed", response.status, failure?.error?.status, failure?.error?.message);
+    throw new HttpError(502, "Google reviews could not load. Check that Places API (New) is enabled for the server API key.");
+  }
   const data = await response.json() as {
+    googleMapsUri?: string;
     rating?: number;
     userRatingCount?: number;
-    reviews?: Array<{ rating?: number; relativePublishTimeDescription?: string; text?: { text?: string }; authorAttribution?: { displayName?: string } }>;
+    reviews?: Array<{ rating?: number; relativePublishTimeDescription?: string; text?: { text?: string }; originalText?: { text?: string }; googleMapsUri?: string; authorAttribution?: { displayName?: string; uri?: string; photoUri?: string } }>;
   };
   const payload: GoogleReviewsResponse = {
     available: true,
     rating: data.rating ?? null,
     reviewCount: data.userRatingCount ?? null,
+    googleMapsUri: data.googleMapsUri ?? null,
     reviews: (data.reviews ?? []).map((review) => ({
       reviewerName: review.authorAttribution?.displayName || "Google user",
+      reviewerUri: review.authorAttribution?.uri ?? null,
+      reviewerPhotoUri: review.authorAttribution?.photoUri ?? null,
+      reviewUri: review.googleMapsUri ?? null,
       rating: review.rating ?? 0,
       relativeTime: review.relativePublishTimeDescription || "",
-      text: review.text?.text || "",
+      text: review.text?.text || review.originalText?.text || "",
     })),
   };
-  googleReviewsCache.set(restaurant.googlePlaceId, { expiresAt: Date.now() + GOOGLE_REVIEWS_CACHE_MS, payload });
-  res.setHeader("Cache-Control", "public, max-age=3600");
+  res.setHeader("Cache-Control", "private, no-store");
   res.json(payload);
 }));
 

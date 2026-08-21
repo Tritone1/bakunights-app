@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent, type InputHTMLAttributes, type ReactNode } from "react";
-import { BarChart3, Bookmark, Copy, Eye, Link2, List, MapPin, Pencil, Plus, QrCode, Search, Store, TicketCheck, Upload, Users } from "lucide-react";
+import { BarChart3, Bookmark, Copy, Eye, Link2, List, MapPin, Pencil, Play, Plus, QrCode, Search, Store, TicketCheck, Upload, Users } from "lucide-react";
 import { Link } from "react-router-dom";
 import { format } from "date-fns";
 import { api } from "../lib/api";
@@ -7,7 +7,7 @@ import { useAuth } from "../context/AuthContext";
 import { SafeImage } from "../components/SafeImage";
 
 type MerchantDeal = {
-  id: string; restaurantId: string; title: string; description: string; menuItem?: string | null; photoUrl?: string | null; offerType: OfferType; discountPct: number | null; tag: string; dietaryTags: string[]; startsAt: string; endsAt: string; status: "draft" | "pending_review" | "approved" | "rejected" | "expired"; reviewNotes?: string | null;
+  id: string; restaurantId: string; title: string; description: string; menuItem?: string | null; photoUrl?: string | null; offerType: OfferType; discountPct: number | null; tag: string; dietaryTags: string[]; startsAt: string; endsAt: string; isActive: boolean; status: "draft" | "pending_review" | "approved" | "rejected" | "expired"; reviewNotes?: string | null;
   scope: OfferScope; scopeCategoryId?: string | null; offerMenuItems: { menuItemId: string; overridePriceAzn?: string | number | null; menuItem: MenuItem }[];
   _count: { views: number; savedBy: number; redemptions: number };
 };
@@ -37,6 +37,7 @@ export function MerchantPage() {
   const [activeTab, setActiveTab] = useState<"dashboard" | "menu">("dashboard");
   const [categories, setCategories] = useState<MenuCategory[]>([]);
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
+  const [publishNotice, setPublishNotice] = useState("");
 
   const load = useCallback(async () => {
     if (user?.role !== "MERCHANT" && user?.role !== "ADMIN") { setLoading(false); return; }
@@ -77,12 +78,19 @@ export function MerchantPage() {
     void load();
   }
 
+  async function goLive(deal: MerchantDeal) {
+    await api(`/merchant/deals/${deal.id}/go-live`, { method: "POST" });
+    setPublishNotice(`“${deal.title}” is live now and available on the main offer feed.`);
+    await load();
+  }
+
   return <Shell>
     <div className="flex flex-wrap items-end justify-between gap-4">
       <div><p className="text-xs font-bold uppercase tracking-[.2em] text-cyan-300"><BarChart3 className="mr-1 inline" size={14} />Merchant dashboard</p><h1 className="mt-1 text-3xl font-semibold">Today at a glance</h1><p className="mt-1 text-white/55">{venues.map((venue) => venue.name).join(" · ")}</p></div>
       <div className="flex gap-2"><Link to="/profile" className="rounded-xl border border-white/10 px-4 py-2 text-sm font-semibold text-white/70 hover:bg-white/5">Account</Link><button onClick={() => { setEditing(null); setShowForm(true); }} className="panel-button"><Plus size={16} />New offer</button></div>
     </div>
     <div className="mt-6 flex gap-2 border-b border-white/10 pb-3"><button onClick={() => setActiveTab("dashboard")} className={activeTab === "dashboard" ? "panel-button" : "rounded-xl px-4 py-2 text-sm font-semibold text-white/55 hover:bg-white/5"}><BarChart3 size={16} />Dashboard</button><button onClick={() => setActiveTab("menu")} className={activeTab === "menu" ? "panel-button" : "rounded-xl px-4 py-2 text-sm font-semibold text-white/55 hover:bg-white/5"}><List size={16} />Menu</button></div>
+    {publishNotice && <button type="button" onClick={() => setPublishNotice("")} className="mt-4 w-full rounded-xl border border-emerald-300/25 bg-emerald-300/10 p-3 text-left text-sm text-emerald-100">{publishNotice}</button>}
     {activeTab === "menu" ? <MenuManager venues={venues} categories={categories} items={menuItems} onChanged={load} /> : <>
     <section className="mt-6 grid gap-3 md:grid-cols-2">
       {venues.map((venue) => <article key={venue.id} className="rounded-xl border border-white/10 bg-white/[0.045] p-4"><div className="flex gap-4">{venue.photoUrl ? <SafeImage src={venue.photoUrl} alt={`${venue.name} logo`} className="h-20 w-20 shrink-0 rounded-xl object-cover" /> : <span className="grid h-20 w-20 shrink-0 place-items-center rounded-xl bg-white/[0.06]"><Store className="text-cyan-300" /></span>}<div className="min-w-0"><p className="text-[10px] font-bold uppercase tracking-[.16em] text-gold">Your registered venue</p><h2 className="mt-1 truncate text-xl font-semibold">{venue.name}</h2><p className="mt-1 flex items-start gap-1 text-sm text-white/55"><MapPin className="mt-0.5 shrink-0 text-cyan-300" size={14} />{venue.address}</p><a href={`https://www.google.com/maps/search/?api=1&query=${venue.lat},${venue.lng}`} target="_blank" rel="noreferrer" className="mt-2 inline-flex text-xs font-semibold text-cyan-300 underline">View registered map location</a></div></div><GooglePlaceLinker venue={venue} onChanged={load} /></article>)}
@@ -99,11 +107,11 @@ export function MerchantPage() {
       <div className="mt-3 overflow-x-auto rounded-xl border border-white/10 bg-white/[0.035]">
         <table className="w-full min-w-[760px] text-left text-sm">
           <thead className="bg-white/[0.055] text-xs uppercase tracking-[.14em] text-white/45"><tr><th className="p-3">Offer</th><th className="p-3">Status</th><th className="p-3">Ends</th><th className="p-3">Views</th><th className="p-3">Saves</th><th className="p-3">QR proofs</th><th className="p-3 text-right">Actions</th></tr></thead>
-          <tbody>{allDeals.map((deal) => <tr key={deal.id} className="border-t border-white/10"><td className="p-3"><strong>{deal.title}</strong><p className="text-xs text-white/45">{offerSummary(deal)} · {deal.tag}</p>{deal.status === "rejected" && deal.reviewNotes && <p className="mt-1 text-xs text-red-300">{deal.reviewNotes}</p>}</td><td className="p-3"><StatusPill label={deal.status} /></td><td className="p-3">{format(new Date(deal.endsAt), "MMM d, HH:mm")}</td><td className="p-3">{deal._count.views}</td><td className="p-3">{deal._count.savedBy}</td><td className="p-3">{deal._count.redemptions}</td><td className="p-3 text-right"><button onClick={() => { setEditing(deal); setShowForm(true); }} className="mr-3 font-semibold text-cyan-300">Edit</button>{deal.status === "approved" && <button onClick={() => void expire(deal)} className="font-semibold text-red-300">Expire</button>}</td></tr>)}</tbody>
+          <tbody>{allDeals.map((deal) => { const visibility = offerVisibility(deal); return <tr key={deal.id} className="border-t border-white/10"><td className="p-3"><strong>{deal.title}</strong><p className="text-xs text-white/45">{offerSummary(deal)} · {deal.tag}</p>{deal.status === "rejected" && deal.reviewNotes && <p className="mt-1 text-xs text-red-300">{deal.reviewNotes}</p>}</td><td className="p-3"><StatusPill label={visibility.label} tone={visibility.tone} /><p className="mt-1 max-w-36 text-[10px] leading-4 text-white/40">{visibility.detail}</p></td><td className="p-3">{format(new Date(deal.endsAt), "MMM d, HH:mm")}</td><td className="p-3">{deal._count.views}</td><td className="p-3">{deal._count.savedBy}</td><td className="p-3">{deal._count.redemptions}</td><td className="p-3 text-right"><button onClick={() => { setEditing(deal); setShowForm(true); }} className="mr-3 font-semibold text-cyan-300">Edit</button>{visibility.kind !== "live" && <button onClick={() => void goLive(deal)} className="mr-3 inline-flex items-center gap-1 font-semibold text-emerald-300"><Play size={13} />Go live now</button>}{deal.status === "approved" && deal.isActive && <button onClick={() => void expire(deal)} className="font-semibold text-red-300">Expire</button>}</td></tr>; })}</tbody>
         </table>
       </div>
     </section>
-    {showForm && <DealForm venues={venues} categories={categories} menuItems={menuItems} editing={editing} onOpenMenu={() => { setShowForm(false); setActiveTab("menu"); }} onClose={() => setShowForm(false)} onSaved={() => { setShowForm(false); void load(); }} />}
+    {showForm && <DealForm venues={venues} categories={categories} menuItems={menuItems} editing={editing} onOpenMenu={() => { setShowForm(false); setActiveTab("menu"); }} onClose={() => setShowForm(false)} onSaved={() => { setShowForm(false); setPublishNotice(editing ? "Offer updated. Check its live status below." : "Offer published. It appears on the main feed as soon as its start time arrives."); void load(); }} />}
     </>}
   </Shell>;
 }
@@ -194,8 +202,17 @@ function RedeemCode() {
   </section>;
 }
 
-function StatusPill({ label }: { label: string }) {
-  return <span className="rounded-full border border-white/10 bg-white/[0.06] px-2 py-1 text-xs capitalize text-white/70">{label.replaceAll("_", " ")}</span>;
+function StatusPill({ label, tone = "neutral" }: { label: string; tone?: "neutral" | "live" | "scheduled" | "ended" }) {
+  const colors = tone === "live" ? "border-emerald-300/25 bg-emerald-300/10 text-emerald-200" : tone === "scheduled" ? "border-amber-300/25 bg-amber-300/10 text-amber-200" : tone === "ended" ? "border-red-300/20 bg-red-300/10 text-red-200" : "border-white/10 bg-white/[0.06] text-white/70";
+  return <span className={`rounded-full border px-2 py-1 text-xs capitalize ${colors}`}>{label.replaceAll("_", " ")}</span>;
+}
+
+function offerVisibility(deal: MerchantDeal) {
+  const now = Date.now(); const starts = new Date(deal.startsAt).getTime(); const ends = new Date(deal.endsAt).getTime();
+  if (deal.status === "approved" && deal.isActive && starts <= now && ends > now) return { kind: "live", label: "Live now", tone: "live" as const, detail: "Visible on the main offer feed." };
+  if (deal.status === "approved" && deal.isActive && starts > now) return { kind: "scheduled", label: "Scheduled", tone: "scheduled" as const, detail: `Starts ${format(new Date(deal.startsAt), "MMM d, HH:mm")}.` };
+  if (ends <= now || deal.status === "expired") return { kind: "ended", label: "Ended", tone: "ended" as const, detail: "Not visible to customers." };
+  return { kind: "hidden", label: deal.status, tone: "neutral" as const, detail: deal.isActive ? "Waiting for publication." : "Offer is inactive." };
 }
 
 function offerSummary(deal: Pick<MerchantDeal, "offerType" | "discountPct">) {
@@ -337,7 +354,7 @@ function DealForm({ venues, categories, menuItems, editing, onOpenMenu, onClose,
       <label className="md:col-span-2"><span className="form-label">Description</span><textarea name="description" className="form-field min-h-24" required defaultValue={editing?.description} placeholder="Combo details, items, price, conditions, and what the customer receives." /></label>
       <label><span className="form-label">Daypart</span><select name="tag" className="form-field" defaultValue={editing?.tag ?? "all day"}>{["breakfast", "lunch", "dinner", "happy hour", "all day"].map((tag) => <option key={tag}>{tag}</option>)}</select></label>
       <Input name="dietaryTags" label="Tags" defaultValue={editing?.dietaryTags.join(", ") ?? ""} required={false} />
-      <Input name="startsAt" label="Starts (date and time)" type="datetime-local" defaultValue={localValue(editing?.startsAt)} />
+      <Input name="startsAt" label="Starts (date and time)" type="datetime-local" defaultValue={localValue(editing?.startsAt, -60_000)} />
       <Input name="endsAt" label="Ends (date and time)" type="datetime-local" defaultValue={localValue(editing?.endsAt, 24 * 60 * 60 * 1000)} />
     </div>
     {formError && <p className="mt-4 rounded-lg border border-red-400/30 bg-red-500/10 p-3 text-sm text-red-200">{formError}</p>}
