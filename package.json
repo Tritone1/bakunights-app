@@ -17,11 +17,9 @@
     "lint": "npm run lint -w @haragedek/web",
     "lint:mobile": "npm --prefix apps/mobile run lint",
     "typecheck:mobile": "npm --prefix apps/mobile run typecheck",
-    "test:mobile": "node scripts/mobile-check.mjs",
     "db:generate": "npm run db:generate -w @haragedek/api",
     "db:migrate": "npm run db:migrate -w @haragedek/api",
     "db:deploy": "npm run db:deploy -w @haragedek/api",
-    "db:seed": "npm run db:seed -w @haragedek/api",
     "railway:start": "npm run db:deploy && npm run start -w @haragedek/api"
   },
   "devDependencies": {

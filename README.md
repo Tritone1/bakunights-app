@@ -128,29 +128,21 @@ Local setup:
 ```powershell
 cd C:\Users\kanan\Desktop\Haragedek
 npm.cmd run db:migrate
-npm.cmd run db:seed
 npm.cmd run dev:fullstack
 ```
 
-Seeded admin accounts:
-
-- `admin@bakunights.test` / `admin1234`
-- `ops@bakunights.test` / `admin1234`
-
-Seeded merchant account:
-
-- `merchant@grubstub.test` / `merchant123`
+The database starts without demo users, venues, offers, or reviews. Use genuine accounts and merchant onboarding records for every environment.
 
 Admin monitoring walkthrough:
 
-1. Open `http://localhost:5173/login/admin` and log in with `admin@bakunights.test`.
+1. Open `http://localhost:5173/login/admin` and log in with your real administrator account.
 2. Go to `/admin`.
 3. Review active venues, live offers, trust flags, claims, and the read-only offer activity table.
 4. Merchant offers are automatically stored as active and approved; no per-offer admin approval is required.
 
 Merchant walkthrough:
 
-1. Open `http://localhost:5173/login/merchant` and log in with `merchant@grubstub.test`.
+1. Open `http://localhost:5173/login/merchant` and log in with a verified merchant account.
 2. Go to `/merchant`.
 3. Create or edit an offer. It publishes automatically after validation, including its scope, timing, and required photo rules.
 4. If the merchant has no verified venue, search for an unclaimed venue and submit a claim with phone, email, and proof notes. Admins review these from `/admin`.

@@ -85,7 +85,6 @@ export default function DiscoverScreen() {
           <View style={styles.liveBadge}><View style={styles.liveDot} /><Text style={styles.liveText}>LIVE IN BAKU</Text></View>
           <Text style={styles.heroTitle}>Tonight in <Text style={styles.gold}>Baku</Text></Text>
           <Text style={styles.heroBody}>Native dining and nightlife discovery, built for your iPhone.</Text>
-          <View style={styles.stats}><Text style={styles.stat}><Text style={styles.statValue}>48</Text> venues</Text><Text style={styles.stat}><Text style={[styles.statValue, styles.gold]}>12</Text> deals</Text><Text style={styles.stat}><Text style={styles.statValue}>7</Text> districts</Text></View>
         </View>
 
         <View style={styles.searchWrap}><Ionicons name="search" color="#777785" size={19} /><TextInput value={query} onChangeText={setQuery} placeholder="Search venues, vibes, or districts" placeholderTextColor="#777785" style={styles.searchInput} returnKeyType="search" /></View>
@@ -110,7 +109,7 @@ export default function DiscoverScreen() {
             </View>
           </View>;
         })}
-        {!venues.length && <View style={styles.empty}><Ionicons name="search" color="#f59e0b" size={28} /><Text style={styles.emptyTitle}>No late-night matches</Text><Text style={styles.emptyBody}>Try a different search or category.</Text></View>}
+        {!venues.length && <View style={styles.empty}><Ionicons name="storefront-outline" color="#f59e0b" size={28} /><Text style={styles.emptyTitle}>No live venues yet</Text><Text style={styles.emptyBody}>Verified merchant venues will appear here.</Text></View>}
       </ScrollView>
     </SafeAreaView>
   );
@@ -147,9 +146,6 @@ const styles = StyleSheet.create({
   liveText: { color: "#f8cf83", fontSize: 9, fontWeight: "800", letterSpacing: 1.4 },
   heroTitle: { color: "#ffffff", fontSize: 42, lineHeight: 45, fontWeight: "900", letterSpacing: -1.5, marginTop: 18 },
   heroBody: { color: "#a0a0ad", fontSize: 14, lineHeight: 21, marginTop: 12, maxWidth: 310 },
-  stats: { flexDirection: "row", gap: 15, marginTop: 20 },
-  stat: { color: "#777785", fontSize: 11 },
-  statValue: { color: "#ffffff", fontSize: 15, fontWeight: "800" },
   searchWrap: { marginHorizontal: 18, marginTop: 22, height: 50, borderRadius: 16, paddingHorizontal: 15, flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: "#12121a", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)" },
   searchInput: { color: "#ffffff", flex: 1, fontSize: 14 },
   categories: { gap: 8, paddingHorizontal: 18, paddingVertical: 16 },

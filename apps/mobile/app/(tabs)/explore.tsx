@@ -12,8 +12,8 @@ import { BAKU_CENTER, VENUES, type Venue } from "@/src/venues";
 export default function MapScreen() {
   const params = useLocalSearchParams<{ venue?: string; navigate?: string }>();
   const initialVenue = useMemo(() => VENUES.find((item) => item.id === Number(params.venue)) ?? VENUES[0], [params.venue]);
-  const [selected, setSelected] = useState<Venue>(initialVenue);
-  const [navigationActive, setNavigationActive] = useState(params.navigate === "1");
+  const [selected, setSelected] = useState<Venue | null>(initialVenue ?? null);
+  const [navigationActive, setNavigationActive] = useState(Boolean(initialVenue) && params.navigate === "1");
   const [taxiVenue, setTaxiVenue] = useState<Venue | null>(null);
   const mapRef = useRef<MapView>(null);
   const hasCenteredOnUser = useRef(false);
@@ -21,8 +21,9 @@ export default function MapScreen() {
   const locationAllowed = Boolean(coords);
 
   useEffect(() => {
-    setSelected(initialVenue);
-    setNavigationActive(params.navigate === "1");
+    setSelected(initialVenue ?? null);
+    setNavigationActive(Boolean(initialVenue) && params.navigate === "1");
+    if (!initialVenue) return;
     mapRef.current?.animateToRegion({ latitude: initialVenue.latitude, longitude: initialVenue.longitude, latitudeDelta: 0.025, longitudeDelta: 0.025 }, 500);
   }, [initialVenue, params.navigate]);
 
@@ -33,7 +34,7 @@ export default function MapScreen() {
   }, [coords, params.venue]);
 
   useEffect(() => {
-    if (!coords || !navigationActive) return;
+    if (!coords || !navigationActive || !selected) return;
     mapRef.current?.fitToCoordinates(
       [
         { latitude: coords.latitude, longitude: coords.longitude },
@@ -44,7 +45,7 @@ export default function MapScreen() {
   }, [coords, navigationActive, selected]);
 
   const routeDistance = useMemo(() => {
-    if (!coords) return null;
+    if (!coords || !selected) return null;
     const toRadians = (value: number) => value * Math.PI / 180;
     const latDistance = toRadians(selected.latitude - coords.latitude);
     const lngDistance = toRadians(selected.longitude - coords.longitude);
@@ -59,12 +60,13 @@ export default function MapScreen() {
   }
 
   async function startNavigation() {
+    if (!selected) return;
     const available = coords ? true : await requestLocation();
     if (available) setNavigationActive(true);
   }
 
   function focusRoute() {
-    if (!coords) return;
+    if (!coords || !selected) return;
     mapRef.current?.fitToCoordinates(
       [
         { latitude: coords.latitude, longitude: coords.longitude },
@@ -91,19 +93,19 @@ export default function MapScreen() {
       </View>
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.venueStrip}>
-        {VENUES.map((venue) => <Pressable key={venue.id} onPress={() => selectVenue(venue)} style={[styles.venuePill, venue.id === selected.id && styles.venuePillSelected]}><Text numberOfLines={1} style={[styles.venuePillText, venue.id === selected.id && styles.venuePillTextSelected]}>{venue.name}</Text></Pressable>)}
+        {VENUES.map((venue) => <Pressable key={venue.id} onPress={() => selectVenue(venue)} style={[styles.venuePill, venue.id === selected?.id && styles.venuePillSelected]}><Text numberOfLines={1} style={[styles.venuePillText, venue.id === selected?.id && styles.venuePillTextSelected]}>{venue.name}</Text></Pressable>)}
       </ScrollView>
 
       <View style={styles.mapWrap}>
         <MapView ref={mapRef} style={StyleSheet.absoluteFill} initialRegion={BAKU_CENTER} mapType="mutedStandard" showsCompass showsUserLocation={locationAllowed} showsMyLocationButton={false}>
-          {navigationActive && coords && <Polyline coordinates={[{ latitude: coords.latitude, longitude: coords.longitude }, { latitude: selected.latitude, longitude: selected.longitude }]} strokeColor="#67e8f9" strokeWidth={6} lineCap="round" lineJoin="round" />}
+          {navigationActive && coords && selected && <Polyline coordinates={[{ latitude: coords.latitude, longitude: coords.longitude }, { latitude: selected.latitude, longitude: selected.longitude }]} strokeColor="#67e8f9" strokeWidth={6} lineCap="round" lineJoin="round" />}
           {coords && <Marker coordinate={{ latitude: coords.latitude, longitude: coords.longitude }} title="Your location" anchor={{ x: 0.5, y: 0.5 }}><View style={styles.userMarkerOuter}><View style={styles.userMarkerInner} /></View></Marker>}
-          {VENUES.map((venue) => <Marker key={venue.id} coordinate={{ latitude: venue.latitude, longitude: venue.longitude }} title={venue.name} description={venue.deal} pinColor={venue.id === selected.id ? "#f59e0b" : "#7c3aed"} onPress={() => selectVenue(venue)} />)}
+          {VENUES.map((venue) => <Marker key={venue.id} coordinate={{ latitude: venue.latitude, longitude: venue.longitude }} title={venue.name} description={venue.deal} pinColor={venue.id === selected?.id ? "#f59e0b" : "#7c3aed"} onPress={() => selectVenue(venue)} />)}
         </MapView>
 
         {!locationAllowed && <Pressable onPress={showMyLocation} disabled={locating} style={styles.permissionBanner}><Ionicons name="location-outline" color="#f59e0b" size={17} /><Text style={styles.permissionText}>{locating ? "Finding your position…" : locationError ? `${locationError} Tap to retry.` : "Tap to show your position"}</Text></Pressable>}
 
-        <View style={styles.destinationCard}>
+        {selected ? <View style={styles.destinationCard}>
           <View style={styles.destinationMain}>
             <Image source={{ uri: selected.image }} style={styles.image} />
             <View style={styles.destinationCopy}><Text style={styles.selectedLabel}>{navigationActive ? "IN-APP ROUTE" : "SELECTED DESTINATION"}</Text><Text numberOfLines={1} style={styles.venueName}>{selected.name}</Text><Text numberOfLines={1} style={styles.address}>{selected.address}</Text></View>
@@ -113,7 +115,7 @@ export default function MapScreen() {
             <Ionicons name="navigate" color="#09090e" size={18} />
             <Text style={styles.navigateText}>{navigationActive && coords ? `Route active${routeDistance === null ? "" : `  ·  ${routeDistance.toFixed(1)} km`}` : locating ? "Finding your location…" : "Navigate me in Haragedek"}</Text>
           </Pressable>
-        </View>
+        </View> : <View style={styles.emptyMapCard}><Ionicons name="storefront-outline" color="#f59e0b" size={22} /><View><Text style={styles.venueName}>No live venues yet</Text><Text style={styles.address}>Verified merchant venues will appear on this map.</Text></View></View>}
       </View>
       <TaxiSheet venue={taxiVenue} onClose={() => setTaxiVenue(null)} />
     </SafeAreaView>
@@ -138,6 +140,7 @@ const styles = StyleSheet.create({
   userMarkerOuter: { width: 24, height: 24, borderRadius: 12, borderWidth: 2, borderColor: "#ffffff", backgroundColor: "rgba(37,99,235,0.25)", alignItems: "center", justifyContent: "center" },
   userMarkerInner: { width: 12, height: 12, borderRadius: 6, backgroundColor: "#2563eb" },
   destinationCard: { position: "absolute", left: 12, right: 12, bottom: 12, borderRadius: 20, padding: 10, backgroundColor: "rgba(14,14,21,0.95)", borderWidth: 1, borderColor: "rgba(255,255,255,0.12)", gap: 10 },
+  emptyMapCard: { position: "absolute", left: 12, right: 12, bottom: 12, minHeight: 82, borderRadius: 20, padding: 16, backgroundColor: "rgba(14,14,21,0.95)", borderWidth: 1, borderColor: "rgba(255,255,255,0.12)", flexDirection: "row", alignItems: "center", gap: 12 },
   destinationMain: { flexDirection: "row", alignItems: "center", gap: 11 },
   image: { width: 66, height: 60, borderRadius: 13 },
   destinationCopy: { flex: 1 },
