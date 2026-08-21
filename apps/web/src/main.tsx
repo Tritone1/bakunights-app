@@ -12,7 +12,13 @@ if ("serviceWorker" in navigator) {
       if ("caches" in window) void caches.keys().then((keys) => Promise.all(keys.filter((key) => key.startsWith("bakunights-")).map((key) => caches.delete(key))));
       return;
     }
-    void navigator.serviceWorker.register("/sw.js");
+    let refreshing = false;
+    navigator.serviceWorker.addEventListener("controllerchange", () => {
+      if (refreshing) return;
+      refreshing = true;
+      window.location.reload();
+    });
+    void navigator.serviceWorker.register("/sw.js", { updateViaCache: "none" }).then((registration) => registration.update());
   });
 }
 

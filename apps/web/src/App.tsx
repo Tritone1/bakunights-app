@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { AdminPage } from "./pages/AdminPage";
 import { AuthPage } from "./pages/AuthPage";
 import { DealCard } from "./components/DealCard";
@@ -203,7 +203,7 @@ function Navigation({ query, setQuery, onLocationClick, locationLabel }: { query
       <div className="ml-auto flex items-center gap-2 sm:gap-3">
         {!user && <><Link to="/login/customer" className="inline-flex rounded-full border border-white/10 bg-white/[0.055] px-2.5 py-2 text-[10px] font-semibold text-white transition hover:border-gold/40 hover:text-gold sm:px-3.5 sm:text-xs"><span className="sm:hidden">Customer</span><span className="hidden sm:inline">Customer login</span></Link><Link to="/login/merchant" className="inline-flex rounded-full border border-gold/25 bg-gold/10 px-2.5 py-2 text-[10px] font-semibold text-gold transition hover:bg-gold hover:text-night sm:px-3.5 sm:text-xs"><span className="sm:hidden">Merchant</span><span className="hidden sm:inline">Merchant login</span></Link></>}
         <button type="button" onClick={onLocationClick} className="flex h-10 w-10 shrink-0 items-center justify-center gap-2 rounded-full border border-white/10 bg-white/[0.055] text-xs font-semibold text-white transition hover:border-gold/40 hover:text-gold sm:h-auto sm:w-auto sm:max-w-44 sm:px-3.5 sm:py-2" title={`Choose your location (${locationLabel})`} aria-label={`Choose your location. Current: ${locationLabel}`}><Icon name="location" size={15} className="shrink-0 text-gold" /><span className="hidden truncate sm:block">{locationLabel}</span><Icon name="chevron" size={14} className="hidden shrink-0 text-muted sm:block" /></button>
-        {user && <div className="relative"><button type="button" onClick={() => setMenuOpen((open) => !open)} className="grid h-10 w-10 place-items-center rounded-full border border-gold/30 bg-gradient-to-br from-gold to-amber-700 text-sm font-bold text-night shadow-[0_0_20px_rgba(245,158,11,.18)]" aria-label="Open account menu" aria-expanded={menuOpen}>{user.name.split(/\s+/).map((part) => part[0]).join("").slice(0, 2).toUpperCase()}</button>{menuOpen && <div className="absolute right-0 top-12 w-52 rounded-2xl border border-white/10 bg-[#15151e] p-2 shadow-2xl"><p className="px-3 py-2 text-xs text-white/45">{user.email}</p>{user.role === "CONSUMER" && <><Link to="/profile" className="block rounded-xl px-3 py-2 text-sm text-white/75 hover:bg-white/10 hover:text-white">Profile</Link><Link to="/saved" className="block rounded-xl px-3 py-2 text-sm text-white/75 hover:bg-white/10 hover:text-white">Saved deals</Link></>}{user.role === "MERCHANT" && <><Link to="/merchant" className="block rounded-xl px-3 py-2 text-sm text-white/75 hover:bg-white/10 hover:text-white">Merchant dashboard</Link><Link to="/profile" className="block rounded-xl px-3 py-2 text-sm text-white/75 hover:bg-white/10 hover:text-white">Account settings</Link></>}{user.role === "ADMIN" && <Link to="/admin" className="block rounded-xl px-3 py-2 text-sm text-white/75 hover:bg-white/10 hover:text-white">Admin dashboard</Link>}<button type="button" onClick={() => void logout()} className="mt-1 w-full rounded-xl px-3 py-2 text-left text-sm text-red-200 hover:bg-red-500/10">Log out</button></div>}</div>}
+        {user && <div className="relative"><button type="button" onClick={() => setMenuOpen((open) => !open)} className="grid h-10 w-10 place-items-center rounded-full border border-gold/30 bg-gradient-to-br from-gold to-amber-700 text-sm font-bold text-night shadow-[0_0_20px_rgba(245,158,11,.18)]" aria-label="Open account menu" aria-expanded={menuOpen}>{user.name.split(/\s+/).map((part) => part[0]).join("").slice(0, 2).toUpperCase()}</button>{menuOpen && <div className="absolute right-0 top-12 w-52 rounded-2xl border border-white/10 bg-[#15151e] p-2 shadow-2xl"><p className="px-3 py-2 text-xs text-white/45">{user.email}</p>{user.role === "CONSUMER" && <><Link to="/profile" className="block rounded-xl px-3 py-2 text-sm text-white/75 hover:bg-white/10 hover:text-white">Profile</Link><Link to="/saved" className="block rounded-xl px-3 py-2 text-sm text-white/75 hover:bg-white/10 hover:text-white">Saved deals</Link></>}{user.role === "MERCHANT" && <Link to="/merchant" className="block rounded-xl px-3 py-2 text-sm text-white/75 hover:bg-white/10 hover:text-white">Merchant dashboard</Link>}{user.role === "ADMIN" && <Link to="/admin" className="block rounded-xl px-3 py-2 text-sm text-white/75 hover:bg-white/10 hover:text-white">Admin dashboard</Link>}<button type="button" onClick={() => void logout()} className="mt-1 w-full rounded-xl px-3 py-2 text-left text-sm text-red-200 hover:bg-red-500/10">Log out</button></div>}</div>}
       </div>
     </div>
   </header>;
@@ -788,6 +788,11 @@ function LocationPickerModal({ apiKey, detectedPosition, currentPosition, onConf
 
 export default function App() {
   const { pathname: path } = useLocation();
+  const { user, loading } = useAuth();
+
+  if (loading) return <main className="grid min-h-screen place-items-center bg-night text-sm text-white/60">Loading BakuNights...</main>;
+  if (user?.role === "MERCHANT" && !path.startsWith("/merchant")) return <Navigate to="/merchant" replace />;
+
   const routedPage = path.startsWith("/verify-email") ? <VerifyEmailPage />
     : path.startsWith("/admin") ? <AdminPage />
       : path.startsWith("/merchant") ? <MerchantPage />
@@ -797,6 +802,7 @@ export default function App() {
               : path.startsWith("/deals/") ? <DealDetailPage />
                 : path.startsWith("/venues/") ? <VenuePage />
                   : null;
+  if (path.startsWith("/merchant")) return routedPage;
   if (routedPage) return <><RouteNavigation />{routedPage}</>;
   return <ConsumerApp />;
 }

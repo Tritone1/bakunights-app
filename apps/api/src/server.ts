@@ -97,9 +97,14 @@ app.use("/api/places", placesRouter);
 if (env.NODE_ENV === "production") {
   const webDist = resolve(dirname(fileURLToPath(import.meta.url)), "../../web/dist");
   if (existsSync(webDist)) {
+    app.get("/sw.js", (_req, res) => {
+      res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+      res.sendFile(resolve(webDist, "sw.js"));
+    });
     app.use(express.static(webDist));
     app.use((req, res, next) => {
       if (req.method !== "GET" || req.path.startsWith("/api/")) return next();
+      res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
       res.sendFile(resolve(webDist, "index.html"));
     });
   }
