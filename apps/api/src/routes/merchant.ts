@@ -10,6 +10,7 @@ import { persistImage } from "../lib/image-storage.js";
 export const merchantRouter = Router();
 const menuUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 const imageValue = z.string().trim().max(3_000_000).refine((value) => /^https?:\/\//i.test(value) || /^data:image\/(jpeg|png|webp);base64,/i.test(value), "Use an image URL or uploaded JPG, PNG, or WebP image");
+const venueImageValue = z.string().trim().max(3_000_000).refine((value) => /^https?:\/\//i.test(value) || /^data:image\/(jpeg|png|webp);base64,/i.test(value) || /^\/api\/restaurants\/[a-z0-9_-]+\/photo$/i.test(value), "Use an uploaded JPG, PNG, or WebP image");
 
 const enrollmentInput = z.object({
   venueName: z.string().trim().min(2).max(120),
@@ -74,6 +75,16 @@ const menuItemInput = z.object({
   isActive: z.boolean().default(true),
 });
 
+const venueProfileInput = z.object({
+  name: z.string().trim().min(2).max(120),
+  cuisine: z.string().trim().min(2).max(80),
+  address: z.string().trim().min(5).max(240),
+  phone: z.string().trim().max(40).nullable(),
+  lat: z.coerce.number().min(-90).max(90),
+  lng: z.coerce.number().min(-180).max(180),
+  photoUrl: venueImageValue.nullable(),
+});
+
 async function assertOwner(userId: string, restaurantId: string) {
   const restaurant = await prisma.restaurant.findFirst({ where: { id: restaurantId, ownerUserId: userId, claimStatus: "verified" } });
   if (!restaurant) throw new HttpError(403, "You do not manage this restaurant.");
@@ -117,6 +128,19 @@ merchantRouter.patch("/venues/:venueId/google-place", asyncRoute(async (req, res
     if (existing && existing.id !== venueId) throw new HttpError(409, "That Google listing is already linked to another venue.");
   }
   const venue = await prisma.restaurant.update({ where: { id: venueId }, data: { googlePlaceId }, select: { id: true, googlePlaceId: true } });
+  res.json({ venue });
+}));
+
+merchantRouter.patch("/venues/:venueId/profile", asyncRoute(async (req, res) => {
+  const venueId = z.string().parse(req.params.venueId);
+  await assertOwner(req.user!.id, venueId);
+  const input = venueProfileInput.parse(req.body);
+  const photoUrl = await persistImage(input.photoUrl, "venues");
+  const venue = await prisma.restaurant.update({
+    where: { id: venueId },
+    data: { ...input, photoUrl },
+    select: { id: true, name: true, cuisine: true, address: true, phone: true, lat: true, lng: true, photoUrl: true },
+  });
   res.json({ venue });
 }));
 

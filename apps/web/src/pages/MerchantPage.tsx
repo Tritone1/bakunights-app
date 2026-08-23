@@ -1,17 +1,18 @@
 import { useCallback, useEffect, useState, type FormEvent, type InputHTMLAttributes, type ReactNode } from "react";
-import { BarChart3, Bookmark, Copy, Eye, Link2, List, MapPin, Pencil, Play, Plus, QrCode, Search, Store, TicketCheck, Upload, Users } from "lucide-react";
-import { Link } from "react-router-dom";
+import { BarChart3, Bookmark, Copy, Eye, Link2, List, LogOut, MapPin, Pencil, Play, Plus, QrCode, Search, Store, TicketCheck, Upload, UserRound, Users } from "lucide-react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { format } from "date-fns";
 import { api } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 import { SafeImage } from "../components/SafeImage";
+import { MerchantProfilePage } from "./MerchantProfilePage";
 
 type MerchantDeal = {
   id: string; restaurantId: string; title: string; description: string; menuItem?: string | null; photoUrl?: string | null; offerType: OfferType; discountPct: number | null; tag: string; dietaryTags: string[]; startsAt: string; endsAt: string; isActive: boolean; status: "draft" | "pending_review" | "approved" | "rejected" | "expired"; reviewNotes?: string | null;
   scope: OfferScope; scopeCategoryId?: string | null; offerMenuItems: { menuItemId: string; overridePriceAzn?: string | number | null; menuItem: MenuItem }[];
   _count: { views: number; savedBy: number; redemptions: number };
 };
-type ManagedVenue = { id: string; name: string; address: string; cuisine: string; lat: number; lng: number; photoUrl: string | null; googlePlaceId?: string | null; deals: MerchantDeal[]; _count: { followers: number } };
+type ManagedVenue = { id: string; name: string; address: string; cuisine: string; lat: number; lng: number; phone?: string | null; photoUrl: string | null; googlePlaceId?: string | null; deals: MerchantDeal[]; _count: { followers: number } };
 type MenuCategory = { id: string; name: string; sortOrder: number };
 type MenuItem = { id: string; venueId: string; categoryId: string; name: string; priceAzn: number; description?: string | null; photoUrl?: string | null; isActive: boolean; category: MenuCategory };
 type CatalogItem = { id: string; name: string; categoryId: string; photoUrl?: string | null; category: MenuCategory };
@@ -28,13 +29,14 @@ const OFFER_TYPES: { value: OfferType; label: string }[] = [
 ];
 
 export function MerchantPage() {
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, logout } = useAuth();
+  const { pathname } = useLocation();
+  const navigate = useNavigate();
   const [venues, setVenues] = useState<ManagedVenue[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<MerchantDeal | null>(null);
-  const [activeTab, setActiveTab] = useState<"dashboard" | "menu">("dashboard");
   const [categories, setCategories] = useState<MenuCategory[]>([]);
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [publishNotice, setPublishNotice] = useState("");
@@ -55,15 +57,25 @@ export function MerchantPage() {
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, [user?.role]);
 
   useEffect(() => { void load(); }, [load]);
+
+  const activeTab = pathname.startsWith("/merchant/profile") ? "profile" : pathname.startsWith("/merchant/menu") ? "menu" : "dashboard";
 
   if (authLoading || loading) return <Shell><p className="text-white/60">Loading merchant dashboard...</p></Shell>;
   if (!user) return <Shell><Gate title="Log in to manage a venue" action={<Link to="/login/merchant" className="panel-button">Log in</Link>} /></Shell>;
   if (user.role === "CONSUMER") return <Shell><Gate title="Merchant account required" subtitle="Log in with the merchant account created for your venue." /></Shell>;
-  if (error) return <Shell><Gate title="Could not load merchant dashboard" subtitle={error} /></Shell>;
-  if (venues.length === 0) return <Shell><Gate title="Venue profile unavailable" subtitle="This merchant account does not contain a complete registered venue profile." /></Shell>;
+
+  async function leaveApplication() {
+    await logout();
+    navigate("/login/merchant", { replace: true });
+  }
+
+  const navigation = <MerchantNavigation activeTab={activeTab} name={user.name} email={user.email} onLogout={leaveApplication} />;
+  if (activeTab === "profile") return <Shell>{navigation}<MerchantProfilePage venues={venues} onVenueChanged={load} /></Shell>;
+  if (error) return <Shell>{navigation}<div className="mt-6"><Gate title="Could not load merchant dashboard" subtitle={error} /></div></Shell>;
+  if (venues.length === 0) return <Shell>{navigation}<div className="mt-6"><Gate title="Venue profile unavailable" subtitle="This merchant account does not contain a complete registered venue profile." action={<Link to="/merchant/profile" className="panel-button">Open account settings</Link>} /></div></Shell>;
 
   const allDeals = venues.flatMap((venue) => venue.deals);
   const totals = allDeals.reduce((sum, deal) => ({
@@ -85,11 +97,11 @@ export function MerchantPage() {
   }
 
   return <Shell>
+    {navigation}
     <div className="flex flex-wrap items-end justify-between gap-4">
       <div><p className="text-xs font-bold uppercase tracking-[.2em] text-cyan-300"><BarChart3 className="mr-1 inline" size={14} />Merchant dashboard</p><h1 className="mt-1 text-3xl font-semibold">Today at a glance</h1><p className="mt-1 text-white/55">{venues.map((venue) => venue.name).join(" · ")}</p></div>
       <button onClick={() => { setEditing(null); setShowForm(true); }} className="panel-button"><Plus size={16} />New offer</button>
     </div>
-    <div className="mt-6 flex gap-2 border-b border-white/10 pb-3"><button onClick={() => setActiveTab("dashboard")} className={activeTab === "dashboard" ? "panel-button" : "rounded-xl px-4 py-2 text-sm font-semibold text-white/55 hover:bg-white/5"}><BarChart3 size={16} />Dashboard</button><button onClick={() => setActiveTab("menu")} className={activeTab === "menu" ? "panel-button" : "rounded-xl px-4 py-2 text-sm font-semibold text-white/55 hover:bg-white/5"}><List size={16} />Menu</button></div>
     {publishNotice && <button type="button" onClick={() => setPublishNotice("")} className="mt-4 w-full rounded-xl border border-emerald-300/25 bg-emerald-300/10 p-3 text-left text-sm text-emerald-100">{publishNotice}</button>}
     {activeTab === "menu" ? <MenuManager venues={venues} categories={categories} items={menuItems} onChanged={load} /> : <>
     <section className="mt-6 grid gap-3 md:grid-cols-2">
@@ -111,7 +123,7 @@ export function MerchantPage() {
         </table>
       </div>
     </section>
-    {showForm && <DealForm venues={venues} categories={categories} menuItems={menuItems} editing={editing} onOpenMenu={() => { setShowForm(false); setActiveTab("menu"); }} onClose={() => setShowForm(false)} onSaved={() => { setShowForm(false); setPublishNotice(editing ? "Offer updated. Check its live status below." : "Offer published. It appears on the main feed as soon as its start time arrives."); void load(); }} />}
+    {showForm && <DealForm venues={venues} categories={categories} menuItems={menuItems} editing={editing} onOpenMenu={() => { setShowForm(false); navigate("/merchant/menu"); }} onClose={() => setShowForm(false)} onSaved={() => { setShowForm(false); setPublishNotice(editing ? "Offer updated. Check its live status below." : "Offer published. It appears on the main feed as soon as its start time arrives."); void load(); }} />}
     </>}
   </Shell>;
 }
@@ -155,6 +167,18 @@ function GooglePlaceLinker({ venue, onChanged }: { venue: ManagedVenue; onChange
   }
 
   return <div className="mt-4 border-t border-white/10 pt-4">{venue.googlePlaceId ? <div className="flex flex-wrap items-center justify-between gap-2"><p className="flex items-center gap-2 text-sm text-emerald-300"><Link2 size={16} />Google listing linked</p><div className="flex gap-3"><button onClick={() => setOpen(true)} className="text-xs font-semibold text-cyan-300">Change</button><button onClick={() => void unlink()} disabled={busy} className="text-xs font-semibold text-red-300">Unlink</button></div></div> : <button onClick={() => setOpen(true)} className="inline-flex items-center gap-2 text-sm font-semibold text-cyan-300"><Link2 size={16} />Link Google listing for reviews</button>}{open && <div className="mt-3 rounded-xl border border-white/10 bg-black/20 p-3"><label className="relative block"><Search className="absolute left-3 top-3 text-white/35" size={17} /><input value={query} onChange={(event) => setQuery(event.target.value)} className="form-field pl-10" placeholder="Search exact venue name and address" /></label>{busy && <p className="mt-2 text-xs text-white/45">Searching…</p>}<div className="mt-2 divide-y divide-white/10">{suggestions.map((suggestion) => <button key={suggestion.id} onClick={() => void choose(suggestion.id)} className="block w-full py-2 text-left text-sm text-white/70 hover:text-cyan-300">{suggestion.label}</button>)}</div><button onClick={() => setOpen(false)} className="mt-2 text-xs text-white/45">Cancel</button></div>}{error && <p className="mt-2 text-xs text-red-300">{error}</p>}</div>;
+}
+
+function MerchantNavigation({ activeTab, name, email, onLogout }: { activeTab: "dashboard" | "menu" | "profile"; name: string; email: string; onLogout: () => Promise<void> }) {
+  const linkClass = (tab: typeof activeTab) => `inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-bold transition ${activeTab === tab ? "bg-cyan-300 text-[#07151a]" : "text-white/55 hover:bg-white/[0.06] hover:text-white"}`;
+  const initials = name.split(/\s+/).map((part) => part[0]).join("").slice(0, 2).toUpperCase();
+  return <header className="mb-7 rounded-2xl border border-white/10 bg-white/[0.035] p-3">
+    <div className="flex flex-wrap items-center gap-3">
+      <Link to="/merchant" className="mr-auto flex min-w-0 items-center gap-3 px-1"><span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-cyan-300 text-[#07151a]"><Store size={21} /></span><span className="min-w-0"><strong className="block truncate">Merchant portal</strong><span className="block truncate text-xs text-white/40">{email}</span></span></Link>
+      <nav className="order-3 flex w-full gap-1 overflow-x-auto border-t border-white/10 pt-3 sm:order-none sm:w-auto sm:border-0 sm:pt-0" aria-label="Merchant navigation"><Link to="/merchant" className={linkClass("dashboard")}><BarChart3 size={16} />Dashboard</Link><Link to="/merchant/menu" className={linkClass("menu")}><List size={16} />Menu</Link><Link to="/merchant/profile" className={linkClass("profile")}><UserRound size={16} />Profile</Link></nav>
+      <div className="flex items-center gap-2"><span className="grid h-9 w-9 place-items-center rounded-full border border-cyan-300/25 bg-cyan-300/10 text-xs font-black text-cyan-200" title={name}>{initials}</span><button type="button" onClick={() => void onLogout()} className="grid h-9 w-9 place-items-center rounded-xl border border-white/10 text-white/55 transition hover:border-red-300/30 hover:bg-red-500/10 hover:text-red-200" aria-label="Log out" title="Log out"><LogOut size={17} /></button></div>
+    </div>
+  </header>;
 }
 
 function Shell({ children }: { children: ReactNode }) {

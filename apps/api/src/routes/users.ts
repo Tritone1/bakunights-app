@@ -105,19 +105,23 @@ usersRouter.get("/me/redemptions", asyncRoute(async (req, res) => {
 }));
 
 usersRouter.delete("/me", asyncRoute(async (req, res) => {
-  const { password } = z.object({ password: z.string().min(1).max(128) }).parse(req.body);
+  const { password, deleteOwnedVenues } = z.object({
+    password: z.string().min(1).max(128),
+    deleteOwnedVenues: z.boolean().default(false),
+  }).parse(req.body);
   const user = await prisma.user.findUnique({
     where: { id: req.user!.id },
-    select: { id: true, passwordHash: true, ownedRestaurants: { where: { isActive: true }, select: { id: true } } },
+    select: { id: true, passwordHash: true, ownedRestaurants: { select: { id: true } } },
   });
   if (!user?.passwordHash || !(await bcrypt.compare(password, user.passwordHash))) {
     throw new HttpError(401, "Password is incorrect.");
   }
-  if (user.ownedRestaurants.length > 0) {
-    throw new HttpError(409, "Deactivate or transfer your active venue before deleting this account.");
+  if (user.ownedRestaurants.length > 0 && !deleteOwnedVenues) {
+    throw new HttpError(409, "This account owns a venue. Confirm that its venues and business data should also be deleted.");
   }
 
   await prisma.$transaction([
+    ...(deleteOwnedVenues ? [prisma.restaurant.deleteMany({ where: { ownerUserId: user.id } })] : []),
     prisma.savedDeal.deleteMany({ where: { userId: user.id } }),
     prisma.follow.deleteMany({ where: { userId: user.id } }),
     prisma.pushSubscription.deleteMany({ where: { userId: user.id } }),
