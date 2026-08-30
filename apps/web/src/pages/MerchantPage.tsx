@@ -43,10 +43,10 @@ export function MerchantPage() {
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [publishNotice, setPublishNotice] = useState("");
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (showPageLoader = false) => {
     if (user?.role !== "MERCHANT" && user?.role !== "ADMIN") { setLoading(false); return; }
     try {
-      setLoading(true);
+      if (showPageLoader) setLoading(true);
       const data = await api<{ restaurants: ManagedVenue[] }>("/merchant/dashboard");
       setVenues(data.restaurants);
       const venueMenus = await Promise.all(data.restaurants.map(async (venue) => {
@@ -62,11 +62,11 @@ export function MerchantPage() {
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Could not load dashboard");
     } finally {
-      setLoading(false);
+      if (showPageLoader) setLoading(false);
     }
   }, [user?.role]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => { void load(true); }, [load]);
 
   const activeTab = pathname.startsWith("/merchant/profile") ? "profile" : pathname.startsWith("/merchant/menu") ? "menu" : "dashboard";
 
