@@ -1,4 +1,4 @@
-# BakuNights architecture
+# WhereToGo architecture
 
 The active product is a client-only React application in `apps/web`. It deliberately keeps all venue data and UI composition in `App.tsx`, matching the prototype requirement and making the experience deployable as static files.
 

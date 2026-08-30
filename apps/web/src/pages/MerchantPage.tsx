@@ -113,7 +113,7 @@ export function MerchantPage() {
       <Metric icon={TicketCheck} label="QR claims" value={totals.redemptions} />
       <Metric icon={Users} label="Followers" value={venues.reduce((sum, venue) => sum + venue._count.followers, 0)} />
     </div>
-    <RedeemCode />
+    <RedeemCode venues={venues} />
     <section className="mt-8">
       <h2 className="text-xl font-semibold">Your offer board</h2>
       <div className="mt-3 overflow-x-auto rounded-xl border border-white/10 bg-white/[0.035]">
@@ -193,8 +193,10 @@ function Metric({ icon: Icon, label, value }: { icon: typeof Eye; label: string;
   return <div className="rounded-xl border border-white/10 bg-white/[0.045] p-5"><Icon className="text-cyan-300" size={22} /><p className="mt-4 text-3xl font-semibold">{value}</p><p className="text-xs uppercase tracking-[.16em] text-white/45">{label}</p></div>;
 }
 
-function RedeemCode() {
+function RedeemCode({ venues }: { venues: ManagedVenue[] }) {
   const [code, setCode] = useState("");
+  const [venueId, setVenueId] = useState(venues[0]?.id ?? "");
+  const [billAmount, setBillAmount] = useState("");
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -203,12 +205,18 @@ function RedeemCode() {
     setBusy(true);
     setMessage("");
     try {
-      const result = await api<{ redemption: { redemptionCode: string; deal: { title: string }; user: { name: string; email: string } } }>("/merchant/redemptions/redeem", {
+      const result = await api<
+        | { kind: "DEAL"; spinUnlocked: true; redemption: { redemptionCode: string; deal: { title: string }; user: { name: string; email: string } } }
+        | { kind: "POINT_REWARD"; reward: { rewardCode: string; discountPct: number; maxBillAzn: number; billAmountAzn: number; discountAmountAzn: number; user: { name: string; email: string } } }
+      >("/merchant/redemptions/redeem", {
         method: "POST",
-        body: JSON.stringify({ code }),
+        body: JSON.stringify({ code, venueId, billAmountAzn: billAmount ? Number(billAmount) : undefined }),
       });
-      setMessage(`Verified ${result.redemption.deal.title} for ${result.redemption.user.name || result.redemption.user.email}.`);
+      setMessage(result.kind === "POINT_REWARD"
+        ? `Points reward verified for ${result.reward.user.name || result.reward.user.email}. Apply ${result.reward.discountAmountAzn.toFixed(2)} AZN discount to the ${result.reward.billAmountAzn.toFixed(2)} AZN bill.`
+        : `Verified ${result.redemption.deal.title} for ${result.redemption.user.name || result.redemption.user.email}. One points-wheel spin is now unlocked.`);
       setCode("");
+      setBillAmount("");
     } catch (reason) {
       setMessage(reason instanceof Error ? reason.message : "Could not verify this QR/code.");
     } finally {
@@ -217,9 +225,11 @@ function RedeemCode() {
   }
 
   return <section className="mt-8 rounded-xl border border-cyan-300/20 bg-cyan-300/[0.07] p-5">
-    <div><p className="text-xs font-bold uppercase tracking-[.2em] text-cyan-300"><QrCode className="mr-1 inline" size={14} />Customer proof</p><h2 className="mt-1 text-xl font-semibold">Verify QR or code</h2><p className="mt-1 text-sm text-white/55">Ask the customer to show their QR from the app, then enter the code here.</p></div>
-    <form onSubmit={submit} className="mt-4 flex max-w-xl flex-col gap-2 sm:flex-row">
-      <input value={code} onChange={(event) => setCode(event.target.value.toUpperCase())} className="form-field font-mono uppercase" placeholder="GS-AB12CD34" required />
+    <div><p className="text-xs font-bold uppercase tracking-[.2em] text-cyan-300"><QrCode className="mr-1 inline" size={14} />Customer proof</p><h2 className="mt-1 text-xl font-semibold">Verify QR or reward code</h2><p className="mt-1 text-sm text-white/55">Verifying a customer&apos;s GS visit code unlocks one points-wheel spin for them. For a PTS reward code, also enter the bill amount.</p></div>
+    <form onSubmit={submit} className="mt-4 grid max-w-3xl gap-2 sm:grid-cols-[minmax(190px,1fr)_160px_auto]">
+      {venues.length > 1 && <select value={venueId} onChange={(event) => setVenueId(event.target.value)} className="form-field sm:col-span-3">{venues.map((venue) => <option key={venue.id} value={venue.id}>{venue.name}</option>)}</select>}
+      <input value={code} onChange={(event) => setCode(event.target.value.toUpperCase())} className="form-field font-mono uppercase" placeholder="GS-... or PTS-..." required />
+      <input value={billAmount} onChange={(event) => setBillAmount(event.target.value)} type="number" min="0.01" step="0.01" className="form-field" placeholder="Bill AZN (PTS only)" />
       <button className="panel-button justify-center" disabled={busy}>{busy ? "Checking..." : "Verify"}</button>
     </form>
     {message && <p className="mt-3 rounded-lg border border-white/10 bg-black/20 p-3 text-sm text-white/75">{message}</p>}

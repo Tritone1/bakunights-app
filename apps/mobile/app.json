@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Haragedek",
+    "name": "WhereToGo",
     "slug": "haragedek",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -16,7 +16,7 @@
         "usesNonExemptEncryption": false
       },
       "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "Haragedek uses your location to show nearby restaurants and deals.",
+        "NSLocationWhenInUseUsageDescription": "WhereToGo uses your location to show nearby restaurants and deals.",
         "LSApplicationQueriesSchemes": ["bolt", "waze"]
       }
     },
@@ -40,13 +40,13 @@
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "Allow Haragedek to show nearby venues and your position on the map."
+          "locationWhenInUsePermission": "Allow WhereToGo to show nearby venues and your position on the map."
         }
       ],
       [
         "expo-image-picker",
         {
-          "photosPermission": "Allow Haragedek to choose a venue logo or photo for merchant registration.",
+          "photosPermission": "Allow WhereToGo to choose a venue logo or photo for merchant registration.",
           "cameraPermission": false
         }
       ],

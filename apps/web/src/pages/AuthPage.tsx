@@ -157,7 +157,7 @@ export function AuthPage() {
     <div className="grid min-h-screen lg:grid-cols-[minmax(320px,.8fr)_1fr]">
       <section className="hidden border-r border-white/10 bg-white/[0.035] p-10 lg:flex lg:flex-col lg:justify-between">
         <Brand />
-        <div><p className="text-xs font-bold uppercase tracking-[.2em] text-gold">{accountType === "MERCHANT" ? "Venue partners" : accountType === "ADMIN" ? "Venue operations" : "Baku after dark"}</p><h1 className="mt-3 max-w-lg font-display text-5xl font-semibold leading-tight text-white">{accountType === "MERCHANT" ? "Put your best offers in front of Baku." : accountType === "ADMIN" ? "Keep BakuNights trusted." : "Save deals and claim your QR code."}</h1><p className="mt-5 max-w-md text-white/55">{isRegister ? "Create your account and verify your email before signing in." : `Sign in through the dedicated ${label} portal.`}</p></div>
+        <div><p className="text-xs font-bold uppercase tracking-[.2em] text-gold">{accountType === "MERCHANT" ? "Venue partners" : accountType === "ADMIN" ? "Venue operations" : "Great deals every day"}</p><h1 className="mt-3 max-w-lg font-display text-5xl font-semibold leading-tight text-white">{accountType === "MERCHANT" ? "Put your best offers in front of Baku." : accountType === "ADMIN" ? "Keep WhereToGo trusted." : "Save deals and claim your QR code."}</h1><p className="mt-5 max-w-md text-white/55">{isRegister ? "Create your account and verify your email before signing in." : `Sign in through the dedicated ${label} portal.`}</p></div>
       </section>
       <section className="flex items-center justify-center px-4 py-10 sm:px-8">
         <div className="w-full max-w-md">

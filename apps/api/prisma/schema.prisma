@@ -55,37 +55,39 @@ enum VenueFlagStatus {
 }
 
 model User {
-  id              String             @id @default(cuid())
-  email           String             @unique
-  emailVerifiedAt DateTime?          @map("email_verified_at")
-  passwordHash    String?            @map("password_hash")
-  name            String
-  role            UserRole           @default(CONSUMER)
-  merchantVenueName String?          @map("merchant_venue_name")
-  merchantVenueImage Bytes?          @map("merchant_venue_image")
-  merchantVenueImageMime String?     @map("merchant_venue_image_mime")
-  merchantVenueImageName String?     @map("merchant_venue_image_name")
-  merchantVenueImageUrl String?      @map("merchant_venue_image_url") @db.Text
-  merchantVenueAddress String?       @map("merchant_venue_address")
-  merchantVenueLat Float?            @map("merchant_venue_lat")
-  merchantVenueLng Float?            @map("merchant_venue_lng")
-  homeLat         Float?             @map("home_lat")
-  homeLng         Float?             @map("home_lng")
-  preferencesJson Json?              @map("preferences_json")
-  createdAt       DateTime           @default(now()) @map("created_at")
-  ownedRestaurants Restaurant[]      @relation("RestaurantOwner")
-  savedDeals      SavedDeal[]
-  redemptions     Redemption[]
-  follows         Follow[]
-  ratings         DealRating[]
-  subscriptions   PushSubscription[]
-  claims          VenueClaimRequest[] @relation("VenueClaimRequester")
+  id                        String                     @id @default(cuid())
+  email                     String                     @unique
+  emailVerifiedAt           DateTime?                  @map("email_verified_at")
+  passwordHash              String?                    @map("password_hash")
+  name                      String
+  role                      UserRole                   @default(CONSUMER)
+  merchantVenueName         String?                    @map("merchant_venue_name")
+  merchantVenueImage        Bytes?                     @map("merchant_venue_image")
+  merchantVenueImageMime    String?                    @map("merchant_venue_image_mime")
+  merchantVenueImageName    String?                    @map("merchant_venue_image_name")
+  merchantVenueImageUrl     String?                    @map("merchant_venue_image_url") @db.Text
+  merchantVenueAddress      String?                    @map("merchant_venue_address")
+  merchantVenueLat          Float?                     @map("merchant_venue_lat")
+  merchantVenueLng          Float?                     @map("merchant_venue_lng")
+  homeLat                   Float?                     @map("home_lat")
+  homeLng                   Float?                     @map("home_lng")
+  preferencesJson           Json?                      @map("preferences_json")
+  createdAt                 DateTime                   @default(now()) @map("created_at")
+  ownedRestaurants          Restaurant[]               @relation("RestaurantOwner")
+  savedDeals                SavedDeal[]
+  redemptions               Redemption[]
+  follows                   Follow[]
+  ratings                   DealRating[]
+  subscriptions             PushSubscription[]
+  claims                    VenueClaimRequest[]        @relation("VenueClaimRequester")
   merchantEnrollmentRequest MerchantEnrollmentRequest? @relation("MerchantEnrollmentRequester")
-  notificationLogs NotificationLog[]
-  submittedDeals  Deal[]              @relation("DealSubmitter")
-  reviewedDeals   Deal[]              @relation("DealReviewer")
-  auditLogs       AuditLog[]          @relation("AuditActor")
-  emailVerificationTokens EmailVerificationToken[]
+  notificationLogs          NotificationLog[]
+  submittedDeals            Deal[]                     @relation("DealSubmitter")
+  reviewedDeals             Deal[]                     @relation("DealReviewer")
+  auditLogs                 AuditLog[]                 @relation("AuditActor")
+  emailVerificationTokens   EmailVerificationToken[]
+  pointSpins                PointSpin[]
+  pointRewards              PointReward[]
 
   @@map("users")
 }
@@ -104,82 +106,83 @@ model EmailVerificationToken {
 }
 
 model Restaurant {
-  id            String            @id @default(cuid())
-  googlePlaceId String?           @unique @map("google_place_id")
-  name          String
-  cuisine       String
-  dietaryTags   String[]          @default([]) @map("dietary_tags")
-  address       String
-  lat           Float
-  lng           Float
-  phone         String?
-  hoursJson     Json?             @map("hours_json")
-  photoUrl      String?           @map("photo_url")
-  rating        Float             @default(0)
-  isActive      Boolean           @default(true) @map("is_active")
-  autoApproveOffers Boolean       @default(false) @map("auto_approve_offers")
-  isVerifiedTrusted Boolean       @default(false) @map("is_verified_trusted")
-  trustedBadgeRevoked Boolean     @default(false) @map("trusted_badge_revoked")
-  honestyRate  Float?             @map("honesty_rate")
-  ownerUserId   String?           @map("owner_user_id")
-  claimStatus   ClaimStatus       @default(unclaimed) @map("claim_status")
-  verificationNotes String?       @map("verification_notes")
-  owner         User?             @relation("RestaurantOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
-  deals         Deal[]
-  followers     Follow[]
-  claims        VenueClaimRequest[]
-  menuItems     MenuItem[]
-  trustFlags    VenueTrustFlag[]
+  id                   String              @id @default(cuid())
+  googlePlaceId        String?             @unique @map("google_place_id")
+  name                 String
+  cuisine              String
+  dietaryTags          String[]            @default([]) @map("dietary_tags")
+  address              String
+  lat                  Float
+  lng                  Float
+  phone                String?
+  hoursJson            Json?               @map("hours_json")
+  photoUrl             String?             @map("photo_url")
+  rating               Float               @default(0)
+  isActive             Boolean             @default(true) @map("is_active")
+  autoApproveOffers    Boolean             @default(false) @map("auto_approve_offers")
+  isVerifiedTrusted    Boolean             @default(false) @map("is_verified_trusted")
+  trustedBadgeRevoked  Boolean             @default(false) @map("trusted_badge_revoked")
+  honestyRate          Float?              @map("honesty_rate")
+  ownerUserId          String?             @map("owner_user_id")
+  claimStatus          ClaimStatus         @default(unclaimed) @map("claim_status")
+  verificationNotes    String?             @map("verification_notes")
+  owner                User?               @relation("RestaurantOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
+  deals                Deal[]
+  followers            Follow[]
+  claims               VenueClaimRequest[]
+  menuItems            MenuItem[]
+  trustFlags           VenueTrustFlag[]
+  redeemedPointRewards PointReward[]
 
   @@map("restaurants")
 }
 
 model Deal {
-  id              String        @id @default(cuid())
-  restaurantId    String        @map("restaurant_id")
-  restaurant      Restaurant    @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
-  title           String
-  description     String
-  menuItem        String?       @map("menu_item")
-  photoUrl        String?       @map("photo_url") @db.Text
-  scope           OfferScope    @default(WHOLE_MENU)
-  scopeCategoryId String?       @map("scope_category_id")
-  scopeCategory   MenuCategory? @relation("ScopedDealCategory", fields: [scopeCategoryId], references: [id], onDelete: SetNull)
-  offerType       DealOfferType @default(discount) @map("offer_type")
-  discountPct     Int?          @map("discount_pct")
-  tag             String
-  dietaryTags     String[]      @default([]) @map("dietary_tags")
-  startsAt        DateTime      @map("starts_at")
-  endsAt          DateTime      @map("ends_at")
-  isActive        Boolean       @default(true) @map("is_active")
-  isRecurring     Boolean       @default(false) @map("is_recurring")
-  recurrenceRule  String?       @map("recurrence_rule")
-  status          DealStatus    @default(pending_review)
-  submittedByUserId String?     @map("submitted_by_user_id")
-  submittedBy     User?         @relation("DealSubmitter", fields: [submittedByUserId], references: [id], onDelete: SetNull)
-  reviewedByUserId String?      @map("reviewed_by_user_id")
-  reviewedBy      User?         @relation("DealReviewer", fields: [reviewedByUserId], references: [id], onDelete: SetNull)
-  reviewNotes     String?       @map("review_notes")
-  submittedAt     DateTime?     @map("submitted_at")
-  reviewedAt      DateTime?     @map("reviewed_at")
-  createdAt       DateTime      @default(now()) @map("created_at")
-  savedBy         SavedDeal[]
-  redemptions     Redemption[]
-  ratings         DealRating[]
-  views           DealView[]
-  notificationLogs NotificationLog[]
-  offerMenuItems  OfferMenuItem[]
+  id                String            @id @default(cuid())
+  restaurantId      String            @map("restaurant_id")
+  restaurant        Restaurant        @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  title             String
+  description       String
+  menuItem          String?           @map("menu_item")
+  photoUrl          String?           @map("photo_url") @db.Text
+  scope             OfferScope        @default(WHOLE_MENU)
+  scopeCategoryId   String?           @map("scope_category_id")
+  scopeCategory     MenuCategory?     @relation("ScopedDealCategory", fields: [scopeCategoryId], references: [id], onDelete: SetNull)
+  offerType         DealOfferType     @default(discount) @map("offer_type")
+  discountPct       Int?              @map("discount_pct")
+  tag               String
+  dietaryTags       String[]          @default([]) @map("dietary_tags")
+  startsAt          DateTime          @map("starts_at")
+  endsAt            DateTime          @map("ends_at")
+  isActive          Boolean           @default(true) @map("is_active")
+  isRecurring       Boolean           @default(false) @map("is_recurring")
+  recurrenceRule    String?           @map("recurrence_rule")
+  status            DealStatus        @default(pending_review)
+  submittedByUserId String?           @map("submitted_by_user_id")
+  submittedBy       User?             @relation("DealSubmitter", fields: [submittedByUserId], references: [id], onDelete: SetNull)
+  reviewedByUserId  String?           @map("reviewed_by_user_id")
+  reviewedBy        User?             @relation("DealReviewer", fields: [reviewedByUserId], references: [id], onDelete: SetNull)
+  reviewNotes       String?           @map("review_notes")
+  submittedAt       DateTime?         @map("submitted_at")
+  reviewedAt        DateTime?         @map("reviewed_at")
+  createdAt         DateTime          @default(now()) @map("created_at")
+  savedBy           SavedDeal[]
+  redemptions       Redemption[]
+  ratings           DealRating[]
+  views             DealView[]
+  notificationLogs  NotificationLog[]
+  offerMenuItems    OfferMenuItem[]
 
   @@index([isActive, startsAt, endsAt])
   @@map("deals")
 }
 
 model MenuCategory {
-  id        String     @id @default(cuid())
-  name      String     @unique
-  sortOrder Int        @default(0) @map("sort_order")
-  items     MenuItem[]
-  scopedDeals Deal[]   @relation("ScopedDealCategory")
+  id           String        @id @default(cuid())
+  name         String        @unique
+  sortOrder    Int           @default(0) @map("sort_order")
+  items        MenuItem[]
+  scopedDeals  Deal[]        @relation("ScopedDealCategory")
   catalogItems CatalogItem[]
 
   @@index([sortOrder])
@@ -187,31 +190,31 @@ model MenuCategory {
 }
 
 model CatalogItem {
-  id          String       @id @default(cuid())
-  name        String       @unique
-  categoryId  String       @map("category_id")
-  photoUrl    String?      @map("photo_url") @db.Text
-  isActive    Boolean      @default(true) @map("is_active")
-  createdAt   DateTime     @default(now()) @map("created_at")
-  category    MenuCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  id         String       @id @default(cuid())
+  name       String       @unique
+  categoryId String       @map("category_id")
+  photoUrl   String?      @map("photo_url") @db.Text
+  isActive   Boolean      @default(true) @map("is_active")
+  createdAt  DateTime     @default(now()) @map("created_at")
+  category   MenuCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
 
   @@index([categoryId, isActive])
   @@map("catalog_items")
 }
 
 model MenuItem {
-  id          String       @id @default(cuid())
-  venueId     String       @map("venue_id")
-  categoryId  String       @map("category_id")
+  id          String          @id @default(cuid())
+  venueId     String          @map("venue_id")
+  categoryId  String          @map("category_id")
   name        String
-  priceAzn    Decimal      @map("price_azn") @db.Decimal(10, 2)
+  priceAzn    Decimal         @map("price_azn") @db.Decimal(10, 2)
   description String?
-  photoUrl    String?      @map("photo_url")
-  isActive    Boolean      @default(true) @map("is_active")
-  createdAt   DateTime     @default(now()) @map("created_at")
-  updatedAt   DateTime     @updatedAt @map("updated_at")
-  venue       Restaurant   @relation(fields: [venueId], references: [id], onDelete: Cascade)
-  category    MenuCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  photoUrl    String?         @map("photo_url")
+  isActive    Boolean         @default(true) @map("is_active")
+  createdAt   DateTime        @default(now()) @map("created_at")
+  updatedAt   DateTime        @updatedAt @map("updated_at")
+  venue       Restaurant      @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  category    MenuCategory    @relation(fields: [categoryId], references: [id], onDelete: Restrict)
   offerLinks  OfferMenuItem[]
 
   @@index([venueId, categoryId, isActive])
@@ -219,64 +222,99 @@ model MenuItem {
 }
 
 model OfferMenuItem {
-  offerId         String   @map("offer_id")
-  menuItemId      String   @map("menu_item_id")
+  offerId          String   @map("offer_id")
+  menuItemId       String   @map("menu_item_id")
   overridePriceAzn Decimal? @map("override_price_azn") @db.Decimal(10, 2)
-  offer           Deal     @relation(fields: [offerId], references: [id], onDelete: Cascade)
-  menuItem        MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+  offer            Deal     @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  menuItem         MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
 
   @@id([offerId, menuItemId])
   @@map("offer_menu_items")
 }
 
 model SavedDeal {
-  userId   String   @map("user_id")
-  dealId   String   @map("deal_id")
-  savedAt  DateTime @default(now()) @map("saved_at")
-  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  deal     Deal     @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  userId  String   @map("user_id")
+  dealId  String   @map("deal_id")
+  savedAt DateTime @default(now()) @map("saved_at")
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deal    Deal     @relation(fields: [dealId], references: [id], onDelete: Cascade)
 
   @@id([userId, dealId])
   @@map("saved_deals")
 }
 
 model Redemption {
-  id             String   @id @default(cuid())
-  userId         String   @map("user_id")
-  dealId         String   @map("deal_id")
-  claimedAt      DateTime @default(now()) @map("claimed_at")
-  redeemedAt     DateTime? @map("redeemed_at")
-  feedbackSkippedAt DateTime? @map("feedback_skipped_at")
-  redemptionCode String   @unique @map("redemption_code")
-  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  deal           Deal     @relation(fields: [dealId], references: [id], onDelete: Cascade)
-  feedback       RedemptionFeedback?
+  id                String              @id @default(cuid())
+  userId            String              @map("user_id")
+  dealId            String              @map("deal_id")
+  claimedAt         DateTime            @default(now()) @map("claimed_at")
+  redeemedAt        DateTime?           @map("redeemed_at")
+  feedbackSkippedAt DateTime?           @map("feedback_skipped_at")
+  redemptionCode    String              @unique @map("redemption_code")
+  user              User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deal              Deal                @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  feedback          RedemptionFeedback?
+  pointSpin         PointSpin?
 
   @@unique([userId, dealId])
   @@map("redemptions")
 }
 
 model RedemptionFeedback {
-  id          String     @id @default(cuid())
-  redemptionId String    @unique @map("redemption_id")
-  wasHonored  Boolean    @map("was_honored")
-  comment     String?
-  createdAt   DateTime   @default(now()) @map("created_at")
-  redemption  Redemption @relation(fields: [redemptionId], references: [id], onDelete: Cascade)
+  id           String     @id @default(cuid())
+  redemptionId String     @unique @map("redemption_id")
+  wasHonored   Boolean    @map("was_honored")
+  comment      String?
+  createdAt    DateTime   @default(now()) @map("created_at")
+  redemption   Redemption @relation(fields: [redemptionId], references: [id], onDelete: Cascade)
 
   @@index([createdAt])
   @@map("redemption_feedback")
 }
 
+model PointSpin {
+  id           String      @id @default(cuid())
+  userId       String      @map("user_id")
+  redemptionId String?     @unique @map("redemption_id")
+  spinDate     DateTime    @map("spin_date") @db.Date
+  points       Int
+  createdAt    DateTime    @default(now()) @map("created_at")
+  user         User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  redemption   Redemption? @relation(fields: [redemptionId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@map("point_spins")
+}
+
+model PointReward {
+  id                String      @id @default(cuid())
+  userId            String      @map("user_id")
+  pointsSpent       Int         @default(500) @map("points_spent")
+  discountPct       Int         @default(50) @map("discount_pct")
+  maxBillAzn        Decimal     @default(200) @map("max_bill_azn") @db.Decimal(10, 2)
+  rewardCode        String      @unique @map("reward_code")
+  issuedAt          DateTime    @default(now()) @map("issued_at")
+  redeemedAt        DateTime?   @map("redeemed_at")
+  redeemedVenueId   String?     @map("redeemed_venue_id")
+  billAmountAzn     Decimal?    @map("bill_amount_azn") @db.Decimal(10, 2)
+  discountAmountAzn Decimal?    @map("discount_amount_azn") @db.Decimal(10, 2)
+  user              User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  redeemedVenue     Restaurant? @relation(fields: [redeemedVenueId], references: [id], onDelete: SetNull)
+
+  @@index([userId, redeemedAt])
+  @@index([redeemedVenueId, redeemedAt])
+  @@map("point_rewards")
+}
+
 model VenueTrustFlag {
-  id          String          @id @default(cuid())
-  venueId     String          @map("venue_id")
-  reason      String
-  status      VenueFlagStatus @default(OPEN)
-  createdAt   DateTime        @default(now()) @map("created_at")
-  resolvedAt  DateTime?       @map("resolved_at")
-  resolvedByUserId String?    @map("resolved_by_user_id")
-  venue       Restaurant      @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  id               String          @id @default(cuid())
+  venueId          String          @map("venue_id")
+  reason           String
+  status           VenueFlagStatus @default(OPEN)
+  createdAt        DateTime        @default(now()) @map("created_at")
+  resolvedAt       DateTime?       @map("resolved_at")
+  resolvedByUserId String?         @map("resolved_by_user_id")
+  venue            Restaurant      @relation(fields: [venueId], references: [id], onDelete: Cascade)
 
   @@index([status, createdAt])
   @@index([venueId, status])
@@ -320,17 +358,17 @@ model PushSubscription {
 }
 
 model VenueClaimRequest {
-  id           String      @id @default(cuid())
-  venueId      String      @map("venue_id")
-  requestingUserId String  @map("requesting_user_id")
-  contactPhone String      @map("contact_phone")
-  contactEmail String      @map("contact_email")
-  proofNotes   String      @map("proof_notes")
-  status       ClaimRequestStatus @default(pending)
-  createdAt    DateTime    @default(now()) @map("created_at")
-  reviewedAt   DateTime?   @map("reviewed_at")
-  venue        Restaurant  @relation(fields: [venueId], references: [id], onDelete: Cascade)
-  requestingUser User      @relation("VenueClaimRequester", fields: [requestingUserId], references: [id], onDelete: Cascade)
+  id               String             @id @default(cuid())
+  venueId          String             @map("venue_id")
+  requestingUserId String             @map("requesting_user_id")
+  contactPhone     String             @map("contact_phone")
+  contactEmail     String             @map("contact_email")
+  proofNotes       String             @map("proof_notes")
+  status           ClaimRequestStatus @default(pending)
+  createdAt        DateTime           @default(now()) @map("created_at")
+  reviewedAt       DateTime?          @map("reviewed_at")
+  venue            Restaurant         @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  requestingUser   User               @relation("VenueClaimRequester", fields: [requestingUserId], references: [id], onDelete: Cascade)
 
   @@unique([requestingUserId, venueId])
   @@map("venue_claim_requests")
@@ -368,13 +406,13 @@ model DealView {
 }
 
 model NotificationLog {
-  id        String   @id @default(cuid())
-  userId    String   @map("user_id")
-  dealId    String   @map("deal_id")
-  kind      String
-  sentAt    DateTime @default(now()) @map("sent_at")
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  deal      Deal     @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  id     String   @id @default(cuid())
+  userId String   @map("user_id")
+  dealId String   @map("deal_id")
+  kind   String
+  sentAt DateTime @default(now()) @map("sent_at")
+  user   User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deal   Deal     @relation(fields: [dealId], references: [id], onDelete: Cascade)
 
   @@unique([userId, dealId, kind])
   @@map("notification_logs")

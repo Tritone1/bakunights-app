@@ -8,7 +8,7 @@ export function DealMap({ deals, center }: { deals: Deal[]; center: { lat: numbe
   const [googleFailed, setGoogleFailed] = useState(false);
   if (!key || googleFailed) return <FallbackMap deals={deals} center={center} reason={key ? "Google Maps failed to load. OpenStreetMap-style preview is active." : "Google Maps is not configured. Map preview is active."} />;
   return <div className="relative h-[62vh] min-h-[430px] overflow-hidden rounded-xl border-2 border-ink shadow-ticket">
-    <APIProvider apiKey={key} onError={(error) => { console.error("BakuNights deal map Google Maps failed:", error); setGoogleFailed(true); }}>
+    <APIProvider apiKey={key} onError={(error) => { console.error("WhereToGo deal map Google Maps failed:", error); setGoogleFailed(true); }}>
       <GoogleMap defaultCenter={center} defaultZoom={13} mapId="DEMO_MAP_ID" gestureHandling="greedy" disableDefaultUI={false}>
         <AdvancedMarker position={center} title="Your location">
           <div className="flex h-6 w-6 items-center justify-center rounded-full border-2 border-white bg-primary-500 shadow-lg">

@@ -1,6 +1,6 @@
-# BakuNights
+# WhereToGo
 
-BakuNights is a dark, mobile-first nightlife and dining discovery experience for Baku. It highlights tonight’s restaurants, bars, pubs, lounges, and limited-time offers in a polished single-page interface.
+WhereToGo is a dark, mobile-first food and deal discovery experience for Baku. It highlights restaurants, bars, pubs, lounges, and limited-time offers in a polished single-page interface.
 
 The repository contains both the original web/PWA experience and a native Expo application for iOS and Android.
 
@@ -38,7 +38,7 @@ npm.cmd install
 npx.cmd expo start --lan --clear
 ```
 
-Keep the iPhone and computer on the same Wi-Fi. Open the iPhone Camera, scan the terminal QR code, and choose **Open in Expo Go**. When BakuNights asks for location access, choose **Allow While Using App**.
+Keep the iPhone and computer on the same Wi-Fi. Open the iPhone Camera, scan the terminal QR code, and choose **Open in Expo Go**. When WhereToGo asks for location access, choose **Allow While Using App**.
 
 If the router blocks local device connections, use a tunnel instead:
 
@@ -49,7 +49,7 @@ npx.cmd expo start --tunnel --clear
 ## Commands
 
 ```powershell
-npm.cmd run dev          # BakuNights Vite server
+npm.cmd run dev          # WhereToGo Vite server
 npm.cmd run build        # production frontend build
 npm.cmd run typecheck    # frontend TypeScript validation
 npm.cmd run lint         # frontend ESLint
@@ -121,7 +121,7 @@ The API logs configuration warnings during startup. The web interface also repor
 
 ## Venue onboarding and moderation
 
-The API includes merchant publishing and admin monitoring tools for getting real venue offers onto BakuNights.
+The API includes merchant publishing and admin monitoring tools for getting real venue offers onto WhereToGo.
 
 Local setup:
 
@@ -165,6 +165,12 @@ OPENAI_VISION_MODEL="gpt-4o"
 ```
 
 Restart the API, log in as a merchant, open **Menu**, and select **Scan photo/PDF**. JPG, PNG, WebP, and PDF files up to 10 MB are accepted. Extraction supports mixed Azerbaijani and English text. If the key is absent, the model cannot read the file, or no reliable rows are found, the UI shows a clear manual/paste fallback.
+
+## Verified-visit customer points
+
+The homepage points wheel is account-backed rather than a client-side deal picker. A spin unlocks only after a merchant verifies the customer's in-app GS QR/code during an in-store visit. Each verified redemption can fund exactly one spin, enforced by a database uniqueness constraint, so refreshing the page or using another device cannot reuse a visit. A customer with several verified, unused visits can use one spin per visit.
+
+The wheel has 24 equal-sized visual slices, while its published probabilities are enforced independently by the API. The seven 10-point entries together carry 35% odds, the six 15-point entries 30%, the five 25-point entries 20%, and the four 30-point entries 12%. The single 50-point entry is 2%, and the single 60-point entry is 1%. After a customer wins 50 or 60 points, their next 10 spins cannot award either high prize. Each 500 accumulated points automatically creates a one-time `PTS-...` reward and carries any remaining balance forward. The reward gives 50% off the eligible portion of a bill up to 200 AZN, for a maximum discount of 100 AZN. Merchants verify the code from the dashboard, enter the bill amount, and receive the exact discount to apply. Reward redemption is atomic and records the venue, bill amount, discount, and redemption time.
 
 ## Offer honesty and trusted venues
 

@@ -8,9 +8,9 @@ type VerificationEmail = {
 };
 
 export async function sendVerificationEmail({ userEmail, verificationUrl }: VerificationEmail) {
-  const subject = "Verify your BakuNights account";
+  const subject = "Verify your WhereToGo account";
   const html = verificationTemplate(verificationUrl);
-  const text = `Verify your BakuNights account: ${verificationUrl}`;
+  const text = `Verify your WhereToGo account: ${verificationUrl}`;
 
   if (isGmailApiConfigured()) {
     await sendWithGmailApi({ to: userEmail, subject, html, text });
@@ -31,7 +31,7 @@ export async function sendVerificationEmail({ userEmail, verificationUrl }: Veri
       auth: { user: env.GMAIL_SENDER_EMAIL, pass: env.GMAIL_APP_PASSWORD.replace(/\s/g, "") },
     });
     await transporter.sendMail({
-      from: `BakuNights <${env.GMAIL_SENDER_EMAIL}>`,
+      from: `WhereToGo <${env.GMAIL_SENDER_EMAIL}>`,
       to: userEmail,
       subject,
       html,
@@ -46,7 +46,7 @@ export async function sendVerificationEmail({ userEmail, verificationUrl }: Veri
 
   console.info([
     "",
-    "========== BakuNights email verification ==========",
+    "========== WhereToGo email verification ==========",
     `To: ${userEmail}`,
     `Subject: ${subject}`,
     `Verification link: ${verificationUrl}`,
@@ -105,7 +105,7 @@ function buildMimeMessage({ to, subject, html, text }: { to: string; subject: st
   const boundary = `bakunights-${randomUUID()}`;
   const encodedSubject = Buffer.from(subject, "utf8").toString("base64");
   return [
-    `From: BakuNights <${env.GMAIL_SENDER_EMAIL}>`,
+    `From: WhereToGo <${env.GMAIL_SENDER_EMAIL}>`,
     `To: ${to}`,
     `Subject: =?UTF-8?B?${encodedSubject}?=`,
     "MIME-Version: 1.0",
@@ -131,7 +131,7 @@ function verificationTemplate(verificationUrl: string) {
   <html><body style="margin:0;background:#09090e;color:#f8fafc;font-family:Inter,Arial,sans-serif">
     <div style="max-width:560px;margin:0 auto;padding:40px 20px">
       <div style="border:1px solid #2b2b35;border-radius:20px;background:#111119;padding:32px">
-        <p style="margin:0 0 22px;font-size:22px;font-weight:800">Baku<span style="color:#f59e0b">Nights</span></p>
+        <p style="margin:0 0 22px;font-size:22px;font-weight:800">Where<span style="color:#f59e0b">ToGo</span></p>
         <h1 style="margin:0 0 14px;font-family:Georgia,serif;font-size:32px">Verify your email</h1>
         <p style="margin:0 0 24px;color:#a7a7b3;line-height:1.6">Confirm your email to finish creating your account. This single-use link expires in 24 hours.</p>
         <a href="${verificationUrl}" style="display:inline-block;border-radius:999px;background:#f59e0b;color:#09090e;padding:13px 22px;font-weight:800;text-decoration:none">Verify email</a>

@@ -21,7 +21,7 @@ self.addEventListener("fetch", (event) => {
 });
 self.addEventListener("push", (event) => {
   const data = event.data?.json() || {};
-  event.waitUntil(self.registration.showNotification(data.title || "BakuNights", {
+  event.waitUntil(self.registration.showNotification(data.title || "WhereToGo", {
     body: data.body || "A fresh deal just dropped.", icon: "/icon.svg", badge: "/icon.svg", data: { url: data.url || "/" },
   }));
 });

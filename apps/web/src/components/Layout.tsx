@@ -14,9 +14,9 @@ export function Layout() {
   return <div className="min-h-screen bg-paper">
     <header className="sticky top-0 z-40 border-b-2 border-ink/10 bg-primary-500 shadow-sm">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 md:px-8">
-        <NavLink to="/" className="group flex items-center gap-2" aria-label="Haragedek home">
-          <span className="flex h-10 w-10 -rotate-3 items-center justify-center border-2 border-white bg-accent-500 font-display text-xl font-bold text-white shadow-ticket-sm transition group-hover:rotate-0">HD</span>
-          <span className="font-display text-2xl font-bold uppercase tracking-tight text-white">Haragedek</span>
+        <NavLink to="/" className="group flex items-center gap-2" aria-label="WhereToGo home">
+          <span className="flex h-10 w-10 -rotate-3 items-center justify-center border-2 border-white bg-accent-500 font-display text-xl font-bold text-white shadow-ticket-sm transition group-hover:rotate-0">WG</span>
+          <span className="font-display text-2xl font-bold uppercase tracking-tight text-white">WhereToGo</span>
         </NavLink>
         <nav className="hidden items-center gap-1 md:flex">
           {items.map(({ to, label }) => <NavLink key={to} to={to} className={({ isActive }) => clsx("text-white hover:bg-primary-600 px-3 py-2 rounded-lg transition", isActive && "bg-primary-600")}>{label}</NavLink>)}

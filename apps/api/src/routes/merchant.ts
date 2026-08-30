@@ -422,9 +422,38 @@ merchantRouter.post("/deals/:id/go-live", asyncRoute(async (req, res) => {
 }));
 
 merchantRouter.post("/redemptions/redeem", asyncRoute(async (req, res) => {
-  const { code } = z.object({ code: z.string().trim().min(4).max(30) }).parse(req.body);
+  const { code, venueId, billAmountAzn } = z.object({
+    code: z.string().trim().min(4).max(30),
+    venueId: z.string().min(1).optional(),
+    billAmountAzn: z.coerce.number().positive().max(100000).optional(),
+  }).parse(req.body);
+  const normalizedCode = code.toUpperCase();
+
+  if (normalizedCode.startsWith("PTS-")) {
+    if (!venueId || billAmountAzn == null) throw new HttpError(400, "Choose the venue and enter the bill amount for a points reward.");
+    await assertOwner(req.user!.id, venueId);
+    const reward = await prisma.pointReward.findUnique({
+      where: { rewardCode: normalizedCode },
+      include: { user: { select: { id: true, name: true, email: true } } },
+    });
+    if (!reward) throw new HttpError(404, "Points reward code not found.");
+    if (reward.redeemedAt) throw new HttpError(409, "This points reward has already been redeemed.");
+    const eligibleBillAzn = Math.min(billAmountAzn, Number(reward.maxBillAzn));
+    const discountAmountAzn = Math.round(eligibleBillAzn * reward.discountPct) / 100;
+    const updated = await prisma.pointReward.updateMany({
+      where: { id: reward.id, redeemedAt: null },
+      data: { redeemedAt: new Date(), redeemedVenueId: venueId, billAmountAzn, discountAmountAzn },
+    });
+    if (!updated.count) throw new HttpError(409, "This points reward has already been redeemed.");
+    res.json({
+      kind: "POINT_REWARD",
+      reward: { rewardCode: reward.rewardCode, discountPct: reward.discountPct, maxBillAzn: Number(reward.maxBillAzn), billAmountAzn, discountAmountAzn, user: reward.user },
+    });
+    return;
+  }
+
   const redemption = await prisma.redemption.findUnique({
-    where: { redemptionCode: code.toUpperCase() },
+    where: { redemptionCode: normalizedCode },
     include: { deal: { include: { restaurant: { select: { id: true, name: true } } } }, user: { select: { id: true, name: true, email: true } } },
   });
   if (!redemption) throw new HttpError(404, "Redemption code not found.");
@@ -433,5 +462,5 @@ merchantRouter.post("/redemptions/redeem", asyncRoute(async (req, res) => {
   const updated = await prisma.redemption.update({
     where: { id: redemption.id }, data: { redeemedAt: new Date() },
   });
-  res.json({ redemption: { ...updated, deal: redemption.deal, user: redemption.user } });
+  res.json({ kind: "DEAL", spinUnlocked: true, redemption: { ...updated, deal: redemption.deal, user: redemption.user } });
 }));

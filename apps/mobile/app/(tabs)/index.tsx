@@ -105,7 +105,7 @@ export default function DiscoverScreen() {
               <View style={styles.cardTitleRow}><View style={styles.cardTitleWrap}><Text style={styles.cardCategory}>{venue.category.toUpperCase()}</Text><Text style={styles.cardTitle}>{venue.name}</Text></View><View style={styles.rating}><Ionicons name="star" color="#f59e0b" size={13} /><Text style={styles.ratingText}>{venue.rating}</Text></View></View>
               <View style={styles.addressRow}><Ionicons name="location" color="#f59e0b" size={15} /><Text style={styles.address} numberOfLines={1}>{venue.address}</Text><Text style={styles.distance}>{liveDistance}</Text></View>
               <Text style={styles.deal}>{venue.deal}</Text>
-              <View style={styles.cardFooter}><Text style={styles.hours}>{venue.hours}</Text><Pressable onPress={() => router.push({ pathname: "/(tabs)/explore", params: { venue: String(venue.id), navigate: "1" } })} style={styles.navigateButton} accessibilityRole="button" accessibilityLabel={`Navigate to ${venue.name} in Haragedek`}><Text style={styles.navigateText}>Navigate me</Text><Ionicons name="navigate" color="#09090e" size={16} /></Pressable></View>
+              <View style={styles.cardFooter}><Text style={styles.hours}>{venue.hours}</Text><Pressable onPress={() => router.push({ pathname: "/(tabs)/explore", params: { venue: String(venue.id), navigate: "1" } })} style={styles.navigateButton} accessibilityRole="button" accessibilityLabel={`Navigate to ${venue.name} in WhereToGo`}><Text style={styles.navigateText}>Navigate me</Text><Ionicons name="navigate" color="#09090e" size={16} /></Pressable></View>
             </View>
           </View>;
         })}

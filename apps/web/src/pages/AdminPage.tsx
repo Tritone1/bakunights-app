@@ -117,7 +117,7 @@ export function AdminPage() {
 
   return <PanelShell>
     <div className="flex flex-wrap items-center justify-between gap-3">
-      <div><p className="text-xs font-bold uppercase tracking-[.2em] text-cyan-300">BakuNights operations</p><h1 className="mt-1 text-3xl font-semibold text-white">Admin panel</h1></div>
+      <div><p className="text-xs font-bold uppercase tracking-[.2em] text-cyan-300">WhereToGo operations</p><h1 className="mt-1 text-3xl font-semibold text-white">Admin panel</h1></div>
       <div className="flex gap-2"><button onClick={() => { setEditingVenue(null); setVenueFormOpen(true); }} className="panel-button"><Plus size={16} />Venue</button></div>
     </div>
     {error && <p className="mt-4 rounded-lg border border-red-400/30 bg-red-500/10 p-3 text-sm text-red-200">{error}</p>}

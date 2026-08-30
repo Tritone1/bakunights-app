@@ -86,7 +86,7 @@ export default function MapScreen() {
   return (
     <SafeAreaView style={styles.screen} edges={["top"]}>
       <View style={styles.header}>
-        <View><Text style={styles.eyebrow}>HARAGEDEK NAVIGATION</Text><Text style={styles.title}>{navigationActive ? "Your route" : "Baku night map"}</Text></View>
+        <View><Text style={styles.eyebrow}>WHERETOGO NAVIGATION</Text><Text style={styles.title}>{navigationActive ? "Your route" : "Baku food map"}</Text></View>
         <Pressable onPress={showMyLocation} style={[styles.locationButton, locationAllowed && styles.locationActive]} accessibilityRole="button" accessibilityLabel="Show my current location">
           <Ionicons name="navigate" size={19} color={locationAllowed ? "#09090e" : "#f59e0b"} />
         </Pressable>
@@ -111,9 +111,9 @@ export default function MapScreen() {
             <View style={styles.destinationCopy}><Text style={styles.selectedLabel}>{navigationActive ? "IN-APP ROUTE" : "SELECTED DESTINATION"}</Text><Text numberOfLines={1} style={styles.venueName}>{selected.name}</Text><Text numberOfLines={1} style={styles.address}>{selected.address}</Text></View>
             <Pressable onPress={() => setTaxiVenue(selected)} style={styles.optionsButton} accessibilityRole="button" accessibilityLabel={`Other navigation options for ${selected.name}`}><Ionicons name="ellipsis-horizontal" color="#ffffff" size={22} /></Pressable>
           </View>
-          <Pressable onPress={navigationActive && coords ? focusRoute : startNavigation} style={[styles.navigateButton, navigationActive && coords && styles.routeActiveButton]} accessibilityRole="button" accessibilityLabel={navigationActive ? `Show active route to ${selected.name}` : `Navigate to ${selected.name} in Haragedek`}>
+          <Pressable onPress={navigationActive && coords ? focusRoute : startNavigation} style={[styles.navigateButton, navigationActive && coords && styles.routeActiveButton]} accessibilityRole="button" accessibilityLabel={navigationActive ? `Show active route to ${selected.name}` : `Navigate to ${selected.name} in WhereToGo`}>
             <Ionicons name="navigate" color="#09090e" size={18} />
-            <Text style={styles.navigateText}>{navigationActive && coords ? `Route active${routeDistance === null ? "" : `  ·  ${routeDistance.toFixed(1)} km`}` : locating ? "Finding your location…" : "Navigate me in Haragedek"}</Text>
+            <Text style={styles.navigateText}>{navigationActive && coords ? `Route active${routeDistance === null ? "" : `  ·  ${routeDistance.toFixed(1)} km`}` : locating ? "Finding your location…" : "Navigate me in WhereToGo"}</Text>
           </Pressable>
         </View> : <View style={styles.emptyMapCard}><Ionicons name="storefront-outline" color="#f59e0b" size={22} /><View><Text style={styles.venueName}>No live venues yet</Text><Text style={styles.address}>Verified merchant venues will appear on this map.</Text></View></View>}
       </View>

@@ -80,7 +80,7 @@ export function VenuePage() {
       <div className="absolute inset-x-0 bottom-0 mx-auto max-w-6xl px-5 pb-8 sm:px-8">
         <p className="text-[10px] font-bold uppercase tracking-[.22em] text-amber-300">{venue.cuisine}</p>
         <h1 className="mt-2 font-display text-5xl font-semibold sm:text-6xl">{venue.name}</h1>
-        <div className="mt-4 flex flex-wrap items-center gap-4 text-sm text-white/70"><span className="flex items-center gap-1 font-semibold text-amber-300"><Star size={17} fill="currentColor" />{(venue.rating ?? 0).toFixed(1)} BakuNights rating</span><span className="flex items-center gap-1"><MapPin size={17} />{venue.address}</span>{venue.isVerifiedTrusted && <span className="flex items-center gap-1 text-cyan-300"><CheckCircle2 size={17} />Verified trusted</span>}</div>
+        <div className="mt-4 flex flex-wrap items-center gap-4 text-sm text-white/70"><span className="flex items-center gap-1 font-semibold text-amber-300"><Star size={17} fill="currentColor" />{(venue.rating ?? 0).toFixed(1)} WhereToGo rating</span><span className="flex items-center gap-1"><MapPin size={17} />{venue.address}</span>{venue.isVerifiedTrusted && <span className="flex items-center gap-1 text-cyan-300"><CheckCircle2 size={17} />Verified trusted</span>}</div>
       </div>
     </section>
 

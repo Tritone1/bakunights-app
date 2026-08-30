@@ -13,7 +13,7 @@ import { api } from "./lib/api";
 import { useAuth } from "./context/AuthContext";
 import type { Deal } from "./types";
 import { SafeImage } from "./components/SafeImage";
-import { DealRoulette } from "./components/DealRoulette";
+import { DailyPointsWheel } from "./components/DailyPointsWheel";
 import { ArrowLeft, Home } from "lucide-react";
 
 type Category = "Restaurants" | "Bars" | "Pubs" | "Lounges";
@@ -68,7 +68,6 @@ const IMAGES = {
   cocktail: "https://images.unsplash.com/photo-1597075687490-8f673c6c17f6?w=600&h=400&fit=crop",
   pub: "https://images.unsplash.com/photo-1578911489158-334e5cd2a051?w=600&h=400&fit=crop",
   lounge: "https://images.unsplash.com/photo-1615887584283-91f1be7fdc34?w=600&h=400&fit=crop",
-  hero: "https://images.unsplash.com/photo-1674857977971-131936c7b5ea?w=1400&h=500&fit=crop",
 };
 
 const CATEGORIES = ["All", "Restaurants", "Bars", "Pubs", "Lounges"] as const;
@@ -121,7 +120,7 @@ function loadGoogleMaps(apiKey: string) {
   if (typeof existingGoogle?.maps?.importLibrary === "function") return Promise.resolve();
   if (googleMapsPromise) return googleMapsPromise;
   googleMapsPromise = new Promise<void>((resolve, reject) => {
-    const callbackName = "__initBakuNightsGoogleMaps";
+    const callbackName = "__initWhereToGoGoogleMaps";
     const callbackWindow = window as unknown as Record<string, unknown>;
     const script = document.createElement("script");
     callbackWindow[callbackName] = () => {
@@ -195,9 +194,9 @@ function Navigation({ query, setQuery, onLocationClick, locationLabel }: { query
   const [menuOpen, setMenuOpen] = useState(false);
   return <header className="sticky top-0 z-50 border-b border-white/[0.07] bg-night/80 backdrop-blur-2xl">
     <div className="mx-auto flex h-[72px] max-w-[1400px] items-center gap-7 px-5 sm:px-8">
-      <a href="#top" className="flex shrink-0 items-center gap-3" aria-label="BakuNights home">
-        <span className="grid h-10 w-10 place-items-center rounded-xl bg-gold text-night shadow-[0_0_28px_rgba(245,158,11,.25)]"><MoonMark /></span>
-        <span className="hidden text-lg font-bold tracking-tight sm:inline sm:text-xl">Baku<span className="text-gold">Nights</span></span>
+      <a href="#top" className="flex shrink-0 items-center gap-3" aria-label="WhereToGo home">
+        <span className="grid h-10 w-10 place-items-center rounded-xl bg-gold text-night shadow-[0_0_28px_rgba(245,158,11,.25)]"><WhereToGoMark /></span>
+        <span className="hidden text-lg font-bold tracking-tight sm:inline sm:text-xl">Where<span className="text-gold">ToGo</span></span>
       </a>
       <div className="flex flex-1 justify-center"><SearchBox value={query} onChange={setQuery} /></div>
       <div className="ml-auto flex items-center gap-2 sm:gap-3">
@@ -209,24 +208,21 @@ function Navigation({ query, setQuery, onLocationClick, locationLabel }: { query
   </header>;
 }
 
-function MoonMark() {
-  return <svg aria-hidden="true" viewBox="0 0 32 32" className="h-6 w-6" fill="none"><path d="M22.7 22.7A11 11 0 0 1 10.1 5.2 11.3 11.3 0 1 0 26.8 21a11 11 0 0 1-4.1 1.7Z" fill="currentColor" /><circle cx="23.5" cy="8.5" r="2" fill="currentColor" /><path d="m25 12 .6 1.7 1.7.6-1.7.6-.6 1.7-.6-1.7-1.7-.6 1.7-.6.6-1.7Z" fill="currentColor" /></svg>;
+function WhereToGoMark() {
+  return <svg aria-hidden="true" viewBox="0 0 32 32" className="h-7 w-7" fill="none"><path d="M16 30S26 20.3 26 11.8a10 10 0 1 0-20 0C6 20.3 16 30 16 30Z" fill="currentColor" /><path d="M12.2 7v6.2m2.2-6.2v6.2m-4.4-3h4.4m-2.2 3v5.2M20.4 7c-2 0-3.2 1.8-3.2 4s1.2 4 3.2 4m0-8v11.4" stroke="#09090e" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" /></svg>;
 }
 
 function Hero({ stats }: { stats: HomepageStats }) {
   const today = new Intl.DateTimeFormat("en-US", { weekday: "long", month: "long", day: "numeric" }).format(new Date());
-  return <section id="top" className="relative isolate min-h-[500px] overflow-hidden border-b border-white/[0.07]">
-    <SafeImage src={IMAGES.hero} alt="Baku illuminated at night" className="absolute inset-0 -z-20 h-full w-full object-cover object-center" />
-    <div className="absolute inset-0 -z-10 bg-[linear-gradient(90deg,rgba(9,9,14,.98)_0%,rgba(9,9,14,.84)_43%,rgba(9,9,14,.26)_78%,rgba(9,9,14,.55)_100%)]" />
-    <div className="absolute inset-0 -z-10 bg-[linear-gradient(0deg,#09090e_0%,transparent_42%)]" />
-    <div className="mx-auto flex min-h-[500px] max-w-[1400px] items-center px-5 py-16 sm:px-8 lg:py-20">
-      <div className="max-w-3xl">
-        <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-gold/25 bg-gold/10 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[.18em] text-amber-200 backdrop-blur"><span className="deal-pulse h-2 w-2 rounded-full bg-gold shadow-[0_0_12px_#f59e0b]" />Live · {today}</div>
-        <h1 className="font-display text-5xl font-semibold leading-[.95] tracking-[-.04em] text-white sm:text-6xl lg:text-[76px]">Tonight in <span className="italic text-gold">Baku</span></h1>
-        <p className="mt-6 max-w-2xl text-base leading-7 text-white/65 sm:text-lg">Discover the city after dark—from candlelit restaurants to rooftop bars, old-city pubs, and velvet lounges. Tonight’s best tables and offers, all in one place.</p>
-        <div className="mt-9 flex flex-wrap gap-3">
+  return <section id="top" className="relative isolate min-h-[calc(100svh-72px)] overflow-hidden border-b border-white/[0.07] sm:min-h-[680px] lg:min-h-[720px]">
+    <SafeImage src="/wheretogo-hero.png" alt="WhereToGo — great food and great deals every day" className="absolute inset-0 -z-20 h-full w-full object-cover object-center" />
+    <div className="absolute inset-0 -z-10 bg-[linear-gradient(180deg,rgba(9,9,14,.1)_0%,transparent_38%,rgba(9,9,14,.12)_62%,rgba(9,9,14,.94)_100%)]" />
+    <div className="mx-auto flex min-h-[calc(100svh-72px)] max-w-[1400px] items-end px-5 py-8 sm:min-h-[680px] sm:px-8 sm:py-10 lg:min-h-[720px]">
+      <div className="w-full">
+        <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-gold/30 bg-night/55 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[.18em] text-amber-100 shadow-lg backdrop-blur-md"><span className="deal-pulse h-2 w-2 rounded-full bg-gold shadow-[0_0_12px_#f59e0b]" />Live · {today}</div>
+        <div className="flex flex-wrap gap-3">
           <Stat value={String(stats.activeVenues)} label="Active venues" />
-          <Stat value={String(stats.liveDeals)} label="Deals tonight" accent />
+          <Stat value={String(stats.liveDeals)} label="Deals today" accent />
           <Stat value={String(stats.areas)} label="Areas" />
         </div>
       </div>
@@ -283,7 +279,7 @@ function VenueCard({ venue, saved, onToggleSave, onNavigate }: { venue: Venue; s
       <div className="mt-4 flex flex-wrap gap-1.5">{venue.tags.map((tag) => <span key={tag} className="rounded-full border border-white/[0.07] bg-white/[0.035] px-2.5 py-1 text-[10px] text-white/55">{tag}</span>)}</div>
       <div className="my-5 h-px bg-white/[0.07]" />
       <p className="text-sm font-semibold text-white">{venue.deal}</p>
-      <div className="mt-4 flex items-center gap-2"><span className="mr-auto flex items-center gap-1.5 text-[11px] text-muted"><Icon name="clock" size={14} />{venue.open}</span><button type="button" onClick={(event) => { event.stopPropagation(); onNavigate(); }} className="inline-flex items-center gap-2 rounded-full bg-gold px-4 py-2 text-xs font-bold text-night transition hover:bg-amber-300" aria-label={`Navigate to ${venue.name} in Haragedek`}>Navigate me<Icon name="location" size={14} /></button></div>
+      <div className="mt-4 flex items-center gap-2"><span className="mr-auto flex items-center gap-1.5 text-[11px] text-muted"><Icon name="clock" size={14} />{venue.open}</span><button type="button" onClick={(event) => { event.stopPropagation(); onNavigate(); }} className="inline-flex items-center gap-2 rounded-full bg-gold px-4 py-2 text-xs font-bold text-night transition hover:bg-amber-300" aria-label={`Navigate to ${venue.name} in WhereToGo`}>Navigate me<Icon name="location" size={14} /></button></div>
     </div>
   </article>;
 }
@@ -355,7 +351,7 @@ function GoogleVenueMap({ venues, selected, onSelect, apiKey, mapId, userPositio
     let cancelled = false;
     const previousAuthFailure = window.gm_authFailure;
     window.gm_authFailure = () => {
-      console.error("BakuNights Google Maps authentication failed. Check the API key, Railway variable, allowed production referrer, enabled APIs, and billing.");
+      console.error("WhereToGo Google Maps authentication failed. Check the API key, Railway variable, allowed production referrer, enabled APIs, and billing.");
       if (!cancelled) setStatus("failed");
     };
 
@@ -394,7 +390,7 @@ function GoogleVenueMap({ venues, selected, onSelect, apiKey, mapId, userPositio
       markersRef.current = markers;
       setStatus("ready");
     }).catch((error: unknown) => {
-      console.error("BakuNights Google Maps initialization failed:", error instanceof Error ? error.message : "Unknown error");
+      console.error("WhereToGo Google Maps initialization failed:", error instanceof Error ? error.message : "Unknown error");
       if (!cancelled) {
         setStatus("failed");
         onRouteChange({ status: "failed", message: "The in-app map could not load. Please retry when your connection is available." });
@@ -513,14 +509,14 @@ function GoogleVenueMap({ venues, selected, onSelect, apiKey, mapId, userPositio
         onRouteChange({ status: "active", mode: routeMode, distanceMeters, durationSeconds, message: routeMessage });
       } catch (error: unknown) {
         if (cancelled || controller.signal.aborted) return;
-        console.warn("Haragedek route could not be drawn:", error);
+        console.warn("WhereToGo route could not be drawn:", error);
         routePolylineRef.current?.setMap(null);
         const modeName = routeMode === "transit" ? "public transport" : routeMode;
         onRouteChange({ status: "failed", mode: routeMode, message: `A ${modeName} route is not available for this journey. Choose another mode or try again.` });
       }
     }).catch((error: unknown) => {
       if (cancelled) return;
-      console.warn("Haragedek map marker could not be loaded:", error);
+      console.warn("WhereToGo map marker could not be loaded:", error);
       onRouteChange({ status: "failed", message: "The in-app map could not start navigation." });
     });
 
@@ -559,13 +555,13 @@ function MapSection({ venues, selected, onSelect, onTaxi, userPosition, location
       ? `${(routeState.distanceMeters / 1000).toFixed(1)} km · ${Math.max(1, Math.round(routeState.durationSeconds / 60))} min`
       : routeState.status === "failed" ? "Choose another route" : "Choose in-app route";
   const routeDescription = routeState.status === "active"
-    ? routeState.message ?? "Route active in Haragedek"
+    ? routeState.message ?? "Route active in WhereToGo"
     : routeState.status === "loading" ? "Building your driving route…"
       : routeState.status === "failed" ? routeState.message
         : "Selected route destination";
 
   return <section id="map" className="border-y border-white/[0.07] bg-[#0c0c14] py-20">
-    <div className="mx-auto max-w-[1400px] px-5 sm:px-8"><SectionHeading eyebrow="Haragedek navigation" title="Navigate without leaving the app" />
+    <div className="mx-auto max-w-[1400px] px-5 sm:px-8"><SectionHeading eyebrow="WhereToGo navigation" title="Navigate without leaving the app" />
       <div className="grid overflow-hidden rounded-2xl border border-white/[0.08] bg-card lg:h-[610px] lg:grid-cols-[minmax(300px,1fr)_2fr]">
         <div className="no-scrollbar order-2 max-h-[420px] overflow-y-auto border-t border-white/[0.07] p-3 lg:order-1 lg:max-h-none lg:border-r lg:border-t-0">
           <p className="px-2 pb-3 pt-1 text-[9px] font-bold uppercase tracking-[.2em] text-muted">All venues · {venues.length}</p>
@@ -609,7 +605,7 @@ function TaxiSheet({ venue, onClose }: { venue: Venue; onClose: () => void }) {
   const [copyState, setCopyState] = useState<"idle" | "copied" | "failed">("idle");
   const destination = `${venue.name}, ${venue.address}`;
   const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${venue.lat},${venue.lng}&travelmode=driving`;
-  const wazeUrl = `https://waze.com/ul?ll=${venue.lat}%2C${venue.lng}&navigate=yes&zoom=17&utm_source=bakunights`;
+  const wazeUrl = `https://waze.com/ul?ll=${venue.lat}%2C${venue.lng}&navigate=yes&zoom=17&utm_source=wheretogo`;
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => { if (event.key === "Escape") onClose(); };
@@ -681,7 +677,7 @@ function TaxiSheet({ venue, onClose }: { venue: Venue; onClose: () => void }) {
         <div className="flex items-center gap-3"><span className="grid h-11 w-11 place-items-center rounded-xl bg-[#33ccff] text-[#07151a]"><Icon name="car" size={21} /></span><div><p className="font-semibold text-white">Waze</p><p className="text-xs text-white/50">Destination ready in the Waze app</p></div></div>
         <a href={wazeUrl} className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#33ccff] px-3 py-3 text-xs font-bold text-[#07151a] transition hover:bg-[#66dcff]">Open destination in Waze<Icon name="arrow" size={15} /></a>
       </div>
-      <p className="mt-4 text-center text-[10px] leading-4 text-white/35">Your route stays in Haragedek unless you choose one of these external apps.</p>
+      <p className="mt-4 text-center text-[10px] leading-4 text-white/35">Your route stays in WhereToGo unless you choose one of these external apps.</p>
     </section>
   </div>;
 }
@@ -761,7 +757,7 @@ function LocationPickerModal({ apiKey, detectedPosition, currentPosition, onConf
       marker.addListener("dragend", () => { const position = marker?.position; if (position && "lat" in position) update(typeof position.lat === "function" ? position.lat() : position.lat, typeof position.lng === "function" ? position.lng() : position.lng); });
       setStatus("Click the map or drag the pin to choose a location.");
     }).catch((error: unknown) => {
-      console.error("BakuNights location picker Google Maps failed:", error);
+      console.error("WhereToGo location picker Google Maps failed:", error);
       setStatus("Google Maps could not load. Check the API key and allowed website origin.");
     });
     return () => { active = false; if (marker) marker.map = null; pickerMarker.current = null; };
@@ -790,7 +786,7 @@ export default function App() {
   const { pathname: path } = useLocation();
   const { user, loading } = useAuth();
 
-  if (loading) return <main className="grid min-h-screen place-items-center bg-night text-sm text-white/60">Loading BakuNights...</main>;
+  if (loading) return <main className="grid min-h-screen place-items-center bg-night text-sm text-white/60">Loading WhereToGo...</main>;
   if (user?.role === "MERCHANT" && !path.startsWith("/merchant")) return <Navigate to="/merchant" replace />;
 
   const routedPage = path.startsWith("/verify-email") ? <VerifyEmailPage />
@@ -867,8 +863,8 @@ function ConsumerApp() {
 
   return <div className="min-h-screen overflow-x-hidden bg-night text-white">
     <Navigation query={query} setQuery={setQuery} locationLabel={locationLabel} onLocationClick={() => { requestLocation(); setLocationPickerOpen(true); }} />
-    <main><Hero stats={stats} />{dataError && <div className="mx-auto mt-6 max-w-[1340px] rounded-2xl border border-red-400/30 bg-red-500/10 p-4 text-sm text-red-100">{dataError}</div>}<LiveOffers deals={deals} loading={dataLoading} error={dataError} /><DealRoulette deals={deals} /><FlashDeals deals={deals} loading={dataLoading} /><VenueDirectory venues={venues} query={query} setQuery={setQuery} onNavigate={navigateInApp} origin={feedPosition} />{selectedVenue ? <MapSection venues={venues} selected={selectedVenue} onSelect={setSelectedVenue} onTaxi={setTaxiVenue} userPosition={feedPosition} locationStatus={locationStatus} locationMessage={locationMessage} onRequestLocation={requestLocation} routeRequest={routeRequest} routeMode={routeMode} onStartRoute={startRoute} /> : <section id="map" className="border-y border-white/[0.07] bg-[#0c0c14] py-20"><div className="mx-auto max-w-[1400px] px-5 text-center text-muted">No active venues are available to show on the map.</div></section>}</main>
-    <footer className="px-5 py-9 text-center text-[11px] text-muted"><p>© {new Date().getFullYear()} BakuNights · All offers valid for today only</p></footer>
+    <main><Hero stats={stats} />{dataError && <div className="mx-auto mt-6 max-w-[1340px] rounded-2xl border border-red-400/30 bg-red-500/10 p-4 text-sm text-red-100">{dataError}</div>}<LiveOffers deals={deals} loading={dataLoading} error={dataError} /><DailyPointsWheel /><FlashDeals deals={deals} loading={dataLoading} /><VenueDirectory venues={venues} query={query} setQuery={setQuery} onNavigate={navigateInApp} origin={feedPosition} />{selectedVenue ? <MapSection venues={venues} selected={selectedVenue} onSelect={setSelectedVenue} onTaxi={setTaxiVenue} userPosition={feedPosition} locationStatus={locationStatus} locationMessage={locationMessage} onRequestLocation={requestLocation} routeRequest={routeRequest} routeMode={routeMode} onStartRoute={startRoute} /> : <section id="map" className="border-y border-white/[0.07] bg-[#0c0c14] py-20"><div className="mx-auto max-w-[1400px] px-5 text-center text-muted">No active venues are available to show on the map.</div></section>}</main>
+    <footer className="px-5 py-9 text-center text-[11px] text-muted"><p>© {new Date().getFullYear()} WhereToGo · Great food. Great deals. Every day.</p></footer>
     {taxiVenue && <TaxiSheet venue={taxiVenue} onClose={() => setTaxiVenue(null)} />}
     {locationPickerOpen && <LocationPickerModal apiKey={mapsApiKey} detectedPosition={userPosition} currentPosition={feedPosition} onClose={() => setLocationPickerOpen(false)} onConfirm={(position, label) => { setManualPosition(position); setLocationLabel(label); setLocationPickerOpen(false); }} />}
   </div>;

@@ -1,7 +1,7 @@
 {
-  "name": "BakuNights",
-  "short_name": "BakuNights",
-  "description": "Baku nightlife and dining discovery",
+  "name": "WhereToGo",
+  "short_name": "WhereToGo",
+  "description": "Great food and great deals every day",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#09090e",

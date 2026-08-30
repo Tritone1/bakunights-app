@@ -41,7 +41,7 @@ export function TaxiSheet({ venue, onClose }: Props) {
 
   async function openWaze() {
     const destination = `${venue?.latitude},${venue?.longitude}`;
-    await Linking.openURL(`https://waze.com/ul?ll=${encodeURIComponent(destination)}&navigate=yes&zoom=17&utm_source=bakunights`);
+    await Linking.openURL(`https://waze.com/ul?ll=${encodeURIComponent(destination)}&navigate=yes&zoom=17&utm_source=wheretogo`);
   }
 
   return (
@@ -104,7 +104,7 @@ export function TaxiSheet({ venue, onClose }: Props) {
               <Ionicons name="arrow-forward" color="#07151a" size={16} />
             </Pressable>
           </View>
-          <Text style={styles.disclaimer}>Your route stays in Haragedek unless you choose one of these external apps. Haragedek is not affiliated with either service.</Text>
+          <Text style={styles.disclaimer}>Your route stays in WhereToGo unless you choose one of these external apps. WhereToGo is not affiliated with either service.</Text>
         </Pressable>
       </Pressable>
     </Modal>
