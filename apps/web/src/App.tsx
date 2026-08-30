@@ -215,7 +215,10 @@ function WhereToGoMark() {
 function Hero({ stats }: { stats: HomepageStats }) {
   const today = new Intl.DateTimeFormat("en-US", { weekday: "long", month: "long", day: "numeric" }).format(new Date());
   return <section id="top" className="relative isolate min-h-[calc(100svh-72px)] overflow-hidden border-b border-white/[0.07] sm:min-h-[680px] lg:min-h-[720px]">
-    <SafeImage src="/wheretogo-hero.png" alt="WhereToGo — great food and great deals every day" className="absolute inset-0 -z-20 h-full w-full object-cover object-center" />
+    <picture className="absolute inset-0 -z-20">
+      <source media="(min-width: 768px)" srcSet="/wheretogo-hero-wide.png" />
+      <SafeImage src="/wheretogo-hero.png" alt="WhereToGo — great food and great deals every day" className="h-full w-full object-cover object-center" />
+    </picture>
     <div className="absolute inset-0 -z-10 bg-[linear-gradient(180deg,rgba(9,9,14,.1)_0%,transparent_38%,rgba(9,9,14,.12)_62%,rgba(9,9,14,.94)_100%)]" />
     <div className="mx-auto flex min-h-[calc(100svh-72px)] max-w-[1400px] items-end px-5 py-8 sm:min-h-[680px] sm:px-8 sm:py-10 lg:min-h-[720px]">
       <div className="w-full">
