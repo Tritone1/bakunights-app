@@ -91,8 +91,29 @@ async function assertOwner(userId: string, restaurantId: string) {
   return restaurant;
 }
 
+async function assertSelectedMenuCategory(venueId: string, categoryId: string) {
+  const selection = await prisma.venueMenuCategory.findUnique({ where: { venueId_categoryId: { venueId, categoryId } } });
+  if (!selection) throw new HttpError(400, "Choose a menu section enabled for this venue.", "MENU_CATEGORY_NOT_SELECTED");
+  return selection;
+}
+
+async function getVenueMenuCategories(venueId: string) {
+  const selected = await prisma.venueMenuCategory.findMany({
+    where: { venueId },
+    include: { category: true },
+    orderBy: [{ sortOrder: "asc" }, { category: { sortOrder: "asc" } }, { category: { name: "asc" } }],
+  });
+  const selectedIds = selected.map((row) => row.categoryId);
+  const available = await prisma.menuCategory.findMany({
+    where: { OR: [{ isGlobal: true }, { createdByVenueId: venueId }], id: selectedIds.length ? { notIn: selectedIds } : undefined },
+    orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+  });
+  return { selected, available };
+}
+
 async function assertOfferScope(restaurantId: string, input: { scope: "WHOLE_MENU" | "CATEGORY" | "SPECIFIC_ITEMS"; scopeCategoryId?: string | null; menuItemIds: string[] }) {
   if (input.scope === "CATEGORY") {
+    await assertSelectedMenuCategory(restaurantId, input.scopeCategoryId!);
     const count = await prisma.menuItem.count({ where: { venueId: restaurantId, categoryId: input.scopeCategoryId!, isActive: true } });
     if (!count) throw new HttpError(400, "That category has no active items at this venue.", "INVALID_OFFER_SCOPE");
   }
@@ -145,14 +166,72 @@ merchantRouter.patch("/venues/:venueId/profile", asyncRoute(async (req, res) => 
 }));
 
 merchantRouter.get("/menu/categories", asyncRoute(async (_req, res) => {
-  const categories = await prisma.menuCategory.findMany({ orderBy: [{ sortOrder: "asc" }, { name: "asc" }] });
+  const categories = await prisma.menuCategory.findMany({ where: { isGlobal: true }, orderBy: [{ sortOrder: "asc" }, { name: "asc" }] });
   res.json({ categories });
 }));
 
+merchantRouter.get("/menu-categories", asyncRoute(async (req, res) => {
+  const { venueId } = z.object({ venueId: z.string().min(1) }).parse(req.query);
+  await assertOwner(req.user!.id, venueId);
+  res.json(await getVenueMenuCategories(venueId));
+}));
+
+merchantRouter.put("/menu-categories", asyncRoute(async (req, res) => {
+  const input = z.object({ venueId: z.string().min(1), categoryIds: z.array(z.string().min(1)).max(50) }).parse(req.body);
+  await assertOwner(req.user!.id, input.venueId);
+  const categoryIds = [...new Set(input.categoryIds)];
+  const accessibleCount = await prisma.menuCategory.count({
+    where: { id: { in: categoryIds }, OR: [{ isGlobal: true }, { createdByVenueId: input.venueId }] },
+  });
+  if (accessibleCount !== categoryIds.length) throw new HttpError(400, "One or more menu sections are unavailable for this venue.", "INVALID_MENU_CATEGORY");
+
+  const current = await prisma.venueMenuCategory.findMany({ where: { venueId: input.venueId }, select: { categoryId: true } });
+  const nextIds = new Set(categoryIds);
+  const removedIds = current.map((row) => row.categoryId).filter((categoryId) => !nextIds.has(categoryId));
+  if (removedIds.length) {
+    const used = await prisma.menuItem.groupBy({
+      by: ["categoryId"],
+      where: { venueId: input.venueId, categoryId: { in: removedIds } },
+      _count: { _all: true },
+    });
+    if (used.length) {
+      const names = await prisma.menuCategory.findMany({ where: { id: { in: used.map((row) => row.categoryId) } }, select: { id: true, name: true } });
+      const nameById = new Map(names.map((category) => [category.id, category.name]));
+      const details = used.map((row) => `${nameById.get(row.categoryId) ?? "Section"} (${row._count._all} item${row._count._all === 1 ? "" : "s"})`).join(", ");
+      throw new HttpError(409, `Move or delete menu items before removing: ${details}.`, "MENU_CATEGORY_IN_USE");
+    }
+    const activeOffer = await prisma.deal.findFirst({ where: { restaurantId: input.venueId, isActive: true, scopeCategoryId: { in: removedIds } }, include: { scopeCategory: { select: { name: true } } } });
+    if (activeOffer) throw new HttpError(409, `Expire or edit “${activeOffer.title}” before removing ${activeOffer.scopeCategory?.name ?? "its menu section"}.`, "MENU_CATEGORY_IN_USE");
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.venueMenuCategory.deleteMany({ where: { venueId: input.venueId } });
+    if (categoryIds.length) await tx.venueMenuCategory.createMany({ data: categoryIds.map((categoryId, sortOrder) => ({ venueId: input.venueId, categoryId, sortOrder })) });
+  });
+  res.json(await getVenueMenuCategories(input.venueId));
+}));
+
+merchantRouter.post("/menu-categories/custom", asyncRoute(async (req, res) => {
+  const input = z.object({ venueId: z.string().min(1), name: z.string().trim().min(2).max(60) }).parse(req.body);
+  await assertOwner(req.user!.id, input.venueId);
+  const duplicate = await prisma.menuCategory.findFirst({
+    where: { name: { equals: input.name, mode: "insensitive" }, OR: [{ isGlobal: true }, { createdByVenueId: input.venueId }] },
+  });
+  if (duplicate) throw new HttpError(409, duplicate.isGlobal ? `“${duplicate.name}” already exists in the global section list.` : `This venue already has a “${duplicate.name}” section.`, "DUPLICATE_MENU_CATEGORY");
+  const selectionCount = await prisma.venueMenuCategory.count({ where: { venueId: input.venueId } });
+  const category = await prisma.$transaction(async (tx) => {
+    const created = await tx.menuCategory.create({ data: { name: input.name, sortOrder: 1000 + selectionCount, isGlobal: false, createdByVenueId: input.venueId } });
+    await tx.venueMenuCategory.create({ data: { venueId: input.venueId, categoryId: created.id, sortOrder: selectionCount } });
+    return created;
+  });
+  res.status(201).json({ category, ...(await getVenueMenuCategories(input.venueId)) });
+}));
+
 merchantRouter.get("/menu/catalog", asyncRoute(async (req, res) => {
-  const query = z.object({ q: z.string().trim().max(80).default("") }).parse(req.query);
+  const query = z.object({ q: z.string().trim().max(80).default(""), venueId: z.string().min(1) }).parse(req.query);
+  await assertOwner(req.user!.id, query.venueId);
   const items = await prisma.catalogItem.findMany({
-    where: { isActive: true, name: query.q ? { contains: query.q, mode: "insensitive" } : undefined },
+    where: { isActive: true, name: query.q ? { contains: query.q, mode: "insensitive" } : undefined, category: { venueSelections: { some: { venueId: query.venueId } } } },
     include: { category: true }, orderBy: { name: "asc" }, take: 30,
   });
   res.json({ items });
@@ -164,6 +243,7 @@ merchantRouter.post("/venues/:venueId/menu/from-catalog", asyncRoute(async (req,
   const input = z.object({ catalogItemId: z.string().min(1), priceAzn: z.coerce.number().positive().max(100000) }).parse(req.body);
   const catalogItem = await prisma.catalogItem.findFirst({ where: { id: input.catalogItemId, isActive: true } });
   if (!catalogItem) throw new HttpError(404, "Catalog item not found.");
+  await assertSelectedMenuCategory(venueId, catalogItem.categoryId);
   const item = await prisma.menuItem.create({ data: { venueId, categoryId: catalogItem.categoryId, name: catalogItem.name, priceAzn: input.priceAzn, photoUrl: catalogItem.photoUrl } });
   res.status(201).json({ item: { ...item, priceAzn: Number(item.priceAzn) } });
 }));
@@ -179,8 +259,7 @@ merchantRouter.post("/venues/:venueId/menu", asyncRoute(async (req, res) => {
   const venueId = z.string().parse(req.params.venueId);
   await assertOwner(req.user!.id, venueId);
   const input = menuItemInput.parse(req.body);
-  const category = await prisma.menuCategory.findUnique({ where: { id: input.categoryId } });
-  if (!category) throw new HttpError(400, "Menu category not found.");
+  await assertSelectedMenuCategory(venueId, input.categoryId);
   const item = await prisma.menuItem.create({ data: { ...input, photoUrl: await persistImage(input.photoUrl, "menu-items"), venueId } });
   res.status(201).json({ item: { ...item, priceAzn: Number(item.priceAzn) } });
 }));
@@ -191,7 +270,7 @@ merchantRouter.patch("/menu/items/:id", asyncRoute(async (req, res) => {
   if (!existing) throw new HttpError(404, "Menu item not found.");
   await assertOwner(req.user!.id, existing.venueId);
   const input = menuItemInput.partial().parse(req.body);
-  if (input.categoryId && !await prisma.menuCategory.findUnique({ where: { id: input.categoryId } })) throw new HttpError(400, "Menu category not found.");
+  if (input.categoryId) await assertSelectedMenuCategory(existing.venueId, input.categoryId);
   const item = await prisma.menuItem.update({ where: { id }, data: { ...input, photoUrl: input.photoUrl === undefined ? undefined : await persistImage(input.photoUrl, "menu-items") } });
   res.json({ item: { ...item, priceAzn: Number(item.priceAzn) } });
 }));
@@ -201,7 +280,7 @@ merchantRouter.post("/venues/:venueId/menu/bulk", asyncRoute(async (req, res) =>
   await assertOwner(req.user!.id, venueId);
   const { items } = z.object({ items: z.array(menuItemInput).min(1).max(200) }).parse(req.body);
   const categoryIds = [...new Set(items.map((item) => item.categoryId))];
-  if (await prisma.menuCategory.count({ where: { id: { in: categoryIds } } }) !== categoryIds.length) throw new HttpError(400, "One or more menu categories are invalid.");
+  if (await prisma.venueMenuCategory.count({ where: { venueId, categoryId: { in: categoryIds } } }) !== categoryIds.length) throw new HttpError(400, "One or more menu sections are not enabled for this venue.", "MENU_CATEGORY_NOT_SELECTED");
   const storedItems = await Promise.all(items.map(async (item) => ({ ...item, photoUrl: await persistImage(item.photoUrl, "menu-items"), venueId })));
   const result = await prisma.menuItem.createMany({ data: storedItems });
   res.status(201).json({ created: result.count });
@@ -212,15 +291,26 @@ merchantRouter.post("/venues/:venueId/menu/clone", asyncRoute(async (req, res) =
   const { sourceVenueId } = z.object({ sourceVenueId: z.string().min(1) }).parse(req.body);
   await Promise.all([assertOwner(req.user!.id, venueId), assertOwner(req.user!.id, sourceVenueId)]);
   if (venueId === sourceVenueId) throw new HttpError(400, "Choose a different source venue.");
-  const source = await prisma.menuItem.findMany({ where: { venueId: sourceVenueId } });
+  const source = await prisma.menuItem.findMany({ where: { venueId: sourceVenueId }, include: { category: true } });
   if (!source.length) throw new HttpError(400, "The source venue has no menu items.");
-  const result = await prisma.menuItem.createMany({ data: source.map(({ id: _id, createdAt: _createdAt, updatedAt: _updatedAt, ...item }) => ({ ...item, venueId })) });
+  const inaccessibleCustom = [...new Map(source.filter((item) => !item.category.isGlobal && item.category.createdByVenueId !== venueId).map((item) => [item.categoryId, item.category.name])).values()];
+  if (inaccessibleCustom.length) throw new HttpError(409, `Create matching custom sections before cloning: ${inaccessibleCustom.join(", ")}.`, "CUSTOM_MENU_CATEGORY_SCOPED");
+  const sourceCategoryIds = [...new Set(source.map((item) => item.categoryId))];
+  const existingSelections = await prisma.venueMenuCategory.findMany({ where: { venueId }, select: { categoryId: true } });
+  const existingIds = new Set(existingSelections.map((row) => row.categoryId));
+  const result = await prisma.$transaction(async (tx) => {
+    const missingIds = sourceCategoryIds.filter((categoryId) => !existingIds.has(categoryId));
+    if (missingIds.length) await tx.venueMenuCategory.createMany({ data: missingIds.map((categoryId, index) => ({ venueId, categoryId, sortOrder: existingSelections.length + index })) });
+    return tx.menuItem.createMany({ data: source.map(({ id: _id, createdAt: _createdAt, updatedAt: _updatedAt, category: _category, ...item }) => ({ ...item, venueId })) });
+  });
   res.status(201).json({ created: result.count });
 }));
 
 merchantRouter.post("/venues/:venueId/menu/ocr", menuUpload.single("menu"), asyncRoute(async (req, res) => {
   const venueId = z.string().parse(req.params.venueId);
   await assertOwner(req.user!.id, venueId);
+  const selectedSections = await prisma.venueMenuCategory.findMany({ where: { venueId }, include: { category: true }, orderBy: { sortOrder: "asc" } });
+  if (!selectedSections.length) throw new HttpError(409, "Add at least one menu section before scanning a menu.", "MENU_CATEGORY_REQUIRED");
   if (!req.file) throw new HttpError(400, "Choose a menu photo or PDF.");
   if (!env.OPENAI_API_KEY) throw new HttpError(503, "Menu scan is not configured yet. Add OPENAI_API_KEY or use paste/manual entry.", "OCR_NOT_CONFIGURED");
   const allowed = new Set(["image/jpeg", "image/png", "image/webp", "application/pdf"]);
@@ -235,7 +325,7 @@ merchantRouter.post("/venues/:venueId/menu/ocr", menuUpload.single("menu"), asyn
     body: JSON.stringify({
       model: env.OPENAI_VISION_MODEL,
       input: [{ role: "user", content: [
-        { type: "input_text", text: "Extract every readable food or drink item from this menu. The menu may mix Azerbaijani and English. Preserve the item's written language, parse prices as AZN numbers, and choose the closest category name from: Breakfast, Appetizers, Mains, Sides, Desserts, Drinks, Alcohol. Do not invent unreadable items." },
+        { type: "input_text", text: `Extract every readable food or drink item from this menu. The menu may mix Azerbaijani and English. Preserve the item's written language, parse prices as AZN numbers, and choose the closest category name from this venue's enabled sections only: ${selectedSections.map((row) => row.category.name).join(", ")}. Do not invent unreadable items.` },
         filePart,
       ] }],
       text: {
@@ -255,7 +345,7 @@ merchantRouter.post("/venues/:venueId/menu/ocr", menuUpload.single("menu"), asyn
                   properties: {
                     name: { type: "string" },
                     priceAzn: { type: "number" },
-                    category: { type: "string", enum: ["Breakfast", "Appetizers", "Mains", "Sides", "Desserts", "Drinks", "Alcohol"] },
+                    category: { type: "string", enum: selectedSections.map((row) => row.category.name) },
                   },
                   required: ["name", "priceAzn", "category"],
                 },
@@ -275,8 +365,7 @@ merchantRouter.post("/venues/:venueId/menu/ocr", menuUpload.single("menu"), asyn
   const outputText = result.output_text ?? result.output?.flatMap((item) => item.content ?? []).find((item) => item.type === "output_text")?.text;
   if (!outputText) throw new HttpError(502, "No menu items could be read. Try a clearer image or enter them manually.", "OCR_EMPTY");
   const extracted = z.object({ items: z.array(z.object({ name: z.string().trim().min(1), priceAzn: z.number().nonnegative(), category: z.string() })) }).parse(JSON.parse(outputText));
-  const categories = await prisma.menuCategory.findMany();
-  const categoryByName = new Map(categories.map((category) => [category.name.toLowerCase(), category.id]));
+  const categoryByName = new Map(selectedSections.map((row) => [row.category.name.toLowerCase(), row.categoryId]));
   const drafts = extracted.items.flatMap((item) => {
     const categoryId = categoryByName.get(item.category.toLowerCase());
     return categoryId ? [{ name: item.name, priceAzn: item.priceAzn, categoryId }] : [];

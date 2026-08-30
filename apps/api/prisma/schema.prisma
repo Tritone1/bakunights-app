@@ -106,33 +106,35 @@ model EmailVerificationToken {
 }
 
 model Restaurant {
-  id                   String              @id @default(cuid())
-  googlePlaceId        String?             @unique @map("google_place_id")
-  name                 String
-  cuisine              String
-  dietaryTags          String[]            @default([]) @map("dietary_tags")
-  address              String
-  lat                  Float
-  lng                  Float
-  phone                String?
-  hoursJson            Json?               @map("hours_json")
-  photoUrl             String?             @map("photo_url")
-  rating               Float               @default(0)
-  isActive             Boolean             @default(true) @map("is_active")
-  autoApproveOffers    Boolean             @default(false) @map("auto_approve_offers")
-  isVerifiedTrusted    Boolean             @default(false) @map("is_verified_trusted")
-  trustedBadgeRevoked  Boolean             @default(false) @map("trusted_badge_revoked")
-  honestyRate          Float?              @map("honesty_rate")
-  ownerUserId          String?             @map("owner_user_id")
-  claimStatus          ClaimStatus         @default(unclaimed) @map("claim_status")
-  verificationNotes    String?             @map("verification_notes")
-  owner                User?               @relation("RestaurantOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
-  deals                Deal[]
-  followers            Follow[]
-  claims               VenueClaimRequest[]
-  menuItems            MenuItem[]
-  trustFlags           VenueTrustFlag[]
-  redeemedPointRewards PointReward[]
+  id                    String              @id @default(cuid())
+  googlePlaceId         String?             @unique @map("google_place_id")
+  name                  String
+  cuisine               String
+  dietaryTags           String[]            @default([]) @map("dietary_tags")
+  address               String
+  lat                   Float
+  lng                   Float
+  phone                 String?
+  hoursJson             Json?               @map("hours_json")
+  photoUrl              String?             @map("photo_url")
+  rating                Float               @default(0)
+  isActive              Boolean             @default(true) @map("is_active")
+  autoApproveOffers     Boolean             @default(false) @map("auto_approve_offers")
+  isVerifiedTrusted     Boolean             @default(false) @map("is_verified_trusted")
+  trustedBadgeRevoked   Boolean             @default(false) @map("trusted_badge_revoked")
+  honestyRate           Float?              @map("honesty_rate")
+  ownerUserId           String?             @map("owner_user_id")
+  claimStatus           ClaimStatus         @default(unclaimed) @map("claim_status")
+  verificationNotes     String?             @map("verification_notes")
+  owner                 User?               @relation("RestaurantOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
+  deals                 Deal[]
+  followers             Follow[]
+  claims                VenueClaimRequest[]
+  menuItems             MenuItem[]
+  menuSections          VenueMenuCategory[]
+  createdMenuCategories MenuCategory[]      @relation("VenueCreatedMenuCategories")
+  trustFlags            VenueTrustFlag[]
+  redeemedPointRewards  PointReward[]
 
   @@map("restaurants")
 }
@@ -178,15 +180,33 @@ model Deal {
 }
 
 model MenuCategory {
-  id           String        @id @default(cuid())
-  name         String        @unique
-  sortOrder    Int           @default(0) @map("sort_order")
-  items        MenuItem[]
-  scopedDeals  Deal[]        @relation("ScopedDealCategory")
-  catalogItems CatalogItem[]
+  id               String              @id @default(cuid())
+  name             String
+  sortOrder        Int                 @default(0) @map("sort_order")
+  isGlobal         Boolean             @default(true) @map("is_global")
+  createdByVenueId String?             @map("created_by_venue_id")
+  createdByVenue   Restaurant?         @relation("VenueCreatedMenuCategories", fields: [createdByVenueId], references: [id], onDelete: Cascade)
+  venueSelections  VenueMenuCategory[]
+  items            MenuItem[]
+  scopedDeals      Deal[]              @relation("ScopedDealCategory")
+  catalogItems     CatalogItem[]
 
-  @@index([sortOrder])
+  @@index([isGlobal, sortOrder])
+  @@index([createdByVenueId])
   @@map("menu_categories")
+}
+
+model VenueMenuCategory {
+  venueId    String       @map("venue_id")
+  categoryId String       @map("category_id")
+  sortOrder  Int          @default(0) @map("sort_order")
+  venue      Restaurant   @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  category   MenuCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@id([venueId, categoryId])
+  @@index([categoryId])
+  @@index([venueId, sortOrder])
+  @@map("venue_menu_categories")
 }
 
 model CatalogItem {

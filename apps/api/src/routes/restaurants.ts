@@ -155,7 +155,11 @@ restaurantsRouter.get("/:id", asyncRoute(async (req, res) => {
       honestyRate: true,
       menuItems: {
         where: { isActive: true },
-        orderBy: [{ category: { sortOrder: "asc" } }, { name: "asc" }],
+        orderBy: { name: "asc" },
+        include: { category: true },
+      },
+      menuSections: {
+        orderBy: [{ sortOrder: "asc" }, { category: { sortOrder: "asc" } }, { category: { name: "asc" } }],
         include: { category: true },
       },
       deals: {
@@ -172,9 +176,10 @@ restaurantsRouter.get("/:id", asyncRoute(async (req, res) => {
     },
   });
   if (!restaurant) throw new HttpError(404, "Venue not found.");
-  const { menuItems, deals, ...publicRestaurant } = restaurant;
-  const categories = [...new Map(menuItems.map((item) => [item.categoryId, item.category])).values()]
-    .map((category) => ({ ...category, items: menuItems.filter((item) => item.categoryId === category.id).map(({ category: _category, ...item }) => item) }));
+  const { menuItems, menuSections, deals, ...publicRestaurant } = restaurant;
+  const categories = menuSections
+    .map((section) => ({ ...section.category, sortOrder: section.sortOrder, items: menuItems.filter((item) => item.categoryId === section.categoryId).map(({ category: _category, ...item }) => item) }))
+    .filter((category) => category.items.length > 0);
   const dealIds = deals.map((deal) => deal.id);
   const [followed, savedRows] = req.user ? await Promise.all([
     prisma.follow.findUnique({ where: { userId_restaurantId: { userId: req.user.id, restaurantId } } }),

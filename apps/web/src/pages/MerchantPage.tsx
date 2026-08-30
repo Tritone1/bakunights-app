@@ -13,7 +13,9 @@ type MerchantDeal = {
   _count: { views: number; savedBy: number; redemptions: number };
 };
 type ManagedVenue = { id: string; name: string; address: string; cuisine: string; lat: number; lng: number; phone?: string | null; photoUrl: string | null; googlePlaceId?: string | null; deals: MerchantDeal[]; _count: { followers: number } };
-type MenuCategory = { id: string; name: string; sortOrder: number };
+type MenuCategory = { id: string; name: string; sortOrder: number; isGlobal: boolean; createdByVenueId?: string | null };
+type VenueMenuCategory = { venueId: string; categoryId: string; sortOrder: number; category: MenuCategory };
+type VenueMenuCategoryOptions = { selected: VenueMenuCategory[]; available: MenuCategory[] };
 type MenuItem = { id: string; venueId: string; categoryId: string; name: string; priceAzn: number; description?: string | null; photoUrl?: string | null; isActive: boolean; category: MenuCategory };
 type CatalogItem = { id: string; name: string; categoryId: string; photoUrl?: string | null; category: MenuCategory };
 type OfferScope = "WHOLE_MENU" | "CATEGORY" | "SPECIFIC_ITEMS";
@@ -37,7 +39,7 @@ export function MerchantPage() {
   const [error, setError] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<MerchantDeal | null>(null);
-  const [categories, setCategories] = useState<MenuCategory[]>([]);
+  const [menuCategoriesByVenue, setMenuCategoriesByVenue] = useState<Record<string, VenueMenuCategoryOptions>>({});
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [publishNotice, setPublishNotice] = useState("");
 
@@ -47,10 +49,15 @@ export function MerchantPage() {
       setLoading(true);
       const data = await api<{ restaurants: ManagedVenue[] }>("/merchant/dashboard");
       setVenues(data.restaurants);
-      const categoryData = await api<{ categories: MenuCategory[] }>("/merchant/menu/categories");
-      setCategories(categoryData.categories);
-      const menus = await Promise.all(data.restaurants.map((venue) => api<{ items: MenuItem[] }>(`/merchant/venues/${venue.id}/menu`)));
-      setMenuItems(menus.flatMap((menu) => menu.items));
+      const venueMenus = await Promise.all(data.restaurants.map(async (venue) => {
+        const [menu, categoryOptions] = await Promise.all([
+          api<{ items: MenuItem[] }>(`/merchant/venues/${venue.id}/menu`),
+          api<VenueMenuCategoryOptions>(`/merchant/menu-categories?venueId=${encodeURIComponent(venue.id)}`),
+        ]);
+        return { venueId: venue.id, menu, categoryOptions };
+      }));
+      setMenuItems(venueMenus.flatMap(({ menu }) => menu.items));
+      setMenuCategoriesByVenue(Object.fromEntries(venueMenus.map(({ venueId, categoryOptions }) => [venueId, categoryOptions])));
       setError("");
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Could not load dashboard");
@@ -103,7 +110,7 @@ export function MerchantPage() {
       <button onClick={() => { setEditing(null); setShowForm(true); }} className="panel-button"><Plus size={16} />New offer</button>
     </div>
     {publishNotice && <button type="button" onClick={() => setPublishNotice("")} className="mt-4 w-full rounded-xl border border-emerald-300/25 bg-emerald-300/10 p-3 text-left text-sm text-emerald-100">{publishNotice}</button>}
-    {activeTab === "menu" ? <MenuManager venues={venues} categories={categories} items={menuItems} onChanged={load} /> : <>
+    {activeTab === "menu" ? <MenuManager venues={venues} categoryOptions={menuCategoriesByVenue} items={menuItems} onChanged={load} /> : <>
     <section className="mt-6 grid gap-3 md:grid-cols-2">
       {venues.map((venue) => <article key={venue.id} className="rounded-xl border border-white/10 bg-white/[0.045] p-4"><div className="flex gap-4">{venue.photoUrl ? <SafeImage src={venue.photoUrl} alt={`${venue.name} logo`} className="h-20 w-20 shrink-0 rounded-xl object-cover" /> : <span className="grid h-20 w-20 shrink-0 place-items-center rounded-xl bg-white/[0.06]"><Store className="text-cyan-300" /></span>}<div className="min-w-0"><p className="text-[10px] font-bold uppercase tracking-[.16em] text-gold">Your registered venue</p><h2 className="mt-1 truncate text-xl font-semibold">{venue.name}</h2><p className="mt-1 flex items-start gap-1 text-sm text-white/55"><MapPin className="mt-0.5 shrink-0 text-cyan-300" size={14} />{venue.address}</p><a href={`https://www.google.com/maps/search/?api=1&query=${venue.lat},${venue.lng}`} target="_blank" rel="noreferrer" className="mt-2 inline-flex text-xs font-semibold text-cyan-300 underline">View registered map location</a></div></div><GooglePlaceLinker venue={venue} onChanged={load} /></article>)}
     </section>
@@ -123,7 +130,7 @@ export function MerchantPage() {
         </table>
       </div>
     </section>
-    {showForm && <DealForm venues={venues} categories={categories} menuItems={menuItems} editing={editing} onOpenMenu={() => { setShowForm(false); navigate("/merchant/menu"); }} onClose={() => setShowForm(false)} onSaved={() => { setShowForm(false); setPublishNotice(editing ? "Offer updated. Check its live status below." : "Offer published. It appears on the main feed as soon as its start time arrives."); void load(); }} />}
+    {showForm && <DealForm venues={venues} categoryOptions={menuCategoriesByVenue} menuItems={menuItems} editing={editing} onOpenMenu={() => { setShowForm(false); navigate("/merchant/menu"); }} onClose={() => setShowForm(false)} onSaved={() => { setShowForm(false); setPublishNotice(editing ? "Offer updated. Check its live status below." : "Offer published. It appears on the main feed as soon as its start time arrives."); void load(); }} />}
     </>}
   </Shell>;
 }
@@ -263,7 +270,7 @@ function readImage(file: File) {
   });
 }
 
-function MenuManager({ venues, categories, items, onChanged }: { venues: ManagedVenue[]; categories: MenuCategory[]; items: MenuItem[]; onChanged: () => Promise<void> }) {
+function MenuManager({ venues, categoryOptions, items, onChanged }: { venues: ManagedVenue[]; categoryOptions: Record<string, VenueMenuCategoryOptions>; items: MenuItem[]; onChanged: () => Promise<void> }) {
   const [venueId, setVenueId] = useState(venues[0]?.id ?? "");
   const [editing, setEditing] = useState<MenuItem | "new" | null>(null);
   const [bulkText, setBulkText] = useState("");
@@ -274,7 +281,49 @@ function MenuManager({ venues, categories, items, onChanged }: { venues: Managed
   const [scanning, setScanning] = useState(false);
   const [catalogQuery, setCatalogQuery] = useState("");
   const [catalogItems, setCatalogItems] = useState<CatalogItem[]>([]);
+  const [customSectionName, setCustomSectionName] = useState("");
+  const [sectionsBusy, setSectionsBusy] = useState(false);
+  const sectionOptions = categoryOptions[venueId] ?? { selected: [], available: [] };
+  const categories = sectionOptions.selected.map((row) => ({ ...row.category, sortOrder: row.sortOrder }));
   const venueItems = items.filter((item) => item.venueId === venueId);
+
+  function focusSections(messageText = "Add at least one menu section before adding items.") {
+    setMessage(messageText);
+    document.getElementById("menu-sections")?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+
+  async function updateSections(categoryIds: string[], successMessage: string) {
+    setSectionsBusy(true);
+    try {
+      await api("/merchant/menu-categories", { method: "PUT", body: JSON.stringify({ venueId, categoryIds }) });
+      setMessage(successMessage);
+      await onChanged();
+    } catch (reason) {
+      setMessage(reason instanceof Error ? reason.message : "Could not update menu sections.");
+    } finally { setSectionsBusy(false); }
+  }
+
+  async function createCustomSection(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!customSectionName.trim()) return;
+    setSectionsBusy(true);
+    try {
+      await api("/merchant/menu-categories/custom", { method: "POST", body: JSON.stringify({ venueId, name: customSectionName.trim() }) });
+      setCustomSectionName("");
+      setMessage("Custom menu section created for this venue.");
+      await onChanged();
+    } catch (reason) {
+      setMessage(reason instanceof Error ? reason.message : "Could not create the custom section.");
+    } finally { setSectionsBusy(false); }
+  }
+
+  function moveSection(index: number, direction: -1 | 1) {
+    const reordered = [...sectionOptions.selected];
+    const target = index + direction;
+    if (!reordered[index] || target < 0 || target >= reordered.length) return;
+    [reordered[index], reordered[target]] = [reordered[target]!, reordered[index]!];
+    void updateSections(reordered.map((row) => row.categoryId), "Menu section order updated.");
+  }
 
   function parseBulk() {
     const defaultCategory = categories[0]?.id ?? "";
@@ -314,7 +363,8 @@ function MenuManager({ venues, categories, items, onChanged }: { venues: Managed
   }
 
   async function searchCatalog() {
-    const result = await api<{ items: CatalogItem[] }>(`/merchant/menu/catalog?q=${encodeURIComponent(catalogQuery)}`); setCatalogItems(result.items);
+    if (!categories.length) return focusSections();
+    const result = await api<{ items: CatalogItem[] }>(`/merchant/menu/catalog?venueId=${encodeURIComponent(venueId)}&q=${encodeURIComponent(catalogQuery)}`); setCatalogItems(result.items);
   }
   async function addCatalogItem(item: CatalogItem) {
     const price = window.prompt(`Price at this venue for ${item.name} (AZN)`); if (!price || Number(price) <= 0) return;
@@ -322,10 +372,16 @@ function MenuManager({ venues, categories, items, onChanged }: { venues: Managed
   }
 
   return <section className="mt-6">
-    <div className="flex flex-wrap items-end justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-[.18em] text-gold">Venue menu</p><h2 className="mt-1 text-2xl font-semibold">Build a reliable item list</h2></div><div className="flex flex-wrap gap-2"><label className="cursor-pointer rounded-xl border border-white/10 px-4 py-2 text-sm font-bold text-white/75"><Upload className="mr-1 inline" size={15} />{scanning ? "Scanning..." : "Scan photo/PDF"}<input type="file" accept="image/jpeg,image/png,image/webp,application/pdf" disabled={scanning} className="hidden" onChange={(event) => void scanMenu(event.target.files?.[0])} /></label><button onClick={() => setBulkOpen(!bulkOpen)} className="rounded-xl border border-white/10 px-4 py-2 text-sm font-bold text-white/75"><Upload className="mr-1 inline" size={15} />Bulk paste</button><button onClick={() => setEditing("new")} className="panel-button"><Plus size={15} />Add item</button></div></div>
-    {venues.length > 1 && <div className="mt-4 grid gap-2 rounded-xl border border-white/10 bg-white/[0.035] p-4 sm:grid-cols-[1fr_1fr_auto]"><select value={venueId} onChange={(event) => setVenueId(event.target.value)} className="form-field">{venues.map((venue) => <option key={venue.id} value={venue.id}>{venue.name}</option>)}</select><select value={cloneSource} onChange={(event) => setCloneSource(event.target.value)} className="form-field"><option value="">Copy menu from...</option>{venues.filter((venue) => venue.id !== venueId).map((venue) => <option key={venue.id} value={venue.id}>{venue.name}</option>)}</select><button onClick={() => void cloneMenu()} disabled={!cloneSource} className="panel-button justify-center"><Copy size={15} />Clone</button></div>}
+    <div className="flex flex-wrap items-end justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-[.18em] text-gold">Venue menu</p><h2 className="mt-1 text-2xl font-semibold">Build a reliable item list</h2></div><div className="flex flex-wrap gap-2"><label className={`rounded-xl border border-white/10 px-4 py-2 text-sm font-bold text-white/75 ${categories.length ? "cursor-pointer" : "cursor-not-allowed opacity-45"}`}><Upload className="mr-1 inline" size={15} />{scanning ? "Scanning..." : "Scan photo/PDF"}<input type="file" accept="image/jpeg,image/png,image/webp,application/pdf" disabled={scanning || !categories.length} className="hidden" onChange={(event) => void scanMenu(event.target.files?.[0])} /></label><button onClick={() => categories.length ? setBulkOpen(!bulkOpen) : focusSections()} className={`rounded-xl border border-white/10 px-4 py-2 text-sm font-bold text-white/75 ${categories.length ? "" : "opacity-45"}`}><Upload className="mr-1 inline" size={15} />Bulk paste</button><button onClick={() => categories.length ? setEditing("new") : focusSections()} className={`panel-button ${categories.length ? "" : "opacity-55"}`}><Plus size={15} />Add item</button></div></div>
+    {venues.length > 1 && <div className="mt-4 grid gap-2 rounded-xl border border-white/10 bg-white/[0.035] p-4 sm:grid-cols-[1fr_1fr_auto]"><select value={venueId} onChange={(event) => { setVenueId(event.target.value); setEditing(null); setDrafts([]); setCatalogItems([]); setMessage(""); }} className="form-field">{venues.map((venue) => <option key={venue.id} value={venue.id}>{venue.name}</option>)}</select><select value={cloneSource} onChange={(event) => setCloneSource(event.target.value)} className="form-field"><option value="">Copy menu from...</option>{venues.filter((venue) => venue.id !== venueId).map((venue) => <option key={venue.id} value={venue.id}>{venue.name}</option>)}</select><button onClick={() => void cloneMenu()} disabled={!cloneSource} className="panel-button justify-center"><Copy size={15} />Clone</button></div>}
     {venues.length === 1 && <p className="mt-3 text-sm text-white/50">{venues[0]!.name}</p>}
-    <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.035] p-4"><p className="form-label">Add a common catalog item</p><div className="flex gap-2"><input value={catalogQuery} onChange={(event) => setCatalogQuery(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); void searchCatalog(); } }} className="form-field" placeholder="Coca-Cola, Heineken, Nescafé..." /><button onClick={() => void searchCatalog()} className="panel-button">Search</button></div>{catalogItems.length > 0 && <div className="mt-2 flex flex-wrap gap-2">{catalogItems.map((item) => <button key={item.id} onClick={() => void addCatalogItem(item)} className="rounded-full border border-white/10 px-3 py-1 text-sm hover:border-cyan-300">+ {item.name}</button>)}</div>}</div>
+    <div id="menu-sections" className="mt-4 scroll-mt-24 rounded-xl border border-cyan-300/20 bg-cyan-300/[0.055] p-4 sm:p-5">
+      <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-[.18em] text-cyan-300">Menu sections</p><h3 className="mt-1 text-xl font-semibold">Choose what this venue serves</h3><p className="mt-1 text-sm text-white/50">These sections control item forms, menu scans, offers, and the public venue menu.</p></div><span className="rounded-full border border-white/10 px-3 py-1 text-xs text-white/50">{categories.length} selected</span></div>
+      {sectionOptions.selected.length ? <div className="mt-4 flex flex-wrap gap-2">{sectionOptions.selected.map((section, index) => <span key={section.categoryId} className="inline-flex items-center gap-1 rounded-full border border-cyan-300/25 bg-black/20 py-1 pl-3 pr-1 text-sm"><span>{section.category.name}</span>{!section.category.isGlobal && <span className="rounded-full bg-amber-300/15 px-1.5 text-[9px] font-bold uppercase text-amber-200">Custom</span>}<button type="button" onClick={() => moveSection(index, -1)} disabled={sectionsBusy || index === 0} className="grid h-6 w-6 place-items-center rounded-full text-white/45 disabled:opacity-20" aria-label={`Move ${section.category.name} earlier`}>↑</button><button type="button" onClick={() => moveSection(index, 1)} disabled={sectionsBusy || index === sectionOptions.selected.length - 1} className="grid h-6 w-6 place-items-center rounded-full text-white/45 disabled:opacity-20" aria-label={`Move ${section.category.name} later`}>↓</button><button type="button" onClick={() => void updateSections(sectionOptions.selected.filter((row) => row.categoryId !== section.categoryId).map((row) => row.categoryId), `${section.category.name} removed.`)} disabled={sectionsBusy} className="grid h-6 w-6 place-items-center rounded-full text-red-200 hover:bg-red-500/15" aria-label={`Remove ${section.category.name}`}>×</button></span>)}</div> : <p className="mt-4 rounded-xl border border-amber-300/20 bg-amber-300/10 p-3 text-sm text-amber-100">No sections selected yet. Add one below before creating menu items.</p>}
+      {sectionOptions.available.length > 0 && <div className="mt-5"><p className="form-label">Add a section</p><div className="flex flex-wrap gap-2">{sectionOptions.available.map((category) => <button key={category.id} type="button" disabled={sectionsBusy} onClick={() => void updateSections([...sectionOptions.selected.map((row) => row.categoryId), category.id], `${category.name} added.`)} className="rounded-full border border-white/10 bg-white/[0.035] px-3 py-1.5 text-sm text-white/70 transition hover:border-cyan-300/50 hover:text-cyan-200 disabled:opacity-40">+ {category.name}</button>)}</div></div>}
+      <form onSubmit={createCustomSection} className="mt-5 grid gap-2 border-t border-white/10 pt-4 sm:grid-cols-[1fr_auto]"><label><span className="form-label">Create custom section</span><input value={customSectionName} onChange={(event) => setCustomSectionName(event.target.value)} className="form-field" maxLength={60} placeholder="e.g. Tea Ceremony" /></label><button disabled={sectionsBusy || customSectionName.trim().length < 2} className="panel-button self-end justify-center disabled:opacity-40"><Plus size={15} />Create custom</button></form>
+    </div>
+    <div className={`mt-4 rounded-xl border border-white/10 bg-white/[0.035] p-4 ${categories.length ? "" : "opacity-50"}`}><p className="form-label">Add a common catalog item</p><div className="flex gap-2"><input value={catalogQuery} disabled={!categories.length} onChange={(event) => setCatalogQuery(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); void searchCatalog(); } }} className="form-field" placeholder="Coca-Cola, Heineken, Nescafé..." /><button onClick={() => void searchCatalog()} disabled={!categories.length} className="panel-button">Search</button></div>{catalogItems.length > 0 && <div className="mt-2 flex flex-wrap gap-2">{catalogItems.map((item) => <button key={item.id} onClick={() => void addCatalogItem(item)} className="rounded-full border border-white/10 px-3 py-1 text-sm hover:border-cyan-300">+ {item.name}</button>)}</div>}</div>
     {message && <p className="mt-4 rounded-xl border border-cyan-300/20 bg-cyan-300/10 p-3 text-sm text-cyan-100">{message}</p>}
     {bulkOpen && <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.035] p-4"><label><span className="form-label">One item per line</span><textarea value={bulkText} onChange={(event) => setBulkText(event.target.value)} className="form-field min-h-32" placeholder={"Lule Kebab, 12\nAzerbaijani Tea - 4 AZN"} /></label><button onClick={parseBulk} className="panel-button mt-3">Parse into drafts</button>{drafts.length > 0 && <div className="mt-4 overflow-x-auto"><table className="w-full min-w-[600px] text-sm"><thead className="text-left text-xs uppercase text-white/45"><tr><th className="p-2">Item</th><th className="p-2">Price AZN</th><th className="p-2">Category</th><th /></tr></thead><tbody>{drafts.map((draft, index) => <tr key={index} className="border-t border-white/10"><td className="p-2"><input value={draft.name} onChange={(event) => setDrafts((rows) => rows.map((row, rowIndex) => rowIndex === index ? { ...row, name: event.target.value } : row))} className="form-field" /></td><td className="p-2"><input value={draft.priceAzn} type="number" min="0.01" step="0.01" onChange={(event) => setDrafts((rows) => rows.map((row, rowIndex) => rowIndex === index ? { ...row, priceAzn: event.target.value } : row))} className="form-field" /></td><td className="p-2"><select value={draft.categoryId} onChange={(event) => setDrafts((rows) => rows.map((row, rowIndex) => rowIndex === index ? { ...row, categoryId: event.target.value } : row))} className="form-field">{categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select></td><td><button onClick={() => setDrafts((rows) => rows.filter((_, rowIndex) => rowIndex !== index))} className="text-red-300">Remove</button></td></tr>)}</tbody></table><button onClick={() => void saveBulk()} className="panel-button mt-3">Confirm and save {drafts.length} items</button></div>}</div>}
     <div className="mt-5 space-y-5">{categories.map((category) => { const group = venueItems.filter((item) => item.categoryId === category.id); return group.length ? <div key={category.id}><h3 className="mb-2 text-sm font-bold uppercase tracking-[.16em] text-white/45">{category.name}</h3><div className="grid gap-2 md:grid-cols-2">{group.map((item) => <article key={item.id} className={`flex items-center gap-3 rounded-xl border border-white/10 p-3 ${item.isActive ? "bg-white/[0.04]" : "bg-black/20 opacity-55"}`}>{item.photoUrl ? <SafeImage src={item.photoUrl} alt={`${item.name} menu item`} className="h-14 w-14 rounded-lg object-cover" /> : <span className="grid h-14 w-14 place-items-center rounded-lg bg-white/5"><List size={20} /></span>}<div className="min-w-0 flex-1"><strong className="block truncate">{item.name}</strong><p className="text-sm text-gold">{item.priceAzn.toFixed(2)} AZN</p></div><button onClick={() => setEditing(item)} title="Edit"><Pencil size={17} /></button><button onClick={() => void toggleItem(item)} className={item.isActive ? "text-red-300" : "text-emerald-300"}>{item.isActive ? "Deactivate" : "Activate"}</button></article>)}</div></div> : null; })}{!venueItems.length && <Gate title="No menu items yet" subtitle="Add one manually or paste multiple lines into the review table." />}</div>
@@ -344,9 +400,10 @@ function MenuItemForm({ venueId, categories, item, onClose, onSaved }: { venueId
   return <div className="fixed inset-0 z-[110] overflow-y-auto bg-black/75 p-4"><form onSubmit={submit} className="mx-auto my-10 max-w-lg rounded-2xl border border-white/10 bg-[#12121a] p-5"><div className="flex justify-between"><h2 className="text-2xl font-semibold">{item ? "Edit menu item" : "Add menu item"}</h2><button type="button" onClick={onClose}>x</button></div><div className="mt-5 grid gap-3"><Input name="name" label="Item name" defaultValue={item?.name} /><label><span className="form-label">Category</span><select name="categoryId" defaultValue={item?.categoryId} className="form-field">{categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select></label><Input name="priceAzn" label="Price (AZN)" type="number" min="0.01" step="0.01" defaultValue={item?.priceAzn} /><label><span className="form-label">Photo (optional)</span><input type="file" accept="image/jpeg,image/png,image/webp" className="form-field" onChange={(event) => { const file = event.target.files?.[0]; if (file) void readImage(file).then(setPhotoUrl).catch((reason) => setError(reason.message)); }} />{photoUrl && <SafeImage src={photoUrl} alt="Item preview" className="mt-2 h-24 w-24 rounded-lg object-cover" />}</label><label><span className="form-label">Description (optional)</span><textarea name="description" className="form-field min-h-24" defaultValue={item?.description ?? ""} /></label></div>{error && <p className="mt-3 text-sm text-red-300">{error}</p>}<div className="mt-5 flex justify-end gap-2"><button type="button" onClick={onClose} className="rounded-xl border border-white/10 px-4 py-2">Cancel</button><button className="panel-button">Save item</button></div></form></div>;
 }
 
-function DealForm({ venues, categories, menuItems, editing, onOpenMenu, onClose, onSaved }: { venues: ManagedVenue[]; categories: MenuCategory[]; menuItems: MenuItem[]; editing: MerchantDeal | null; onOpenMenu: () => void; onClose: () => void; onSaved: () => void }) {
+function DealForm({ venues, categoryOptions, menuItems, editing, onOpenMenu, onClose, onSaved }: { venues: ManagedVenue[]; categoryOptions: Record<string, VenueMenuCategoryOptions>; menuItems: MenuItem[]; editing: MerchantDeal | null; onOpenMenu: () => void; onClose: () => void; onSaved: () => void }) {
   const [venueId, setVenueId] = useState(editing?.restaurantId ?? venues[0]?.id ?? "");
   const [scope, setScope] = useState<OfferScope>(editing?.scope ?? "WHOLE_MENU");
+  const [scopeCategoryId, setScopeCategoryId] = useState(editing?.scopeCategoryId ?? "");
   const [selectedItems, setSelectedItems] = useState<string[]>(editing?.offerMenuItems?.map((item) => item.menuItemId) ?? []);
   const [itemSearch, setItemSearch] = useState("");
   const [itemOverrides, setItemOverrides] = useState<Record<string, string>>(Object.fromEntries((editing?.offerMenuItems ?? []).filter((item) => item.overridePriceAzn != null).map((item) => [item.menuItemId, String(item.overridePriceAzn)])));
@@ -354,6 +411,7 @@ function DealForm({ venues, categories, menuItems, editing, onOpenMenu, onClose,
   const [formError, setFormError] = useState("");
   const [offerType, setOfferType] = useState<OfferType>(editing?.offerType ?? "combo");
   const [manualDiscount, setManualDiscount] = useState(editing?.discountPct == null ? "" : String(editing.discountPct));
+  const selectedCategories = (categoryOptions[venueId]?.selected ?? []).map((row) => ({ ...row.category, sortOrder: row.sortOrder }));
   const activeItems = menuItems.filter((item) => item.venueId === venueId && item.isActive);
   const selectedMenuItems = activeItems.filter((item) => selectedItems.includes(item.id));
   const selectedItemPhoto = scope === "SPECIFIC_ITEMS" ? activeItems.find((item) => selectedItems.includes(item.id) && item.photoUrl)?.photoUrl ?? null : null;
@@ -362,13 +420,14 @@ function DealForm({ venues, categories, menuItems, editing, onOpenMenu, onClose,
   const offerTotal = overriddenItems.reduce((sum, item) => sum + Number(itemOverrides[item.id]), 0);
   const calculatedDiscount = regularTotal > 0 && offerTotal < regularTotal ? Math.round((1 - offerTotal / regularTotal) * 100) : null;
   const activeCategoryIds = new Set(activeItems.map((item) => item.categoryId));
+  const offerCategories = selectedCategories.filter((category) => activeCategoryIds.has(category.id));
   const localValue = (date?: string, offset = 0) => { const value = date ? new Date(date) : new Date(Date.now() + offset); value.setMinutes(value.getMinutes() - value.getTimezoneOffset()); return value.toISOString().slice(0, 16); };
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     const discountValue = String(form.get("discountPct") || "").trim();
     const menuItem = String(form.get("menuItem") || "").trim();
-    const body = { restaurantId: String(form.get("restaurantId")), scope, scopeCategoryId: scope === "CATEGORY" ? String(form.get("scopeCategoryId")) : null, menuItemIds: scope === "SPECIFIC_ITEMS" ? selectedItems : [], menuItemOverrides: Object.fromEntries(Object.entries(itemOverrides).filter(([id, value]) => selectedItems.includes(id) && value).map(([id, value]) => [id, Number(value)])), photoUrl: selectedItemPhoto ? null : photoUrl || null, title: String(form.get("title")), description: String(form.get("description")), menuItem: menuItem || null, offerType: String(form.get("offerType")), discountPct: discountValue ? Number(discountValue) : null, tag: String(form.get("tag")), dietaryTags: String(form.get("dietaryTags") || "").split(",").map((item) => item.trim()).filter(Boolean), startsAt: new Date(String(form.get("startsAt"))).toISOString(), endsAt: new Date(String(form.get("endsAt"))).toISOString(), isRecurring: false };
+    const body = { restaurantId: String(form.get("restaurantId")), scope, scopeCategoryId: scope === "CATEGORY" ? scopeCategoryId : null, menuItemIds: scope === "SPECIFIC_ITEMS" ? selectedItems : [], menuItemOverrides: Object.fromEntries(Object.entries(itemOverrides).filter(([id, value]) => selectedItems.includes(id) && value).map(([id, value]) => [id, Number(value)])), photoUrl: selectedItemPhoto ? null : photoUrl || null, title: String(form.get("title")), description: String(form.get("description")), menuItem: menuItem || null, offerType: String(form.get("offerType")), discountPct: discountValue ? Number(discountValue) : null, tag: String(form.get("tag")), dietaryTags: String(form.get("dietaryTags") || "").split(",").map((item) => item.trim()).filter(Boolean), startsAt: new Date(String(form.get("startsAt"))).toISOString(), endsAt: new Date(String(form.get("endsAt"))).toISOString(), isRecurring: false };
     try { await api(editing ? `/merchant/deals/${editing.id}` : "/merchant/deals", { method: editing ? "PATCH" : "POST", body: JSON.stringify(body) }); onSaved(); }
     catch (reason) { setFormError(reason instanceof Error ? reason.message : "Could not submit offer."); }
   }
@@ -376,9 +435,9 @@ function DealForm({ venues, categories, menuItems, editing, onOpenMenu, onClose,
     <div className="mb-5 flex items-center justify-between"><h2 className="text-2xl font-semibold">{editing ? "Edit offer" : "Submit new offer"}</h2><button type="button" onClick={onClose} className="text-2xl text-white/60">x</button></div>
     {!activeItems.length && <p className="mb-4 rounded-xl border border-amber-300/20 bg-amber-300/10 p-3 text-sm text-amber-100">This venue has no active menu items yet. <button type="button" onClick={onOpenMenu} className="font-bold underline">Add menu items</button>, or continue with <strong>Whole menu</strong> and describe the coverage in free text.</p>}
     <div className="grid gap-3 md:grid-cols-2">
-      <label><span className="form-label">Venue</span><select name="restaurantId" value={venueId} onChange={(event) => { setVenueId(event.target.value); setSelectedItems([]); }} className="form-field">{venues.map((venue) => <option key={venue.id} value={venue.id}>{venue.name}</option>)}</select></label>
+      <label><span className="form-label">Venue</span><select name="restaurantId" value={venueId} onChange={(event) => { setVenueId(event.target.value); setSelectedItems([]); setScopeCategoryId(""); }} className="form-field">{venues.map((venue) => <option key={venue.id} value={venue.id}>{venue.name}</option>)}</select></label>
       <label><span className="form-label">Offer scope</span><select value={scope} onChange={(event) => setScope(event.target.value as OfferScope)} className="form-field"><option value="WHOLE_MENU">Whole menu</option><option value="CATEGORY">Specific category</option><option value="SPECIFIC_ITEMS">Specific items</option></select></label>
-      {scope === "CATEGORY" && <label className="md:col-span-2"><span className="form-label">Covered category</span><select name="scopeCategoryId" defaultValue={editing?.scopeCategoryId ?? ""} className="form-field" required><option value="">Choose category</option>{categories.filter((category) => activeCategoryIds.has(category.id)).map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select></label>}
+      {scope === "CATEGORY" && <label className="md:col-span-2"><span className="form-label">Covered category</span><select name="scopeCategoryId" value={scopeCategoryId} onChange={(event) => setScopeCategoryId(event.target.value)} className="form-field" required><option value="">Choose an enabled section with active items</option>{offerCategories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select>{!offerCategories.length && <span className="mt-2 block text-xs text-amber-200">No selected section has active menu items. Add or activate items from the Menu tab first.</span>}</label>}
       {scope === "SPECIFIC_ITEMS" && <div className="md:col-span-2 rounded-xl border border-white/10 p-3"><p className="form-label">Covered items</p>{activeItems.length ? <><input value={itemSearch} onChange={(event) => setItemSearch(event.target.value)} className="form-field mb-2" placeholder="Search menu items..." /><div className="max-h-60 space-y-1 overflow-y-auto">{activeItems.filter((item) => item.name.toLowerCase().includes(itemSearch.toLowerCase())).map((item) => <div key={item.id} className="flex items-center gap-2 rounded-lg p-2 hover:bg-white/5"><label className="flex min-w-0 flex-1 items-center gap-2"><input type="checkbox" checked={selectedItems.includes(item.id)} onChange={() => setSelectedItems((ids) => ids.includes(item.id) ? ids.filter((id) => id !== item.id) : [...ids, item.id])} /><span className="flex-1 truncate">{item.name}</span>{item.photoUrl && <span className="text-xs text-cyan-300">photo</span>}<span className="text-gold">{item.priceAzn.toFixed(2)} AZN</span></label>{selectedItems.includes(item.id) && <input aria-label={`Offer price for ${item.name}`} value={itemOverrides[item.id] ?? ""} onChange={(event) => setItemOverrides((values) => ({ ...values, [item.id]: event.target.value }))} type="number" min="0.01" step="0.01" className="w-24 rounded-lg border border-white/10 bg-black/20 px-2 py-1 text-sm" placeholder="Offer AZN" />}</div>)}</div></> : <p className="text-sm text-white/55">No active items yet. <button type="button" onClick={onOpenMenu} className="font-bold text-cyan-300 underline">Add menu items</button>, or use Whole menu with free text.</p>}</div>}
       <label><span className="form-label">Offer type</span><select name="offerType" className="form-field" value={offerType} onChange={(event) => setOfferType(event.target.value as OfferType)}>{OFFER_TYPES.map((type) => <option key={type.value} value={type.value}>{type.label}</option>)}</select></label>
       <label><span className="form-label">Discount % {calculatedDiscount != null ? "(calculated automatically)" : "(only for discount offers)"}</span><input name="discountPct" className="form-field" type="number" min={1} max={100} value={calculatedDiscount ?? manualDiscount} readOnly={calculatedDiscount != null} required={offerType === "discount"} onChange={(event) => setManualDiscount(event.target.value)} />{calculatedDiscount != null && <span className="mt-1 block text-xs text-emerald-300">{regularTotal.toFixed(2)} AZN → {offerTotal.toFixed(2)} AZN = {calculatedDiscount}% saving</span>}{overriddenItems.length > 0 && calculatedDiscount == null && <span className="mt-1 block text-xs text-amber-300">The offer price must be lower than the normal menu price to calculate a saving.</span>}</label>

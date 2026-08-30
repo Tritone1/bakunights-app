@@ -99,19 +99,50 @@ adminRouter.post("/venues/:id/trusted-badge/restore", asyncRoute(async (req, res
 }));
 
 adminRouter.get("/menu/categories", asyncRoute(async (_req, res) => {
-  res.json({ categories: await prisma.menuCategory.findMany({ orderBy: [{ sortOrder: "asc" }, { name: "asc" }] }) });
+  res.json({ categories: await prisma.menuCategory.findMany({ where: { isGlobal: true }, orderBy: [{ sortOrder: "asc" }, { name: "asc" }] }) });
 }));
 
 adminRouter.post("/menu/categories", asyncRoute(async (req, res) => {
   const input = z.object({ name: z.string().trim().min(2).max(60), sortOrder: z.number().int().min(0).max(1000) }).parse(req.body);
-  const category = await prisma.menuCategory.create({ data: input });
+  const duplicate = await prisma.menuCategory.findFirst({ where: { isGlobal: true, name: { equals: input.name, mode: "insensitive" } } });
+  if (duplicate) throw new HttpError(409, `A global “${duplicate.name}” category already exists.`);
+  const category = await prisma.menuCategory.create({ data: { ...input, isGlobal: true } });
   res.status(201).json({ category });
 }));
 
 adminRouter.patch("/menu/categories/:id", asyncRoute(async (req, res) => {
   const id = z.string().parse(req.params.id);
   const input = z.object({ name: z.string().trim().min(2).max(60).optional(), sortOrder: z.number().int().min(0).max(1000).optional() }).parse(req.body);
+  const existing = await prisma.menuCategory.findFirst({ where: { id, isGlobal: true } });
+  if (!existing) throw new HttpError(404, "Global menu category not found.");
+  if (input.name) {
+    const duplicate = await prisma.menuCategory.findFirst({ where: { id: { not: id }, isGlobal: true, name: { equals: input.name, mode: "insensitive" } } });
+    if (duplicate) throw new HttpError(409, `A global “${duplicate.name}” category already exists.`);
+  }
   res.json({ category: await prisma.menuCategory.update({ where: { id }, data: input }) });
+}));
+
+adminRouter.get("/menu/categories/custom", asyncRoute(async (_req, res) => {
+  const categories = await prisma.menuCategory.findMany({
+    where: { isGlobal: false },
+    include: {
+      createdByVenue: { select: { id: true, name: true } },
+      _count: { select: { venueSelections: true, items: true } },
+    },
+    orderBy: [{ name: "asc" }, { createdByVenue: { name: "asc" } }],
+  });
+  res.json({ categories });
+}));
+
+adminRouter.post("/menu/categories/:id/promote", asyncRoute(async (req, res) => {
+  const id = z.string().parse(req.params.id);
+  const category = await prisma.menuCategory.findFirst({ where: { id, isGlobal: false }, include: { createdByVenue: { select: { name: true } } } });
+  if (!category) throw new HttpError(404, "Custom menu category not found.");
+  const duplicate = await prisma.menuCategory.findFirst({ where: { id: { not: id }, isGlobal: true, name: { equals: category.name, mode: "insensitive" } } });
+  if (duplicate) throw new HttpError(409, `Global category “${duplicate.name}” already exists. Keep this custom section scoped or reassign its items first.`);
+  const promoted = await prisma.menuCategory.update({ where: { id }, data: { isGlobal: true, createdByVenueId: null } });
+  await audit(req.user!.id, "menu_category_promoted", "menu_category", id, `${category.name} promoted from ${category.createdByVenue?.name ?? "a venue"}`);
+  res.json({ category: promoted });
 }));
 
 adminRouter.get("/menu/catalog", asyncRoute(async (_req, res) => {
@@ -120,12 +151,14 @@ adminRouter.get("/menu/catalog", asyncRoute(async (_req, res) => {
 
 adminRouter.post("/menu/catalog", asyncRoute(async (req, res) => {
   const input = z.object({ name: z.string().trim().min(2).max(120), categoryId: z.string().min(1), photoUrl: imageValue.nullable().optional() }).parse(req.body);
+  if (!await prisma.menuCategory.findFirst({ where: { id: input.categoryId, isGlobal: true } })) throw new HttpError(400, "Choose a global menu category.");
   res.status(201).json({ item: await prisma.catalogItem.create({ data: { ...input, photoUrl: await persistImage(input.photoUrl, "catalog") } }) });
 }));
 
 adminRouter.patch("/menu/catalog/:id", asyncRoute(async (req, res) => {
   const id = z.string().parse(req.params.id);
   const input = z.object({ name: z.string().trim().min(2).max(120).optional(), categoryId: z.string().min(1).optional(), photoUrl: imageValue.nullable().optional(), isActive: z.boolean().optional() }).parse(req.body);
+  if (input.categoryId && !await prisma.menuCategory.findFirst({ where: { id: input.categoryId, isGlobal: true } })) throw new HttpError(400, "Choose a global menu category.");
   res.json({ item: await prisma.catalogItem.update({ where: { id }, data: { ...input, photoUrl: input.photoUrl === undefined ? undefined : await persistImage(input.photoUrl, "catalog") } }) });
 }));
 

@@ -12,7 +12,8 @@ type AdminVenue = {
   _count: { deals: number };
 };
 type TrustFlag = { id: string; reason: string; createdAt: string; venue: { id: string; name: string; honestyRate?: number | null; isVerifiedTrusted: boolean } };
-type MenuCategory = { id: string; name: string; sortOrder: number };
+type MenuCategory = { id: string; name: string; sortOrder: number; isGlobal: boolean; createdByVenueId?: string | null };
+type CustomMenuCategory = MenuCategory & { createdByVenue: { id: string; name: string } | null; _count: { venueSelections: number; items: number } };
 type CatalogItem = { id: string; name: string; categoryId: string; isActive: boolean; category: MenuCategory };
 type AdminDeal = {
   id: string; restaurantId: string; title: string; description: string; menuItem?: string | null; photoUrl?: string | null; offerType: OfferType; discountPct: number | null; tag: string; dietaryTags: string[]; startsAt: string; endsAt: string; isActive: boolean; status: "draft" | "pending_review" | "approved" | "rejected" | "expired"; reviewNotes?: string | null;
@@ -49,6 +50,7 @@ export function AdminPage() {
   const [enrollments, setEnrollments] = useState<MerchantEnrollment[]>([]);
   const [flags, setFlags] = useState<TrustFlag[]>([]);
   const [categories, setCategories] = useState<MenuCategory[]>([]);
+  const [customCategories, setCustomCategories] = useState<CustomMenuCategory[]>([]);
   const [catalogItems, setCatalogItems] = useState<CatalogItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -59,7 +61,7 @@ export function AdminPage() {
     if (user?.role !== "ADMIN") { setLoading(false); return; }
     try {
       setLoading(true);
-      const [dashboard, venueData, dealData, claimData, enrollmentData, flagData, categoryData, catalogData] = await Promise.all([
+      const [dashboard, venueData, dealData, claimData, enrollmentData, flagData, categoryData, customCategoryData, catalogData] = await Promise.all([
         api<{ metrics: MetricSet }>("/admin/dashboard"),
         api<{ venues: AdminVenue[] }>("/admin/venues"),
         api<{ deals: AdminDeal[] }>("/admin/deals"),
@@ -67,6 +69,7 @@ export function AdminPage() {
         api<{ enrollments: MerchantEnrollment[] }>("/admin/merchant-enrollment-requests"),
         api<{ flags: TrustFlag[] }>("/admin/trust-flags"),
         api<{ categories: MenuCategory[] }>("/admin/menu/categories"),
+        api<{ categories: CustomMenuCategory[] }>("/admin/menu/categories/custom"),
         api<{ items: CatalogItem[] }>("/admin/menu/catalog"),
       ]);
       setMetrics(dashboard.metrics);
@@ -75,6 +78,7 @@ export function AdminPage() {
       setClaims(claimData.claims);
       setEnrollments(enrollmentData.enrollments);
       setFlags(flagData.flags); setCategories(categoryData.categories);
+      setCustomCategories(customCategoryData.categories);
       setCatalogItems(catalogData.items);
       setError("");
     } catch (reason) {
@@ -109,6 +113,7 @@ export function AdminPage() {
   async function resolveFlag(flag: TrustFlag) { await api(`/admin/trust-flags/${flag.id}/resolve`, { method: "POST" }); void load(); }
   async function toggleTrustedBadge(venue: AdminVenue) { await api(`/admin/venues/${venue.id}/trusted-badge/${venue.trustedBadgeRevoked ? "restore" : "revoke"}`, { method: "POST" }); void load(); }
   async function addCategory() { const name = window.prompt("New global menu category name"); if (!name?.trim()) return; await api("/admin/menu/categories", { method: "POST", body: JSON.stringify({ name: name.trim(), sortOrder: categories.length }) }); void load(); }
+  async function promoteCategory(category: CustomMenuCategory) { if (!window.confirm(`Promote “${category.name}” to a global section available to every venue?`)) return; await api(`/admin/menu/categories/${category.id}/promote`, { method: "POST" }); void load(); }
   async function addCatalogItem() { const name = window.prompt("Common item name"); if (!name?.trim()) return; const category = categories[0]; if (!category) return; await api("/admin/menu/catalog", { method: "POST", body: JSON.stringify({ name: name.trim(), categoryId: category.id, photoUrl: null }) }); void load(); }
 
   if (authLoading || loading) return <PanelShell><p className="text-white/60">Loading admin desk...</p></PanelShell>;
@@ -145,6 +150,7 @@ export function AdminPage() {
       </DataTable>
     </Section>
     <Section title="Global menu categories" subtitle="Shared taxonomy; merchants cannot edit this list"><div className="rounded-xl border border-white/10 bg-white/[0.035] p-4"><div className="flex flex-wrap gap-2">{categories.map((category) => <button key={category.id} onClick={async () => { const name = window.prompt("Category name", category.name); if (name?.trim() && name.trim() !== category.name) { await api(`/admin/menu/categories/${category.id}`, { method: "PATCH", body: JSON.stringify({ name: name.trim() }) }); void load(); } }} className="rounded-full border border-white/10 px-3 py-1 text-sm">{category.name}</button>)}<button onClick={() => void addCategory()} className="rounded-full bg-cyan-300 px-3 py-1 text-sm font-bold text-[#07151a]">+ Add</button></div></div></Section>
+    <Section title="Venue-created menu sections" subtitle={`${customCategories.length} awaiting review`}><div className="rounded-xl border border-white/10 bg-white/[0.035] p-4">{customCategories.length ? <div className="space-y-2">{customCategories.map((category) => <div key={category.id} className="flex flex-wrap items-center gap-3 rounded-xl border border-white/10 bg-black/15 p-3"><div className="min-w-0 flex-1"><strong>{category.name}</strong><p className="text-xs text-white/45">Created by {category.createdByVenue?.name ?? "deleted venue"} · {category._count.items} item{category._count.items === 1 ? "" : "s"}</p></div><button onClick={() => void promoteCategory(category)} className="rounded-lg border border-amber-300/25 bg-amber-300/10 px-3 py-2 text-xs font-bold text-amber-200">Promote globally</button></div>)}</div> : <p className="text-sm text-white/45">No venue-specific sections need review.</p>}</div></Section>
     <Section title="Global item catalog" subtitle={`${catalogItems.length} reusable items`}><div className="rounded-xl border border-white/10 bg-white/[0.035] p-4"><div className="flex flex-wrap gap-2">{catalogItems.map((item) => <button key={item.id} onClick={async () => { await api(`/admin/menu/catalog/${item.id}`, { method: "PATCH", body: JSON.stringify({ isActive: !item.isActive }) }); void load(); }} className={`rounded-full border border-white/10 px-3 py-1 text-sm ${item.isActive ? "" : "opacity-40"}`}>{item.name} · {item.category.name}</button>)}<button onClick={() => void addCatalogItem()} className="rounded-full bg-cyan-300 px-3 py-1 text-sm font-bold text-[#07151a]">+ Add catalog item</button></div><p className="mt-2 text-xs text-white/45">Click an item to activate/deactivate it. New items use the first category; edit its category through the API until a dedicated editor is added.</p></div></Section>
     <Section title="Offer activity" subtitle="Merchant offers publish automatically; monitoring only">
       <DataTable columns={["Offer", "Venue", "Merchant", "Status", "Ends"]}>
