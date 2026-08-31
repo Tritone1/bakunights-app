@@ -8,6 +8,17 @@
     <link rel="icon" type="image/svg+xml" href="/icon.svg" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <title>WhereToGo — Great Food. Great Deals. Every Day.</title>
+    <script>
+      (() => {
+        let language = "en";
+        try {
+          const saved = localStorage.getItem("wheretogo-language");
+          if (saved === "az" || saved === "ru" || saved === "en") language = saved;
+        } catch { /* Storage can be unavailable in private browsing. */ }
+        document.documentElement.lang = language;
+        document.documentElement.dataset.language = language;
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

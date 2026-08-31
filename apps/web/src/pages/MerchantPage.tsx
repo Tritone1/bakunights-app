@@ -6,6 +6,7 @@ import { api } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 import { SafeImage } from "../components/SafeImage";
 import { MerchantProfilePage } from "./MerchantProfilePage";
+import { LanguageSwitcher } from "../components/LanguageSwitcher";
 
 type MerchantDeal = {
   id: string; restaurantId: string; title: string; description: string; menuItem?: string | null; photoUrl?: string | null; offerType: OfferType; discountPct: number | null; tag: string; dietaryTags: string[]; startsAt: string; endsAt: string; isActive: boolean; status: "draft" | "pending_review" | "approved" | "rejected" | "expired"; reviewNotes?: string | null;
@@ -189,7 +190,7 @@ function MerchantNavigation({ activeTab, name, email, onLogout }: { activeTab: "
 }
 
 function Shell({ children }: { children: ReactNode }) {
-  return <div className="min-h-screen bg-[#09090e] px-4 py-6 text-white md:px-8"><div className="mx-auto max-w-6xl">{children}</div></div>;
+  return <div className="min-h-screen bg-[#09090e] px-4 py-6 text-white md:px-8"><div className="mx-auto max-w-6xl"><div className="mb-3 flex justify-end"><LanguageSwitcher /></div>{children}</div></div>;
 }
 
 function Gate({ title, subtitle, action }: { title: string; subtitle?: string; action?: ReactNode }) {

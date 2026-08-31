@@ -3,6 +3,7 @@ import { CheckCircle2, Gauge, Plus, ShieldCheck, Store, Ticket, XCircle } from "
 import { Link } from "react-router-dom";
 import { format } from "date-fns";
 import { api } from "../lib/api";
+import { LanguageSwitcher } from "../components/LanguageSwitcher";
 import { useAuth } from "../context/AuthContext";
 
 type MetricSet = { activeVenues: number; dealsLiveToday: number; dealsPendingReview: number };
@@ -162,7 +163,7 @@ export function AdminPage() {
 }
 
 function PanelShell({ children }: { children: ReactNode }) {
-  return <div className="min-h-screen bg-[#09090e] px-4 py-6 text-white md:px-8"><div className="mx-auto max-w-7xl">{children}</div></div>;
+  return <div className="min-h-screen bg-[#09090e] px-4 py-6 text-white md:px-8"><div className="mx-auto max-w-7xl"><div className="mb-3 flex justify-end"><LanguageSwitcher /></div>{children}</div></div>;
 }
 
 function Gate({ title, subtitle, action }: { title: string; subtitle?: string; action?: ReactNode }) {

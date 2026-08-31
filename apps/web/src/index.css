@@ -48,6 +48,32 @@ button { cursor: pointer; }
 .profile-action { display: flex; width: 100%; align-items: center; gap: .65rem; border: 1px solid rgba(255,255,255,.1); border-radius: .75rem; padding: .75rem .9rem; color: rgba(255,255,255,.78); font-weight: 700; transition: background .18s ease, border-color .18s ease; }
 .profile-action:hover { border-color: rgba(103,232,249,.32); background: rgba(255,255,255,.06); color: #fff; }
 
+.language-switcher {
+  position: relative;
+  z-index: 70;
+  flex: none;
+}
+
+.language-switcher-floating { position: fixed; right: max(1rem, env(safe-area-inset-right)); top: max(1rem, env(safe-area-inset-top)); z-index: 200; }
+.language-switcher-trigger { display: inline-flex; height: 40px; align-items: center; gap: .5rem; border: 1px solid rgba(255,255,255,.1); border-radius: 999px; padding: 0 .8rem; color: rgba(255,255,255,.82); background: rgba(255,255,255,.055); font-size: .76rem; font-weight: 800; box-shadow: 0 8px 24px rgba(0,0,0,.12); transition: color .18s ease, border-color .18s ease, background .18s ease; }
+.language-switcher-trigger:hover, .language-switcher-trigger[aria-expanded="true"] { border-color: rgba(245,158,11,.42); color: #f59e0b; background: rgba(245,158,11,.08); }
+.language-switcher-trigger svg { flex: none; transition: transform .18s ease; }
+.language-switcher-trigger:focus-visible { outline: 2px solid #f59e0b; outline-offset: 2px; }
+.language-switcher-menu { position: absolute; right: 0; top: calc(100% + .55rem); width: 210px; overflow: hidden; border: 1px solid rgba(255,255,255,.11); border-radius: 1rem; padding: .4rem; background: rgba(21,21,30,.98); box-shadow: 0 22px 55px rgba(0,0,0,.46); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); }
+.language-switcher-option { display: flex; width: 100%; align-items: center; justify-content: space-between; gap: .75rem; border-radius: .7rem; padding: .7rem .75rem; color: rgba(255,255,255,.65); text-align: left; font-size: .78rem; transition: color .16s ease, background .16s ease; }
+.language-switcher-option > span { display: flex; min-width: 0; align-items: center; gap: .65rem; }
+.language-switcher-option strong { width: 1.7rem; flex: none; color: rgba(255,255,255,.92); font-size: .68rem; letter-spacing: .06em; }
+.language-switcher-option:hover { color: #fff; background: rgba(255,255,255,.07); }
+.language-switcher-option[data-active="true"] { color: #fbbf24; background: rgba(245,158,11,.11); }
+.language-switcher-option[data-active="true"] strong { color: #f59e0b; }
+.language-switcher-option:focus-visible { outline: 2px solid rgba(245,158,11,.7); outline-offset: -2px; }
+
+@media (max-width: 479px) {
+  .language-switcher-trigger { gap: .3rem; padding: 0 .55rem; }
+  .language-switcher-trigger > svg:first-child { display: none; }
+  .language-switcher-floating { right: .65rem; top: max(.65rem, env(safe-area-inset-top)); }
+}
+
 .google-venue-pin {
   display: grid;
   width: 34px;

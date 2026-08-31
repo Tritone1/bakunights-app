@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import App from "./App";
 import { AuthProvider } from "./context/AuthContext";
+import { LanguageProvider } from "./context/LanguageContext";
 import "./index.css";
 
 if ("serviceWorker" in navigator) {
@@ -22,4 +23,4 @@ if ("serviceWorker" in navigator) {
   });
 }
 
-createRoot(document.getElementById("root")!).render(<StrictMode><BrowserRouter><AuthProvider><App /></AuthProvider></BrowserRouter></StrictMode>);
+createRoot(document.getElementById("root")!).render(<StrictMode><LanguageProvider><BrowserRouter><AuthProvider><App /></AuthProvider></BrowserRouter></LanguageProvider></StrictMode>);
