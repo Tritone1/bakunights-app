@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent, type InputHTMLAttributes, type ReactNode } from "react";
-import { BarChart3, Bookmark, Copy, Eye, Link2, List, LogOut, MapPin, Pencil, Play, Plus, QrCode, Search, Store, TicketCheck, Upload, UserRound, Users } from "lucide-react";
+import { BarChart3, Bookmark, Check, ChevronDown, Copy, Eye, ImagePlus, Link2, List, LogOut, MapPin, Pencil, Play, Plus, QrCode, Search, Store, TicketCheck, Upload, UserRound, Users, X } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { format } from "date-fns";
 import { api } from "../lib/api";
@@ -392,13 +392,42 @@ function MenuManager({ venues, categoryOptions, items, onChanged }: { venues: Ma
 
 function MenuItemForm({ venueId, categories, item, onClose, onSaved }: { venueId: string; categories: MenuCategory[]; item: MenuItem | null; onClose: () => void; onSaved: () => Promise<void> }) {
   const [photoUrl, setPhotoUrl] = useState(item?.photoUrl ?? "");
+  const [categoryId, setCategoryId] = useState(item?.categoryId ?? categories[0]?.id ?? "");
+  const [categoryOpen, setCategoryOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const selectedCategory = categories.find((category) => category.id === categoryId);
+
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); const form = new FormData(event.currentTarget);
-    const body = { name: String(form.get("name")), categoryId: String(form.get("categoryId")), priceAzn: Number(form.get("priceAzn")), description: String(form.get("description") || "") || null, photoUrl: photoUrl || null, isActive: item?.isActive ?? true };
-    await api(item ? `/merchant/menu/items/${item.id}` : `/merchant/venues/${venueId}/menu`, { method: item ? "PATCH" : "POST", body: JSON.stringify(body) }); await onSaved();
+    if (!categoryId) { setError("Choose a category."); return; }
+    setSaving(true); setError("");
+    try {
+      const body = { name: String(form.get("name")), categoryId, priceAzn: Number(form.get("priceAzn")), description: String(form.get("description") || "") || null, photoUrl: photoUrl || null, isActive: item?.isActive ?? true };
+      await api(item ? `/merchant/menu/items/${item.id}` : `/merchant/venues/${venueId}/menu`, { method: item ? "PATCH" : "POST", body: JSON.stringify(body) });
+      await onSaved();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Could not save this menu item.");
+    } finally { setSaving(false); }
   }
-  return <div className="fixed inset-0 z-[110] overflow-y-auto bg-black/75 p-4"><form onSubmit={submit} className="mx-auto my-10 max-w-lg rounded-2xl border border-white/10 bg-[#12121a] p-5"><div className="flex justify-between"><h2 className="text-2xl font-semibold">{item ? "Edit menu item" : "Add menu item"}</h2><button type="button" onClick={onClose}>x</button></div><div className="mt-5 grid gap-3"><Input name="name" label="Item name" defaultValue={item?.name} /><label><span className="form-label">Category</span><select name="categoryId" defaultValue={item?.categoryId} className="form-field">{categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select></label><Input name="priceAzn" label="Price (AZN)" type="number" min="0.01" step="0.01" defaultValue={item?.priceAzn} /><label><span className="form-label">Photo (optional)</span><input type="file" accept="image/jpeg,image/png,image/webp" className="form-field" onChange={(event) => { const file = event.target.files?.[0]; if (file) void readImage(file).then(setPhotoUrl).catch((reason) => setError(reason.message)); }} />{photoUrl && <SafeImage src={photoUrl} alt="Item preview" className="mt-2 h-24 w-24 rounded-lg object-cover" />}</label><label><span className="form-label">Description (optional)</span><textarea name="description" className="form-field min-h-24" defaultValue={item?.description ?? ""} /></label></div>{error && <p className="mt-3 text-sm text-red-300">{error}</p>}<div className="mt-5 flex justify-end gap-2"><button type="button" onClick={onClose} className="rounded-xl border border-white/10 px-4 py-2">Cancel</button><button className="panel-button">Save item</button></div></form></div>;
+  return <div className="fixed inset-0 z-[110] overflow-y-auto bg-black/80 p-4 backdrop-blur-sm" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
+    <form onSubmit={submit} role="dialog" aria-modal="true" aria-labelledby="menu-item-title" className="mx-auto my-6 max-w-xl overflow-visible rounded-3xl border border-white/[0.09] bg-[#111119] p-5 shadow-[0_28px_90px_rgba(0,0,0,.72)] sm:my-10 sm:p-7">
+      <div className="flex items-start justify-between gap-4 border-b border-white/[0.08] pb-5">
+        <div><p className="text-[10px] font-black uppercase tracking-[.22em] text-gold">Venue menu</p><h2 id="menu-item-title" className="mt-1 font-display text-3xl font-semibold text-white">{item ? "Edit menu item" : "Add menu item"}</h2><p className="mt-1 text-sm text-white/45">Keep the item clear, priced, and easy to find.</p></div>
+        <button type="button" onClick={onClose} className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-white/10 text-white/55 transition hover:border-gold/40 hover:bg-gold/10 hover:text-gold" aria-label="Close menu item form"><X size={18} /></button>
+      </div>
+
+      <div className="mt-6 grid gap-5 sm:grid-cols-2">
+        <Input name="name" label="Item name" defaultValue={item?.name} className="form-field merchant-modal-field" wide />
+        <label className="relative"><span className="form-label">Category</span><input type="hidden" name="categoryId" value={categoryId} /><button type="button" onClick={() => setCategoryOpen((open) => !open)} className={`merchant-modal-field flex w-full items-center justify-between gap-3 text-left ${categoryOpen ? "border-gold/70 ring-4 ring-gold/10" : ""}`} aria-haspopup="listbox" aria-expanded={categoryOpen}><span className={selectedCategory ? "text-white" : "text-white/40"}>{selectedCategory?.name ?? "Choose category"}</span><ChevronDown size={17} className={`shrink-0 text-gold transition ${categoryOpen ? "rotate-180" : ""}`} /></button>{categoryOpen && <div role="listbox" aria-label="Category" className="absolute inset-x-0 top-[calc(100%+.45rem)] z-40 max-h-60 overflow-y-auto rounded-xl border border-white/10 bg-[#181820] p-1.5 shadow-[0_22px_55px_rgba(0,0,0,.72)]">{categories.map((category) => <button key={category.id} type="button" role="option" aria-selected={category.id === categoryId} onClick={() => { setCategoryId(category.id); setCategoryOpen(false); }} className={`flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-left text-sm transition ${category.id === categoryId ? "bg-gold/15 font-bold text-amber-100" : "text-white/70 hover:bg-white/[0.06] hover:text-white"}`}><span>{category.name}</span>{category.id === categoryId && <Check size={15} className="text-gold" />}</button>)}</div>}</label>
+        <label><span className="form-label">Price</span><span className="relative block"><input name="priceAzn" aria-label="Price in AZN" type="number" min="0.01" step="0.01" defaultValue={item?.priceAzn} required className="form-field merchant-modal-field pr-16" /><span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-xs font-black tracking-wider text-gold">AZN</span></span></label>
+        <label className="sm:col-span-2"><span className="form-label">Photo (optional)</span><span className="flex cursor-pointer items-center gap-4 rounded-2xl border border-dashed border-white/15 bg-white/[0.025] p-3 transition hover:border-gold/40 hover:bg-gold/[0.035]">{photoUrl ? <SafeImage src={photoUrl} alt="Item preview" className="h-20 w-20 shrink-0 rounded-xl object-cover" /> : <span className="grid h-20 w-20 shrink-0 place-items-center rounded-xl border border-white/[0.07] bg-black/20 text-gold"><ImagePlus size={25} /></span>}<span><strong className="block text-sm text-white/80">{photoUrl ? "Replace image" : "Choose an image"}</strong><span className="mt-1 block text-xs text-white/40">JPG, PNG or WebP · maximum 2 MB</span></span><input type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={(event) => { const file = event.target.files?.[0]; if (file) void readImage(file).then(setPhotoUrl).catch((reason) => setError(reason.message)); }} /></span></label>
+        <label className="sm:col-span-2"><span className="form-label">Description (optional)</span><textarea name="description" className="form-field merchant-modal-field min-h-28 resize-y" defaultValue={item?.description ?? ""} placeholder="Ingredients, serving details, or a short description..." /></label>
+      </div>
+      {error && <p className="mt-4 rounded-xl border border-red-400/25 bg-red-500/10 p-3 text-sm text-red-100">{error}</p>}
+      <div className="mt-6 flex flex-col-reverse gap-2 border-t border-white/[0.08] pt-5 sm:flex-row sm:justify-end"><button type="button" onClick={onClose} className="rounded-xl border border-white/10 px-5 py-3 text-sm font-bold text-white/65 transition hover:border-white/20 hover:bg-white/[0.05] hover:text-white">Cancel</button><button disabled={saving} className="inline-flex items-center justify-center gap-2 rounded-xl bg-gold px-5 py-3 text-sm font-black text-[#111119] shadow-[0_10px_28px_rgba(245,158,11,.18)] transition hover:bg-amber-300 disabled:cursor-wait disabled:opacity-55">{saving ? "Saving..." : "Save item"}</button></div>
+    </form>
+  </div>;
 }
 
 function DealForm({ venues, categoryOptions, menuItems, editing, onOpenMenu, onClose, onSaved }: { venues: ManagedVenue[]; categoryOptions: Record<string, VenueMenuCategoryOptions>; menuItems: MenuItem[]; editing: MerchantDeal | null; onOpenMenu: () => void; onClose: () => void; onSaved: () => void }) {
