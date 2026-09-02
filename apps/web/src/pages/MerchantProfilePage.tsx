@@ -71,8 +71,9 @@ export function MerchantProfilePage({ venues, onVenueChanged }: { venues: Mercha
 
   async function changePassword(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const formElement = event.currentTarget;
     setBusy("password");
-    const form = new FormData(event.currentTarget);
+    const form = new FormData(formElement);
     const newPassword = String(form.get("newPassword"));
     if (newPassword !== String(form.get("confirmPassword"))) {
       showResult("New passwords do not match.", true);
@@ -84,7 +85,7 @@ export function MerchantProfilePage({ venues, onVenueChanged }: { venues: Mercha
         method: "PATCH",
         body: JSON.stringify({ currentPassword: String(form.get("currentPassword")), newPassword }),
       });
-      event.currentTarget.reset();
+      formElement.reset();
       showResult("Password updated.");
     } catch (reason) {
       showResult(reason instanceof Error ? reason.message : "Could not update the password.", true);

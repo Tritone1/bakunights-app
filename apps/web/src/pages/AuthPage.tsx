@@ -38,11 +38,12 @@ export function AuthPage() {
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const formElement = event.currentTarget;
     setBusy(true);
     setError("");
     setNotice("");
     setUnverifiedEmail("");
-    const form = new FormData(event.currentTarget);
+    const form = new FormData(formElement);
     const email = String(form.get("email") || "").trim();
     const password = String(form.get("password") || "");
     const confirmPassword = String(form.get("confirmPassword") || "");
@@ -75,7 +76,7 @@ export function AuthPage() {
         setNotice(result.message);
         setDevVerificationUrl(result.devVerificationUrl || "");
         setRegisteredEmail(email);
-        event.currentTarget.reset();
+        formElement.reset();
         if (venueImagePreview) URL.revokeObjectURL(venueImagePreview);
         setVenueImage(null);
         setVenueImagePreview("");

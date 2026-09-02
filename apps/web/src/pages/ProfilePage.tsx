@@ -53,9 +53,9 @@ export function ProfilePage() {
   }
 
   async function changePassword(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault(); setBusy("password"); setError(""); setNotice(""); const form = new FormData(event.currentTarget); const next = String(form.get("newPassword"));
+    event.preventDefault(); const formElement = event.currentTarget; setBusy("password"); setError(""); setNotice(""); const form = new FormData(formElement); const next = String(form.get("newPassword"));
     if (next !== String(form.get("confirmPassword"))) { setError("New passwords do not match."); setBusy(""); return; }
-    try { await api("/users/me/password", { method: "PATCH", body: JSON.stringify({ currentPassword: String(form.get("currentPassword")), newPassword: next }) }); event.currentTarget.reset(); setNotice("Password updated."); }
+    try { await api("/users/me/password", { method: "PATCH", body: JSON.stringify({ currentPassword: String(form.get("currentPassword")), newPassword: next }) }); formElement.reset(); setNotice("Password updated."); }
     catch (reason) { setError(reason instanceof Error ? reason.message : "Could not update password."); } finally { setBusy(""); }
   }
 
