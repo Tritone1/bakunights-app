@@ -15,6 +15,7 @@ import type { Deal } from "./types";
 import { SafeImage } from "./components/SafeImage";
 import { DailyPointsWheel } from "./components/DailyPointsWheel";
 import { LanguageSwitcher } from "./components/LanguageSwitcher";
+import { Reveal } from "./components/Reveal";
 import { ArrowLeft, Home } from "lucide-react";
 
 type Category = "Restaurants" | "Bars" | "Pubs" | "Lounges";
@@ -267,7 +268,7 @@ function Star({ filled = true }: { filled?: boolean }) {
 
 function VenueCard({ venue, saved, onToggleSave, onNavigate }: { venue: Venue; saved: boolean; onToggleSave?: () => void; onNavigate: () => void }) {
   const navigate = useNavigate();
-  return <article data-venue-card role="link" tabIndex={0} onClick={() => navigate(`/venues/${venue.id}`)} onKeyDown={(event) => { if (event.target === event.currentTarget && (event.key === "Enter" || event.key === " ")) navigate(`/venues/${venue.id}`); }} className="group cursor-pointer overflow-hidden rounded-2xl border border-white/[0.07] bg-card transition-transform duration-200 hover:-translate-y-1 hover:border-white/[0.13]">
+  return <article data-venue-card role="link" tabIndex={0} onClick={() => navigate(`/venues/${venue.id}`)} onKeyDown={(event) => { if (event.target === event.currentTarget && (event.key === "Enter" || event.key === " ")) navigate(`/venues/${venue.id}`); }} className="group h-full cursor-pointer overflow-hidden rounded-2xl border border-white/[0.07] bg-card transition-transform duration-200 hover:-translate-y-1 hover:border-white/[0.13]">
     <div className="relative h-44 overflow-hidden">
       <SafeImage src={venue.image} alt={`${venue.name} atmosphere`} loading="lazy" className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.04]" />
       <div className="absolute inset-0 bg-gradient-to-t from-card via-black/15 to-transparent" />
@@ -320,7 +321,7 @@ function VenueDirectory({ venues, query, setQuery, onNavigate, origin }: { venue
     <SearchBox value={query} onChange={setQuery} mobile />
     {saveNotice && <p className="mb-3 rounded-xl border border-red-400/25 bg-red-500/10 p-3 text-sm text-red-100">{saveNotice}</p>}
     <div className="no-scrollbar mt-5 flex gap-2 overflow-x-auto pb-2 lg:mt-0">{CATEGORIES.map((item) => <button key={item} onClick={() => setCategory(item)} className={`shrink-0 rounded-full border px-4 py-2 text-xs font-semibold transition ${category === item ? "border-gold bg-gold text-night" : "border-white/[0.08] bg-white/[0.035] text-muted hover:border-white/20 hover:text-white"}`}>{item}</button>)}</div>
-    {filtered.length ? <div className="mt-7 grid gap-5 md:grid-cols-2 xl:grid-cols-3">{filtered.map((venue) => <VenueCard key={venue.id} venue={venue} saved={Boolean(venue.dealId && saved.has(venue.dealId))} onToggleSave={venue.dealId ? () => void toggleSaved(venue.dealId!) : undefined} onNavigate={() => onNavigate(venue)} />)}</div> : <div className="mt-8 grid min-h-64 place-items-center rounded-2xl border border-dashed border-white/10 bg-card/50 text-center"><div><Icon name="search" size={30} className="mx-auto text-gold" /><h3 className="mt-3 font-display text-2xl text-white">No venues found</h3><p className="mt-1 text-sm text-muted">No active venue matches this search yet.</p></div></div>}
+    {filtered.length ? <div className="mt-7 grid gap-5 md:grid-cols-2 xl:grid-cols-3">{filtered.map((venue, index) => <Reveal key={venue.id} delay={Math.min(index, 5) * 100} className="h-full"><VenueCard venue={venue} saved={Boolean(venue.dealId && saved.has(venue.dealId))} onToggleSave={venue.dealId ? () => void toggleSaved(venue.dealId!) : undefined} onNavigate={() => onNavigate(venue)} /></Reveal>)}</div> : <div className="mt-8 grid min-h-64 place-items-center rounded-2xl border border-dashed border-white/10 bg-card/50 text-center"><div><Icon name="search" size={30} className="mx-auto text-gold" /><h3 className="mt-3 font-display text-2xl text-white">No venues found</h3><p className="mt-1 text-sm text-muted">No active venue matches this search yet.</p></div></div>}
   </section>;
 }
 
@@ -868,7 +869,15 @@ function ConsumerApp() {
 
   return <div className="min-h-screen overflow-x-hidden bg-night text-white">
     <Navigation query={query} setQuery={setQuery} locationLabel={locationLabel} onLocationClick={() => { requestLocation(); setLocationPickerOpen(true); }} />
-    <main><Hero stats={stats} />{dataError && <div className="mx-auto mt-6 max-w-[1340px] rounded-2xl border border-red-400/30 bg-red-500/10 p-4 text-sm text-red-100">{dataError}</div>}<LiveOffers deals={deals} loading={dataLoading} error={dataError} /><DailyPointsWheel /><FlashDeals deals={deals} loading={dataLoading} /><VenueDirectory venues={venues} query={query} setQuery={setQuery} onNavigate={navigateInApp} origin={feedPosition} />{selectedVenue ? <MapSection venues={venues} selected={selectedVenue} onSelect={setSelectedVenue} onTaxi={setTaxiVenue} userPosition={feedPosition} locationStatus={locationStatus} locationMessage={locationMessage} onRequestLocation={requestLocation} routeRequest={routeRequest} routeMode={routeMode} onStartRoute={startRoute} /> : <section id="map" className="border-y border-white/[0.07] bg-[#0c0c14] py-20"><div className="mx-auto max-w-[1400px] px-5 text-center text-muted">No active venues are available to show on the map.</div></section>}</main>
+    <main>
+      <Hero stats={stats} />
+      {dataError && <div className="mx-auto mt-6 max-w-[1340px] rounded-2xl border border-red-400/30 bg-red-500/10 p-4 text-sm text-red-100">{dataError}</div>}
+      <Reveal><LiveOffers deals={deals} loading={dataLoading} error={dataError} /></Reveal>
+      <Reveal><DailyPointsWheel /></Reveal>
+      <Reveal><FlashDeals deals={deals} loading={dataLoading} /></Reveal>
+      <Reveal><VenueDirectory venues={venues} query={query} setQuery={setQuery} onNavigate={navigateInApp} origin={feedPosition} /></Reveal>
+      <Reveal>{selectedVenue ? <MapSection venues={venues} selected={selectedVenue} onSelect={setSelectedVenue} onTaxi={setTaxiVenue} userPosition={feedPosition} locationStatus={locationStatus} locationMessage={locationMessage} onRequestLocation={requestLocation} routeRequest={routeRequest} routeMode={routeMode} onStartRoute={startRoute} /> : <section id="map" className="border-y border-white/[0.07] bg-[#0c0c14] py-20"><div className="mx-auto max-w-[1400px] px-5 text-center text-muted">No active venues are available to show on the map.</div></section>}</Reveal>
+    </main>
     <footer className="px-5 py-9 text-center text-[11px] text-muted"><p>© {new Date().getFullYear()} WhereToGo · Great food. Great deals. Every day.</p></footer>
     {taxiVenue && <TaxiSheet venue={taxiVenue} onClose={() => setTaxiVenue(null)} />}
     {locationPickerOpen && <LocationPickerModal apiKey={mapsApiKey} detectedPosition={userPosition} currentPosition={feedPosition} onClose={() => setLocationPickerOpen(false)} onConfirm={(position, label) => { setManualPosition(position); setLocationLabel(label); setLocationPickerOpen(false); }} />}
