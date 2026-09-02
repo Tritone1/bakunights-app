@@ -12,8 +12,10 @@ const categories = [
   ["menu_cat_desserts", "Desserts", 60],
   ["menu_cat_drinks", "Soft Drinks", 70],
   ["menu_cat_mocktails", "Non-Alcoholic Cocktails", 80],
+  ["menu_cat_alcohol_general", "Alcohol", 85],
   ["menu_cat_alcohol", "Beer & Wine", 90],
   ["menu_cat_cocktails", "Cocktails & Spirits", 100],
+  ["menu_cat_shots", "Shots", 105],
   ["menu_cat_shisha", "Shisha", 110],
   ["menu_cat_combos", "Combos & Sets", 120],
 ] as const;
