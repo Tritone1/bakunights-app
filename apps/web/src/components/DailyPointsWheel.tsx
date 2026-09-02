@@ -5,8 +5,9 @@ import { useAuth } from "../context/AuthContext";
 import { api } from "../lib/api";
 
 // Keep this order in sync with the API. All visual slices stay equal-sized;
-// the API independently applies the published server-side prize odds.
-const POINT_VALUES = [10, 25, 15, 30, 10, 15, 25, 10, 30, 15, 10, 25, 15, 50, 10, 30, 25, 15, 10, 60, 25, 15, 30, 10] as const;
+// the API independently applies the published server-side prize odds. The
+// 50- and 60-point slices are 12 positions apart, directly opposite each other.
+const POINT_VALUES = [10, 25, 15, 30, 10, 15, 25, 50, 30, 15, 10, 25, 15, 10, 10, 30, 25, 15, 10, 60, 25, 15, 30, 10] as const;
 const CASINO_RED = "#A51C30";
 const CASINO_BLACK = "#101214";
 const FELT_GREEN = "#0B6B4F";

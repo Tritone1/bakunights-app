@@ -22,7 +22,8 @@ const profileUpdateSchema = z.object({
 const POINTS_PER_REWARD = 500;
 // Server-side weights total 100: 50 points is 2% and 60 points is 1%.
 // A high win also starts a 10-spin per-customer cooldown.
-const WHEEL_SLICES = [10, 25, 15, 30, 10, 15, 25, 10, 30, 15, 10, 25, 15, 50, 10, 30, 25, 15, 10, 60, 25, 15, 30, 10]
+// Keep this order in sync with the client: indexes 7 and 19 are opposite.
+const WHEEL_SLICES = [10, 25, 15, 30, 10, 15, 25, 50, 30, 15, 10, 25, 15, 10, 10, 30, 25, 15, 10, 60, 25, 15, 30, 10]
   .map((points) => ({ points, weight: points === 10 || points === 15 ? 5 : points === 25 ? 4 : points === 30 ? 3 : points === 50 ? 2 : 1 }));
 const HIGH_REWARD_COOLDOWN_SPINS = 10;
 const BAKU_UTC_OFFSET_MS = 4 * 60 * 60 * 1000;
