@@ -71,6 +71,7 @@ authRouter.post("/signup", merchantImageUpload, asyncRoute(async (req, res) => {
     password: strongPassword,
     confirmPassword: z.string(),
     venueName: z.string().trim().max(120).optional(),
+    venueType: z.enum(["Restaurant", "Pub", "Bar", "Lounge", "Cafe"]).optional(),
     venueAddress: z.string().trim().max(240).optional(),
     venueLat: optionalLatitude,
     venueLng: optionalLongitude,
@@ -80,6 +81,9 @@ authRouter.post("/signup", merchantImageUpload, asyncRoute(async (req, res) => {
     }
     if (value.accountType === "MERCHANT" && !value.venueName) {
       context.addIssue({ code: "custom", message: "Venue name is required for merchant registration.", path: ["venueName"] });
+    }
+    if (value.accountType === "MERCHANT" && !value.venueType) {
+      context.addIssue({ code: "custom", message: "Choose whether the venue is a restaurant, pub, bar, lounge, or cafe.", path: ["venueType"] });
     }
     if (value.accountType === "MERCHANT" && !value.venueAddress) {
       context.addIssue({ code: "custom", message: "Venue address is required.", path: ["venueAddress"] });
@@ -114,6 +118,7 @@ authRouter.post("/signup", merchantImageUpload, asyncRoute(async (req, res) => {
       passwordHash: await bcrypt.hash(input.password, 12),
       role: input.accountType,
       merchantVenueName: input.accountType === "MERCHANT" ? input.venueName : null,
+      merchantVenueType: input.accountType === "MERCHANT" ? input.venueType : null,
       merchantVenueImageUrl: storedVenueImageUrl,
       merchantVenueImage: input.accountType === "MERCHANT" && req.file && !storedVenueImageUrl ? Uint8Array.from(req.file.buffer) : null,
       merchantVenueImageMime: input.accountType === "MERCHANT" && req.file && !storedVenueImageUrl ? req.file.mimetype : null,

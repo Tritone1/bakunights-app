@@ -37,7 +37,7 @@ type ClaimRequest = {
   requestingUser: { id: string; name: string; email: string };
 };
 type MerchantEnrollment = {
-  id: string; venueName: string; venueAddress: string; venueLat: number; venueLng: number;
+  id: string; venueName: string; venueType: string; venueAddress: string; venueLat: number; venueLng: number;
   contactPhone: string; contactEmail: string; proofNotes: string; createdAt: string;
   requestingUser: { id: string; name: string; email: string; role: string };
 };
@@ -142,7 +142,7 @@ export function AdminPage() {
     </Section>
     <Section title="New merchant applications" subtitle={`${enrollments.length} pending`}>
       <DataTable columns={["Proposed venue", "Applicant", "Contact", "Verification", "Actions"]}>
-        {enrollments.map((enrollment) => <tr key={enrollment.id} className="border-t border-white/10"><td className="p-3"><strong>{enrollment.venueName}</strong><p className="text-xs text-white/45">{enrollment.venueAddress}</p><p className="text-xs text-white/35">{enrollment.venueLat.toFixed(5)}, {enrollment.venueLng.toFixed(5)}</p></td><td className="p-3 text-sm">{enrollment.requestingUser.name}<br /><span className="text-white/45">{enrollment.requestingUser.email}</span></td><td className="p-3 text-sm">{enrollment.contactEmail}<br />{enrollment.contactPhone}</td><td className="max-w-md p-3 text-sm text-white/65">{enrollment.proofNotes}</td><td className="p-3"><button onClick={() => void reviewEnrollment(enrollment, true)} className="mr-2 text-cyan-300" title="Approve and create venue"><CheckCircle2 /></button><button onClick={() => void reviewEnrollment(enrollment, false)} className="text-red-300" title="Reject"><XCircle /></button></td></tr>)}
+        {enrollments.map((enrollment) => <tr key={enrollment.id} className="border-t border-white/10"><td className="p-3"><strong>{enrollment.venueName}</strong><p className="mt-1 text-xs font-bold uppercase tracking-wide text-gold">{enrollment.venueType}</p><p className="text-xs text-white/45">{enrollment.venueAddress}</p><p className="text-xs text-white/35">{enrollment.venueLat.toFixed(5)}, {enrollment.venueLng.toFixed(5)}</p></td><td className="p-3 text-sm">{enrollment.requestingUser.name}<br /><span className="text-white/45">{enrollment.requestingUser.email}</span></td><td className="p-3 text-sm">{enrollment.contactEmail}<br />{enrollment.contactPhone}</td><td className="max-w-md p-3 text-sm text-white/65">{enrollment.proofNotes}</td><td className="p-3"><button onClick={() => void reviewEnrollment(enrollment, true)} className="mr-2 text-cyan-300" title="Approve and create venue"><CheckCircle2 /></button><button onClick={() => void reviewEnrollment(enrollment, false)} className="text-red-300" title="Reject"><XCircle /></button></td></tr>)}
       </DataTable>
     </Section>
     <Section title="Venues" subtitle="Create, edit, or deactivate">

@@ -62,6 +62,7 @@ model User {
   name                      String
   role                      UserRole                   @default(CONSUMER)
   merchantVenueName         String?                    @map("merchant_venue_name")
+  merchantVenueType         String?                    @map("merchant_venue_type")
   merchantVenueImage        Bytes?                     @map("merchant_venue_image")
   merchantVenueImageMime    String?                    @map("merchant_venue_image_mime")
   merchantVenueImageName    String?                    @map("merchant_venue_image_name")
@@ -398,6 +399,7 @@ model MerchantEnrollmentRequest {
   id               String             @id @default(cuid())
   requestingUserId String             @unique @map("requesting_user_id")
   venueName        String             @map("venue_name")
+  venueType        String             @default("Restaurant") @map("venue_type")
   venueAddress     String             @map("venue_address")
   venueLat         Float              @map("venue_lat")
   venueLng         Float              @map("venue_lng")

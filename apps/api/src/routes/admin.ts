@@ -320,7 +320,7 @@ adminRouter.post("/merchant-enrollment-requests/:id/approve", asyncRoute(async (
     const venue = await transaction.restaurant.create({
       data: {
         name: enrollment.venueName,
-        cuisine: "Restaurant",
+        cuisine: enrollment.venueType,
         address: enrollment.venueAddress,
         lat: enrollment.venueLat,
         lng: enrollment.venueLng,
@@ -336,6 +336,7 @@ adminRouter.post("/merchant-enrollment-requests/:id/approve", asyncRoute(async (
       data: {
         role: "MERCHANT",
         merchantVenueName: enrollment.venueName,
+        merchantVenueType: enrollment.venueType,
         merchantVenueAddress: enrollment.venueAddress,
         merchantVenueLat: enrollment.venueLat,
         merchantVenueLng: enrollment.venueLng,

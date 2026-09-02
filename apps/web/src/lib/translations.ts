@@ -424,6 +424,9 @@ const messages: Record<string, Translation> = {
   "View registered map location": ["Qeydiyyatlı məkanı xəritədə göstər", "Показать зарегистрированное место на карте"],
 
   // Merchant profile
+  "Venue type": ["Məkan növü", "Тип заведения"],
+  "Choose venue type": ["Məkan növünü seçin", "Выберите тип заведения"],
+  "Choose the option that best describes your venue.": ["Məkanınızı ən yaxşı təsvir edən variantı seçin.", "Выберите вариант, который лучше всего описывает ваше заведение."],
   "Account and venue settings": ["Hesab və məkan parametrləri", "Настройки аккаунта и заведения"],
   "Merchant profile": ["Tərəfdaş profili", "Профиль партнёра"],
   "Manage your sign-in details and the business information customers see.": ["Giriş məlumatlarını və müştərilərin gördüyü biznes məlumatlarını idarə et.", "Управляйте данными входа и информацией о бизнесе, которую видят клиенты."],
@@ -666,6 +669,8 @@ const messages: Record<string, Translation> = {
   "Selected": ["Seçilib", "Выбрано"],
 
   // Values supplied by the API and seeded global menu categories
+  "Café": ["Kafe", "Кафе"],
+  "Cafe": ["Kafe", "Кафе"],
   "Restaurant": ["Restoran", "Ресторан"],
   "Bar": ["Bar", "Бар"],
   "Pub": ["Pub", "Паб"],

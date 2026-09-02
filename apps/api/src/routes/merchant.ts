@@ -8,12 +8,14 @@ import { env } from "../env.js";
 import { persistImage } from "../lib/image-storage.js";
 
 export const merchantRouter = Router();
+const venueType = z.enum(["Restaurant", "Pub", "Bar", "Lounge", "Cafe"]);
 const menuUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 const imageValue = z.string().trim().max(3_000_000).refine((value) => /^https?:\/\//i.test(value) || /^data:image\/(jpeg|png|webp);base64,/i.test(value), "Use an image URL or uploaded JPG, PNG, or WebP image");
 const venueImageValue = z.string().trim().max(3_000_000).refine((value) => /^https?:\/\//i.test(value) || /^data:image\/(jpeg|png|webp);base64,/i.test(value) || /^\/api\/restaurants\/[a-z0-9_-]+\/photo$/i.test(value), "Use an uploaded JPG, PNG, or WebP image");
 
 const enrollmentInput = z.object({
   venueName: z.string().trim().min(2).max(120),
+  venueType,
   venueAddress: z.string().trim().min(5).max(240),
   venueLat: z.coerce.number().min(-90).max(90),
   venueLng: z.coerce.number().min(-180).max(180),
@@ -77,7 +79,7 @@ const menuItemInput = z.object({
 
 const venueProfileInput = z.object({
   name: z.string().trim().min(2).max(120),
-  cuisine: z.string().trim().min(2).max(80),
+  cuisine: venueType,
   address: z.string().trim().min(5).max(240),
   phone: z.string().trim().max(40).nullable(),
   lat: z.coerce.number().min(-90).max(90),
@@ -157,11 +159,14 @@ merchantRouter.patch("/venues/:venueId/profile", asyncRoute(async (req, res) => 
   await assertOwner(req.user!.id, venueId);
   const input = venueProfileInput.parse(req.body);
   const photoUrl = await persistImage(input.photoUrl, "venues");
-  const venue = await prisma.restaurant.update({
-    where: { id: venueId },
-    data: { ...input, photoUrl },
-    select: { id: true, name: true, cuisine: true, address: true, phone: true, lat: true, lng: true, photoUrl: true },
-  });
+  const [venue] = await prisma.$transaction([
+    prisma.restaurant.update({
+      where: { id: venueId },
+      data: { ...input, photoUrl },
+      select: { id: true, name: true, cuisine: true, address: true, phone: true, lat: true, lng: true, photoUrl: true },
+    }),
+    prisma.user.update({ where: { id: req.user!.id }, data: { merchantVenueType: input.cuisine } }),
+  ]);
   res.json({ venue });
 }));
 
@@ -395,6 +400,7 @@ merchantRouter.get("/dashboard", asyncRoute(async (req, res) => {
       where: { id: req.user!.id },
       select: {
         merchantVenueName: true,
+        merchantVenueType: true,
         merchantVenueAddress: true,
         merchantVenueLat: true,
         merchantVenueLng: true,
@@ -406,7 +412,7 @@ merchantRouter.get("/dashboard", asyncRoute(async (req, res) => {
       let venue = await prisma.restaurant.create({
         data: {
           name: profile.merchantVenueName,
-          cuisine: "Venue",
+          cuisine: profile.merchantVenueType ?? "Restaurant",
           address: profile.merchantVenueAddress,
           lat: profile.merchantVenueLat,
           lng: profile.merchantVenueLng,

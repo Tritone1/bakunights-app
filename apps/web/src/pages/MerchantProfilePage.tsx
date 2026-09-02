@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { api } from "../lib/api";
 import { SafeImage } from "../components/SafeImage";
+import { normalizeVenueType, VENUE_TYPES } from "../lib/venueTypes";
 
 export type MerchantProfileVenue = {
   id: string;
@@ -204,7 +205,7 @@ function VenueProfileForm({ venue, busy, setBusy, onSaved, onError }: { venue: M
     <div className="flex items-center gap-3"><span className="grid h-11 w-11 place-items-center rounded-xl bg-cyan-300/10 text-cyan-300"><Building2 size={22} /></span><div><h3 className="text-xl font-semibold">{venue.name}</h3><p className="text-xs text-white/40">Shown to customers in search, maps, and offers</p></div></div>
     <div className="mt-5 grid gap-4 md:grid-cols-2">
       <MerchantField name="name" label="Venue name" defaultValue={venue.name} />
-      <MerchantField name="cuisine" label="Cuisine or venue type" defaultValue={venue.cuisine} />
+      <label><span className="form-label">Venue type</span><select name="cuisine" required className="form-field" defaultValue={normalizeVenueType(venue.cuisine)}>{VENUE_TYPES.map((type) => <option key={type.value} value={type.value}>{type.label}</option>)}</select></label>
       <MerchantField name="address" label="Full address" defaultValue={venue.address} wide />
       <MerchantField name="phone" label="Public phone" type="tel" defaultValue={venue.phone ?? ""} required={false} />
       <div className="hidden md:block" />
