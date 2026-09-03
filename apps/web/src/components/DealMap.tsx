@@ -42,7 +42,7 @@ function OpenStreetDealMap({ deal }: { deal: Deal }) {
   const bbox = [lng - delta, lat - delta * 0.65, lng + delta, lat + delta * 0.65].join("%2C");
   const source = `https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&marker=${lat}%2C${lng}`;
   return <div className="relative h-[62vh] min-h-[430px] overflow-hidden rounded-xl border-2 border-ink bg-primary-50 shadow-ticket">
-    <iframe title={`Map showing ${deal.restaurant.name}`} src={source} className="h-full w-full border-0" loading="lazy" referrerPolicy="no-referrer-when-downgrade" />
+    <iframe title={`Map showing ${deal.restaurant.name}`} src={source} className="h-full w-full border-0" loading="eager" referrerPolicy="no-referrer-when-downgrade" />
     <span className="absolute right-3 top-3 rounded-full border border-ink/15 bg-cream/90 px-3 py-1 font-mono text-[9px] font-bold uppercase shadow-sm backdrop-blur">OpenStreetMap</span>
   </div>;
 }
