@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Bookmark, Check, CheckCircle2, ChevronLeft, ChevronRight, Clock3, ExternalLink, Heart, Images, MapPin, Navigation, Share2, Star } from "lucide-react";
+import { Bookmark, Check, CheckCircle2, ChevronLeft, ChevronRight, Clock3, ExternalLink, Heart, MapPin, Navigation, Share2, Star } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { format, formatDistanceToNowStrict } from "date-fns";
 import { api } from "../lib/api";
@@ -110,6 +110,7 @@ export function DealDetailPage() {
 
 function OfferPhotoGallery({ deal }: { deal: Deal }) {
   const trackRef = useRef<HTMLDivElement>(null);
+  const activePhotoRef = useRef(0);
   const [activePhoto, setActivePhoto] = useState(0);
   const itemPhotos = (deal.offerMenuItems ?? []).flatMap(({ menuItem }) => menuItem.photoUrl ? [{ src: menuItem.photoUrl, label: menuItem.name }] : []);
   const candidates = deal.offerType === "set_menu"
@@ -118,21 +119,31 @@ function OfferPhotoGallery({ deal }: { deal: Deal }) {
   if (!candidates.length && deal.restaurant.photoUrl) candidates.push({ src: deal.restaurant.photoUrl, label: deal.restaurant.name });
   const photos = [...new Map(candidates.map((photo) => [photo.src, photo])).values()];
 
-  function goToPhoto(index: number) {
+  const goToPhoto = useCallback((index: number) => {
     const next = (index + photos.length) % photos.length;
-    trackRef.current?.scrollTo({ left: next * trackRef.current.clientWidth, behavior: "smooth" });
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    trackRef.current?.scrollTo({ left: next * trackRef.current.clientWidth, behavior: reduceMotion ? "auto" : "smooth" });
+    activePhotoRef.current = next;
     setActivePhoto(next);
-  }
+  }, [photos.length]);
+
+  useEffect(() => {
+    if (photos.length <= 1 || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const autoplay = window.setInterval(() => goToPhoto(activePhotoRef.current + 1), 3_000);
+    return () => window.clearInterval(autoplay);
+  }, [goToPhoto, photos.length]);
 
   if (!photos.length) return <SafeImage alt={`${deal.restaurant.name} offer`} className="h-full w-full object-cover" />;
 
   return <>
-    <div ref={trackRef} onScroll={(event) => { const width = event.currentTarget.clientWidth; if (width) setActivePhoto(Math.round(event.currentTarget.scrollLeft / width)); }} className="no-scrollbar flex h-full snap-x snap-mandatory overflow-x-auto scroll-smooth">
-      {photos.map((photo, index) => <figure key={photo.src} className="relative h-full w-full shrink-0 snap-center overflow-hidden bg-ink"><SafeImage src={photo.src} alt="" aria-hidden="true" className="absolute inset-0 h-full w-full scale-110 object-cover opacity-35 blur-2xl" /><SafeImage src={photo.src} alt={`${photo.label} photo ${index + 1}`} className="relative h-full w-full object-contain" />{photos.length > 1 && <figcaption className="absolute left-1/2 top-4 max-w-[40%] -translate-x-1/2 truncate rounded-full bg-ink/75 px-3 py-1 text-xs font-semibold text-white backdrop-blur">{photo.label}</figcaption>}</figure>)}
+    <div ref={trackRef} onScroll={(event) => { const width = event.currentTarget.clientWidth; if (width) { const next = Math.round(event.currentTarget.scrollLeft / width); activePhotoRef.current = next; setActivePhoto(next); } }} className="no-scrollbar flex h-full snap-x snap-mandatory overflow-x-auto scroll-smooth motion-reduce:scroll-auto">
+      {photos.map((photo, index) => <figure key={photo.src} className="relative h-full w-full shrink-0 snap-center overflow-hidden bg-ink"><SafeImage src={photo.src} alt="" aria-hidden="true" className="absolute inset-0 h-full w-full scale-110 object-cover opacity-35 blur-2xl" /><SafeImage src={photo.src} alt={`${photo.label} photo ${index + 1}`} className="relative h-full w-full object-contain" />{photos.length > 1 && <figcaption className="absolute left-1/2 top-16 z-20 max-w-[calc(100%-2rem)] -translate-x-1/2 rounded-lg border border-white/25 bg-ink/95 px-4 py-2 text-center text-sm font-bold text-white shadow-xl backdrop-blur-md sm:top-5">{photo.label}</figcaption>}</figure>)}
     </div>
-    {photos.length > 1 && <div className="absolute bottom-4 right-4 z-20 flex items-center gap-1.5 rounded-full border border-white/25 bg-ink/75 p-1 text-white shadow-lg backdrop-blur">
+    {photos.length > 1 && <div className="absolute bottom-4 left-1/2 z-20 flex -translate-x-1/2 items-center gap-2 rounded-full border border-white/30 bg-ink/90 p-1.5 text-white shadow-xl backdrop-blur-md">
       <button type="button" onClick={() => goToPhoto(activePhoto - 1)} className="grid h-8 w-8 place-items-center rounded-full transition hover:bg-white/15" aria-label="Previous offer photo"><ChevronLeft size={18} /></button>
-      <span className="inline-flex min-w-14 items-center justify-center gap-1 font-mono text-[10px] font-bold"><Images size={13} />{activePhoto + 1}/{photos.length}</span>
+      <div className="flex items-center gap-2 px-1" role="group" aria-label={`Offer photos, showing ${activePhoto + 1} of ${photos.length}`}>
+        {photos.map((photo, index) => <button key={photo.src} type="button" onClick={() => goToPhoto(index)} aria-label={`Show ${photo.label} photo ${index + 1}`} aria-current={activePhoto === index ? "true" : undefined} className={`h-2.5 rounded-full border border-white/70 transition-all ${activePhoto === index ? "w-7 bg-white" : "w-2.5 bg-white/35 hover:bg-white/70"}`} />)}
+      </div>
       <button type="button" onClick={() => goToPhoto(activePhoto + 1)} className="grid h-8 w-8 place-items-center rounded-full transition hover:bg-white/15" aria-label="Next offer photo"><ChevronRight size={18} /></button>
     </div>}
   </>;
