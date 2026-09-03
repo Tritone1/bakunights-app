@@ -24,6 +24,11 @@ export function DealDetailPage() {
     catch (reason) { setError(reason instanceof Error ? reason.message : "Could not load offer"); }
   }, [id]);
   useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    if (!notice) return;
+    const timer = window.setTimeout(() => setNotice(""), 3_000);
+    return () => window.clearTimeout(timer);
+  }, [notice]);
   if (error) return <ErrorState message={error} retry={() => void load()} />;
   if (!data) return <LoadingState label="Preparing your offer..." />;
   const { deal } = data; const restaurant = deal.restaurant;
