@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
-import { Bookmark, Check, CheckCircle2, Clock3, ExternalLink, Heart, MapPin, Navigation, Share2, Star } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Bookmark, Check, CheckCircle2, ChevronLeft, ChevronRight, Clock3, ExternalLink, Heart, Images, MapPin, Navigation, Share2, Star } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { format, formatDistanceToNowStrict } from "date-fns";
 import { api } from "../lib/api";
@@ -74,8 +74,8 @@ export function DealDetailPage() {
 
   return <div className="pb-8">
     <div className="relative h-64 border-b-2 border-ink bg-primary-50 sm:h-80 md:mx-8 md:mt-6 md:overflow-hidden md:rounded-xl md:border-2">
-      <SafeImage src={deal.photoUrl || restaurant.photoUrl || undefined} alt={`${restaurant.name} offer`} className="h-full w-full object-cover" />
-      <div className="absolute inset-0 bg-gradient-to-t from-ink/70 via-transparent to-transparent" />
+      <OfferPhotoGallery deal={deal} />
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-ink/70 via-transparent to-transparent" />
       <div className="stamp absolute right-4 top-4 flex h-28 w-28 items-center justify-center rounded-full text-center text-white"><span className="relative px-2 font-display text-3xl font-bold uppercase leading-none">{badge.main}<small className="block text-xs tracking-widest">{badge.sub}</small></span></div>
       <div className="absolute bottom-5 left-5 text-white"><p className="eyebrow">{restaurant.cuisine} · {deal.tag}</p><p className="font-display text-xl font-semibold uppercase">{restaurant.name}</p></div>
     </div>
@@ -86,7 +86,7 @@ export function DealDetailPage() {
         <div className="mt-3 flex flex-wrap gap-2">{(deal.dietaryTags ?? []).map((tag) => <span key={tag} className="rounded-full border border-ink px-2 py-1 font-mono text-[10px] font-semibold uppercase">{tag}</span>)}</div>
         <p className="mt-5 text-lg leading-relaxed text-ink/75">{deal.description}</p>
         {deal.scope === "CATEGORY" && deal.scopeCategory && <p className="mt-3 font-semibold">Covers all active items in {deal.scopeCategory.name}.</p>}
-        {deal.scope === "SPECIFIC_ITEMS" && Boolean(deal.offerMenuItems?.length) && <div className="mt-3"><p className="eyebrow text-ink/50">Covered menu items</p><ul className="mt-2 grid gap-2 sm:grid-cols-2">{deal.offerMenuItems!.map(({ menuItem }) => <li key={menuItem.id} className="rounded-lg border border-ink/15 p-2 font-semibold">{menuItem.name} <span className="text-sm font-normal text-ink/55">{Number(menuItem.priceAzn).toFixed(2)} AZN</span></li>)}</ul></div>}
+        {deal.scope === "SPECIFIC_ITEMS" && Boolean(deal.offerMenuItems?.length) && <div className="mt-3"><p className="eyebrow text-ink/50">Covered menu items</p><ul className="mt-2 grid gap-2 sm:grid-cols-2">{deal.offerMenuItems!.map(({ menuItem }) => <li key={menuItem.id} className="flex items-center gap-3 rounded-lg border border-ink/15 p-2 font-semibold">{menuItem.photoUrl && <SafeImage src={menuItem.photoUrl} alt={menuItem.name} className="h-12 w-12 shrink-0 rounded-md object-cover" />}<span className="min-w-0"><span className="block truncate">{menuItem.name}</span><span className="block text-sm font-normal text-ink/55">{Number(menuItem.priceAzn).toFixed(2)} AZN</span></span></li>)}</ul></div>}
         <div className="my-6 grid grid-cols-2 gap-3 border-y-2 border-dashed border-ink/25 py-5">
           <div><p className="eyebrow text-ink/50">Offer ends</p><p className="mt-1 flex items-center gap-2 font-semibold"><Clock3 size={17} className="text-primary-500" />{format(new Date(deal.endsAt), "EEE, MMM d · h:mm a")}</p><p className="mt-1 text-xs text-tomato">in {formatDistanceToNowStrict(new Date(deal.endsAt))}</p></div>
           <div><p className="eyebrow text-ink/50">Restaurant rating</p><p className="mt-1 flex items-center gap-2 font-semibold"><Star size={17} fill="#e9bd45" />{(restaurant.rating ?? 0).toFixed(1)}</p>{deal.dealRating && <p className="mt-1 text-xs">Offer score {deal.dealRating.toFixed(1)}/5</p>}</div>
@@ -106,6 +106,36 @@ export function DealDetailPage() {
     </div>
     {notice && <button onClick={() => setNotice("")} className="fixed bottom-24 left-1/2 z-50 -translate-x-1/2 rounded-lg border-2 border-ink bg-ink px-4 py-3 text-sm font-semibold text-white shadow-ticket md:bottom-6">{notice}</button>}
   </div>;
+}
+
+function OfferPhotoGallery({ deal }: { deal: Deal }) {
+  const trackRef = useRef<HTMLDivElement>(null);
+  const [activePhoto, setActivePhoto] = useState(0);
+  const itemPhotos = (deal.offerMenuItems ?? []).flatMap(({ menuItem }) => menuItem.photoUrl ? [{ src: menuItem.photoUrl, label: menuItem.name }] : []);
+  const candidates = deal.offerType === "set_menu"
+    ? [...itemPhotos, ...(deal.photoUrl ? [{ src: deal.photoUrl, label: deal.title }] : [])]
+    : [...(deal.photoUrl ? [{ src: deal.photoUrl, label: deal.title }] : []), ...itemPhotos];
+  if (!candidates.length && deal.restaurant.photoUrl) candidates.push({ src: deal.restaurant.photoUrl, label: deal.restaurant.name });
+  const photos = [...new Map(candidates.map((photo) => [photo.src, photo])).values()];
+
+  function goToPhoto(index: number) {
+    const next = (index + photos.length) % photos.length;
+    trackRef.current?.scrollTo({ left: next * trackRef.current.clientWidth, behavior: "smooth" });
+    setActivePhoto(next);
+  }
+
+  if (!photos.length) return <SafeImage alt={`${deal.restaurant.name} offer`} className="h-full w-full object-cover" />;
+
+  return <>
+    <div ref={trackRef} onScroll={(event) => { const width = event.currentTarget.clientWidth; if (width) setActivePhoto(Math.round(event.currentTarget.scrollLeft / width)); }} className="no-scrollbar flex h-full snap-x snap-mandatory overflow-x-auto scroll-smooth">
+      {photos.map((photo, index) => <figure key={photo.src} className="relative h-full w-full shrink-0 snap-center"><SafeImage src={photo.src} alt={`${photo.label} photo ${index + 1}`} className="h-full w-full object-cover" />{photos.length > 1 && <figcaption className="absolute bottom-14 right-4 max-w-[55%] truncate rounded-full bg-ink/70 px-3 py-1 text-xs font-semibold text-white backdrop-blur">{photo.label}</figcaption>}</figure>)}
+    </div>
+    {photos.length > 1 && <div className="absolute left-4 top-4 z-20 flex items-center gap-1.5 rounded-full border border-white/25 bg-ink/75 p-1 text-white shadow-lg backdrop-blur">
+      <button type="button" onClick={() => goToPhoto(activePhoto - 1)} className="grid h-8 w-8 place-items-center rounded-full transition hover:bg-white/15" aria-label="Previous offer photo"><ChevronLeft size={18} /></button>
+      <span className="inline-flex min-w-14 items-center justify-center gap-1 font-mono text-[10px] font-bold"><Images size={13} />{activePhoto + 1}/{photos.length}</span>
+      <button type="button" onClick={() => goToPhoto(activePhoto + 1)} className="grid h-8 w-8 place-items-center rounded-full transition hover:bg-white/15" aria-label="Next offer photo"><ChevronRight size={18} /></button>
+    </div>}
+  </>;
 }
 
 function offerLabel(deal: Deal) {

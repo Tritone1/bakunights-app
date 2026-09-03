@@ -1,11 +1,24 @@
 import { AdvancedMarker, APIProvider, Map as GoogleMap } from "@vis.gl/react-google-maps";
 import { Link } from "react-router-dom";
 import type { Deal } from "../types";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 export function DealMap({ deals, center }: { deals: Deal[]; center: { lat: number; lng: number } }) {
   const key = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined;
   const [googleFailed, setGoogleFailed] = useState(false);
+  useEffect(() => {
+    const previousAuthFailure = window.gm_authFailure;
+    const handleAuthFailure = () => {
+      previousAuthFailure?.();
+      setGoogleFailed(true);
+    };
+    window.gm_authFailure = handleAuthFailure;
+    return () => {
+      if (window.gm_authFailure === handleAuthFailure) window.gm_authFailure = previousAuthFailure;
+    };
+  }, []);
+
+  if (deals.length === 1 && center.lat === deals[0]!.restaurant.lat && center.lng === deals[0]!.restaurant.lng) return <OpenStreetDealMap deal={deals[0]!} />;
   if (!key || googleFailed) return <FallbackMap deals={deals} center={center} reason={key ? "Google Maps failed to load. OpenStreetMap-style preview is active." : "Google Maps is not configured. Map preview is active."} />;
   return <div className="relative h-[62vh] min-h-[430px] overflow-hidden rounded-xl border-2 border-ink shadow-ticket">
     <APIProvider apiKey={key} onError={(error) => { console.error("WhereToGo deal map Google Maps failed:", error); setGoogleFailed(true); }}>
@@ -20,6 +33,17 @@ export function DealMap({ deals, center }: { deals: Deal[]; center: { lat: numbe
         </AdvancedMarker>)}
       </GoogleMap>
     </APIProvider>
+  </div>;
+}
+
+function OpenStreetDealMap({ deal }: { deal: Deal }) {
+  const { lat, lng } = deal.restaurant;
+  const delta = 0.008;
+  const bbox = [lng - delta, lat - delta * 0.65, lng + delta, lat + delta * 0.65].join("%2C");
+  const source = `https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&marker=${lat}%2C${lng}`;
+  return <div className="relative h-[62vh] min-h-[430px] overflow-hidden rounded-xl border-2 border-ink bg-primary-50 shadow-ticket">
+    <iframe title={`Map showing ${deal.restaurant.name}`} src={source} className="h-full w-full border-0" loading="lazy" referrerPolicy="no-referrer-when-downgrade" />
+    <span className="absolute right-3 top-3 rounded-full border border-ink/15 bg-cream/90 px-3 py-1 font-mono text-[9px] font-bold uppercase shadow-sm backdrop-blur">OpenStreetMap</span>
   </div>;
 }
 

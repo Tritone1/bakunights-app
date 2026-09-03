@@ -65,6 +65,7 @@ const dealInput = z.object({
 })
   .refine((value) => value.endsAt > value.startsAt, { message: "End time must be after start time", path: ["endsAt"] })
   .refine((value) => value.offerType !== "discount" || value.discountPct != null, { message: "Discount-type offers need a percentage", path: ["discountPct"] })
+  .refine((value) => value.offerType !== "set_menu" || (value.scope === "SPECIFIC_ITEMS" && (value.menuItemIds?.length ?? 0) >= 2), { message: "Set menus must include at least two specific menu items", path: ["menuItemIds"] })
   .refine((value) => value.scope !== "CATEGORY" || Boolean(value.scopeCategoryId), { message: "Choose a menu category", path: ["scopeCategoryId"] })
   .refine((value) => value.scope !== "SPECIFIC_ITEMS" || value.menuItemIds.length > 0, { message: "Choose at least one menu item", path: ["menuItemIds"] });
 
