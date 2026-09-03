@@ -17,6 +17,7 @@ import { DailyPointsWheel } from "./components/DailyPointsWheel";
 import { LanguageSwitcher } from "./components/LanguageSwitcher";
 import { Reveal } from "./components/Reveal";
 import { ArrowLeft, Home } from "lucide-react";
+import { loadGoogleMaps } from "./lib/googleMaps";
 
 type Category = "Restaurants" | "Bars" | "Pubs" | "Lounges";
 
@@ -113,34 +114,6 @@ function toVenue(restaurant: HomepageRestaurant, origin: UserPosition | null): V
     priceRange: "",
     image: restaurant.photoUrl || deal?.photoUrl || fallbackImage(category),
   };
-}
-
-let googleMapsPromise: Promise<void> | null = null;
-
-function loadGoogleMaps(apiKey: string) {
-  const existingGoogle = (window as unknown as { google?: { maps?: { importLibrary?: unknown } } }).google;
-  if (typeof existingGoogle?.maps?.importLibrary === "function") return Promise.resolve();
-  if (googleMapsPromise) return googleMapsPromise;
-  googleMapsPromise = new Promise<void>((resolve, reject) => {
-    const callbackName = "__initWhereToGoGoogleMaps";
-    const callbackWindow = window as unknown as Record<string, unknown>;
-    const script = document.createElement("script");
-    callbackWindow[callbackName] = () => {
-      delete callbackWindow[callbackName];
-      resolve();
-    };
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(apiKey)}&v=weekly&loading=async&callback=${callbackName}`;
-    script.async = true;
-    script.onerror = () => {
-      delete callbackWindow[callbackName];
-      reject(new Error("Google Maps could not be loaded"));
-    };
-    document.head.appendChild(script);
-  });
-  return googleMapsPromise.catch((error) => {
-    googleMapsPromise = null;
-    throw error;
-  });
 }
 
 type IconName = "search" | "pin" | "bookmark" | "arrow" | "location" | "clock" | "chevron" | "spark" | "car" | "bus" | "walk" | "copy" | "close";
