@@ -778,7 +778,7 @@ export default function App() {
                 : path.startsWith("/venues/") ? <VenuePage />
                   : null;
   if (path.startsWith("/merchant")) return routedPage;
-  if (routedPage) return <><RouteNavigation /><LanguageSwitcher floating />{routedPage}</>;
+  if (routedPage) return <>{path.startsWith("/deals/") ? null : <RouteNavigation />}<LanguageSwitcher floating />{routedPage}</>;
   return <ConsumerApp />;
 }
 
