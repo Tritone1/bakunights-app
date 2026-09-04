@@ -156,43 +156,39 @@ export function OfferDetailPage({
   }
 
   return <main className="min-h-screen bg-night pb-12 text-white">
-    <section className="relative h-[340px] overflow-hidden border-b border-white/10 bg-card sm:h-[360px]">
-      <div className="absolute inset-0 overflow-hidden">
-        <div className="flex h-full transition-transform duration-700 ease-out" style={{ transform: `translateX(-${activePhoto * 100}%)` }}>
-          {gallery.map((photo, index) => <div key={photo.src} className="relative h-full min-w-full overflow-hidden">
-            <SafeImage src={photo.src} alt="" aria-hidden="true" className="absolute inset-0 h-full w-full scale-110 object-cover opacity-45 blur-2xl" />
-            <SafeImage src={photo.src} alt={`${photo.label} photo ${index + 1}`} className="relative h-full w-full object-contain" />
-          </div>)}
+    <section className="mx-auto max-w-6xl px-4 pt-20 lg:px-8">
+      <div className="grid overflow-hidden rounded-3xl border border-white/[.09] bg-card shadow-2xl shadow-black/30 lg:grid-cols-[minmax(0,1.35fr)_minmax(300px,.65fr)]">
+        <div className="relative h-60 overflow-hidden border-b border-white/[.08] bg-[#0d0d14] sm:h-72 lg:h-[300px] lg:border-b-0 lg:border-r">
+          <div className="flex h-full transition-transform duration-700 ease-out" style={{ transform: `translateX(-${activePhoto * 100}%)` }}>
+            {gallery.map((photo, index) => <div key={photo.src} className="h-full min-w-full bg-[#0d0d14]">
+              <SafeImage src={photo.src} alt={`${photo.label} photo ${index + 1}`} className="h-full w-full object-contain" />
+            </div>)}
+          </div>
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/70 to-transparent" />
+          <button type="button" onClick={onBack} className="glass absolute left-4 top-4 z-20 inline-flex h-10 items-center gap-2 rounded-full px-4 text-sm font-bold transition hover:border-amber-400/50 hover:text-amber-400" aria-label="Go back"><ArrowLeft size={17} />Back</button>
+          {gallery.length > 1 && <div className="glass absolute bottom-4 left-4 z-30 max-w-[calc(100%-2rem)] rounded-xl px-3 py-2.5">
+            <p className="max-w-52 truncate text-xs font-bold text-white">{gallery[activePhoto]?.label}</p>
+            <div className="mt-2 flex gap-2" role="group" aria-label={`Offer photos, showing ${activePhoto + 1} of ${gallery.length}`}>
+              {gallery.map((photo, index) => <button key={photo.src} type="button" onClick={() => setActivePhoto(index)} aria-label={`Show ${photo.label} photo ${index + 1}`} aria-current={activePhoto === index ? "true" : undefined} className={`h-2 rounded-full transition-all ${activePhoto === index ? "w-7 bg-amber-400" : "w-2 bg-white/40 hover:bg-white/70"}`} />)}
+            </div>
+          </div>}
+        </div>
+
+        <div className="relative flex min-h-56 flex-col justify-end p-5 sm:p-7 lg:min-h-0">
+          <div className="absolute right-5 top-5 flex items-start gap-3">
+            <span className="rounded-full border border-white/15 px-3 py-1.5 text-xs font-extrabold uppercase tracking-[.16em] shadow-lg" style={{ backgroundColor: venue.dealColor }}>{venue.dealTag}</span>
+            <div className="glass grid h-16 w-16 place-items-center rounded-2xl border-amber-400/70 text-center">
+              <span className="font-display text-xl font-semibold leading-none text-amber-400">{badgeMain}<small className="mt-1 block font-sans text-[9px] font-extrabold tracking-[.18em] text-white">{badgeSub}</small></span>
+            </div>
+          </div>
+          <div className="mb-3 flex flex-wrap gap-2 pr-28">
+            <span className="rounded-full border border-white/15 bg-white/[.07] px-3 py-1 text-xs font-bold">{venue.category}</span>
+            {venue.mealPeriods.map((period) => <span key={period} className="rounded-full border border-amber-400/25 bg-amber-400/10 px-3 py-1 text-xs font-semibold text-amber-300">{period}</span>)}
+          </div>
+          <h1 className="font-display text-3xl font-semibold leading-tight text-white sm:text-4xl">{venue.name}</h1>
+          <p className="mt-1.5 text-sm leading-5 text-[#b3b3c8] sm:text-base sm:leading-6">{venue.deal}</p>
         </div>
       </div>
-      <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/10 via-black/25 to-black" />
-
-      <button type="button" onClick={onBack} className="glass absolute left-5 top-5 z-20 inline-flex h-11 items-center gap-2 rounded-full px-4 text-sm font-bold transition hover:border-amber-400/50 hover:text-amber-400" aria-label="Go back">
-        <ArrowLeft size={18} /> Back
-      </button>
-
-      <div className="absolute right-5 top-16 z-20 flex flex-col items-end gap-2 sm:right-8">
-        <span className="rounded-full border border-white/15 px-3 py-1.5 text-xs font-extrabold uppercase tracking-[.16em] shadow-lg" style={{ backgroundColor: venue.dealColor }}>{venue.dealTag}</span>
-        <div className="glass grid h-[72px] w-[72px] place-items-center rounded-2xl border-amber-400/70 text-center">
-          <span className="font-display text-2xl font-semibold leading-none text-amber-400">{badgeMain}<small className="mt-1 block font-sans text-[10px] font-extrabold tracking-[.2em] text-white">{badgeSub}</small></span>
-        </div>
-      </div>
-
-      <div className="absolute bottom-5 left-5 z-20 max-w-2xl pr-6 sm:bottom-6 sm:left-8">
-        <div className="mb-3 flex flex-wrap gap-2">
-          <span className="rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-bold">{venue.category}</span>
-          {venue.mealPeriods.map((period) => <span key={period} className="rounded-full border border-amber-400/25 bg-amber-400/10 px-3 py-1 text-xs font-semibold text-amber-300">{period}</span>)}
-        </div>
-        <h1 className="font-display text-3xl font-semibold leading-tight text-white sm:text-4xl">{venue.name}</h1>
-        <p className="mt-1.5 max-w-xl text-sm leading-5 text-[#b3b3c8] sm:text-base sm:leading-6">{venue.deal}</p>
-      </div>
-
-      {gallery.length > 1 && <div className="glass absolute right-5 top-[170px] z-30 max-w-36 rounded-2xl px-3 py-2.5 sm:bottom-6 sm:top-auto sm:max-w-64 sm:px-4 sm:py-3">
-        <p className="truncate text-xs font-bold text-white">{gallery[activePhoto]?.label}</p>
-        <div className="mt-2 flex gap-2" role="group" aria-label={`Offer photos, showing ${activePhoto + 1} of ${gallery.length}`}>
-          {gallery.map((photo, index) => <button key={photo.src} type="button" onClick={() => setActivePhoto(index)} aria-label={`Show ${photo.label} photo ${index + 1}`} aria-current={activePhoto === index ? "true" : undefined} className={`h-2 rounded-full transition-all ${activePhoto === index ? "w-7 bg-amber-400" : "w-2 bg-white/40 hover:bg-white/70"}`} />)}
-        </div>
-      </div>}
     </section>
 
     <div className="mx-auto grid max-w-6xl gap-6 px-4 py-6 lg:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)] lg:px-8 lg:py-7">
