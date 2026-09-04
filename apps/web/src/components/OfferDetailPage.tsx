@@ -139,7 +139,11 @@ export function OfferDetailPage({
   async function submitRating() {
     if (!rating) return;
     setBusy("rating");
-    try { await onSubmitRating?.(rating); setNotice("Rating saved. Thanks for keeping offers honest."); }
+    try {
+      await onSubmitRating?.(rating);
+      setRating(0);
+      setNotice("Rating saved. Thanks for keeping offers honest.");
+    }
     catch (reason) { setNotice(errorMessage(reason, "Could not save your rating.")); }
     finally { setBusy(""); }
   }
@@ -210,6 +214,15 @@ export function OfferDetailPage({
           <ActionButton onClick={() => void shareOffer()} icon={<Upload size={18} />} label="Share" />
         </div>
 
+        <section className="rounded-2xl border border-amber-400/25 bg-gradient-to-br from-amber-400/[.07] to-card p-6 shadow-xl shadow-black/15">
+          <p className="text-xs font-extrabold uppercase tracking-[.18em] text-amber-400">Rate this offer</p>
+          <h2 className="mt-2 font-display text-2xl font-semibold">Was this offer worth it?</h2>
+          <div className="mt-5 flex flex-wrap items-center gap-2">
+            {[1, 2, 3, 4, 5].map((value) => <button key={value} type="button" onClick={() => setRating(value)} className="text-amber-400 transition hover:scale-110 focus-visible:scale-110" aria-label={`Rate ${value} stars`}><Star size={31} fill={value <= rating ? "currentColor" : "none"} /></button>)}
+            {rating > 0 && <button type="button" onClick={() => void submitRating()} disabled={busy === "rating"} className="ml-2 rounded-xl bg-amber-500 px-5 py-2.5 text-sm font-extrabold text-night transition hover:bg-amber-400 disabled:opacity-55">{busy === "rating" ? "Saving…" : "Submit"}</button>}
+          </div>
+        </section>
+
         <section>
           <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
             <h2 className="flex items-center gap-2 font-display text-2xl font-semibold"><MapPin size={21} className="text-amber-400" />Find Your Way</h2>
@@ -218,14 +231,6 @@ export function OfferDetailPage({
           <PremiumVenueMap venue={venue} />
         </section>
 
-        <section className="rounded-2xl border border-white/[.08] bg-card p-6">
-          <p className="text-xs font-extrabold uppercase tracking-[.18em] text-muted">Rate this offer</p>
-          <h2 className="mt-2 font-display text-2xl font-semibold">Was this offer worth it?</h2>
-          <div className="mt-5 flex flex-wrap items-center gap-2">
-            {[1, 2, 3, 4, 5].map((value) => <button key={value} type="button" onClick={() => setRating(value)} className="text-amber-400 transition hover:scale-110 focus-visible:scale-110" aria-label={`Rate ${value} stars`}><Star size={31} fill={value <= rating ? "currentColor" : "none"} /></button>)}
-            {rating > 0 && <button type="button" onClick={() => void submitRating()} disabled={busy === "rating"} className="ml-2 rounded-xl bg-amber-500 px-5 py-2.5 text-sm font-extrabold text-night transition hover:bg-amber-400 disabled:opacity-55">{busy === "rating" ? "Saving…" : "Submit"}</button>}
-          </div>
-        </section>
       </div>
 
       <aside className="space-y-5 lg:sticky lg:top-6 lg:self-start">
