@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
   Bookmark,
@@ -14,6 +14,7 @@ import {
   Upload,
 } from "lucide-react";
 import { SafeImage } from "./SafeImage";
+import { loadGoogleMaps } from "../lib/googleMaps";
 
 export interface Venue {
   id: number;
@@ -49,6 +50,7 @@ export interface OfferDetailPageProps {
   initiallyFollowed?: boolean;
   initiallyConfirmed?: boolean;
   confirmationCode?: string;
+  qrCodeUrl?: string;
   onSaveChange?: (saved: boolean) => void | Promise<void>;
   onFollowChange?: (followed: boolean) => void | Promise<void>;
   onShare?: () => void | Promise<void>;
@@ -65,6 +67,7 @@ export function OfferDetailPage({
   initiallyFollowed = false,
   initiallyConfirmed = false,
   confirmationCode,
+  qrCodeUrl,
   onSaveChange,
   onFollowChange,
   onShare,
@@ -75,6 +78,7 @@ export function OfferDetailPage({
   const [followed, setFollowed] = useState(initiallyFollowed);
   const [rating, setRating] = useState(0);
   const [confirmed, setConfirmed] = useState(initiallyConfirmed);
+  const [claimed, setClaimed] = useState(Boolean(confirmationCode));
   const [busy, setBusy] = useState("");
   const [notice, setNotice] = useState("");
   const countdown = useCountdown(expiresAt);
@@ -100,14 +104,12 @@ export function OfferDetailPage({
   useEffect(() => setSaved(initiallySaved), [initiallySaved]);
   useEffect(() => setFollowed(initiallyFollowed), [initiallyFollowed]);
   useEffect(() => setConfirmed(initiallyConfirmed), [initiallyConfirmed]);
+  useEffect(() => setClaimed(Boolean(confirmationCode)), [confirmationCode]);
 
   const percent = venue.dealTag.match(/(\d+)%/)?.[1];
   const badgeMain = percent ? `${percent}%` : venue.dealTag.split(/\s+/)[0]?.toUpperCase().slice(0, 4) || "DEAL";
   const badgeSub = percent ? "OFF" : venue.dealTag.split(/\s+/)[1]?.toUpperCase() || "OFFER";
   const code = confirmationCode || `WTG-${venue.id.toString(36).toUpperCase().padStart(6, "0").slice(-6)}`;
-  const bbox = `${venue.lng - 0.02}%2C${venue.lat - 0.012}%2C${venue.lng + 0.02}%2C${venue.lat + 0.012}`;
-  const embedUrl = `https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&marker=${venue.lat}%2C${venue.lng}`;
-  const mapUrl = `https://www.openstreetmap.org/?mlat=${venue.lat}&mlon=${venue.lng}#map=16/${venue.lat}/${venue.lng}`;
 
   async function toggleSave() {
     const next = !saved;
@@ -144,13 +146,17 @@ export function OfferDetailPage({
 
   async function confirmVisit() {
     setBusy("confirm");
-    try { await onConfirmVisit?.(); setConfirmed(true); setNotice("Visit confirmed successfully."); }
+    try {
+      await onConfirmVisit?.();
+      if (onConfirmVisit) { setClaimed(true); setNotice("QR proof created. Show it to the merchant to confirm your visit."); }
+      else { setClaimed(true); setConfirmed(true); setNotice("Visit confirmed successfully."); }
+    }
     catch (reason) { setNotice(errorMessage(reason, "Could not confirm your visit.")); }
     finally { setBusy(""); }
   }
 
   return <main className="min-h-screen bg-night pb-12 text-white">
-    <section className="relative h-[420px] overflow-hidden border-b border-white/10 bg-card">
+    <section className="relative h-[340px] overflow-hidden border-b border-white/10 bg-card sm:h-[360px]">
       <div className="absolute inset-0 overflow-hidden">
         <div className="flex h-full transition-transform duration-700 ease-out" style={{ transform: `translateX(-${activePhoto * 100}%)` }}>
           {gallery.map((photo, index) => <div key={photo.src} className="relative h-full min-w-full overflow-hidden">
@@ -165,23 +171,23 @@ export function OfferDetailPage({
         <ArrowLeft size={18} /> Back
       </button>
 
-      <div className="absolute right-5 top-16 z-20 flex flex-col items-end gap-3 sm:right-8">
+      <div className="absolute right-5 top-16 z-20 flex flex-col items-end gap-2 sm:right-8">
         <span className="rounded-full border border-white/15 px-3 py-1.5 text-xs font-extrabold uppercase tracking-[.16em] shadow-lg" style={{ backgroundColor: venue.dealColor }}>{venue.dealTag}</span>
         <div className="glass grid h-[72px] w-[72px] place-items-center rounded-2xl border-amber-400/70 text-center">
           <span className="font-display text-2xl font-semibold leading-none text-amber-400">{badgeMain}<small className="mt-1 block font-sans text-[10px] font-extrabold tracking-[.2em] text-white">{badgeSub}</small></span>
         </div>
       </div>
 
-      <div className="absolute bottom-7 left-5 z-20 max-w-2xl pr-6 sm:left-8">
+      <div className="absolute bottom-5 left-5 z-20 max-w-2xl pr-6 sm:bottom-6 sm:left-8">
         <div className="mb-3 flex flex-wrap gap-2">
           <span className="rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-bold">{venue.category}</span>
           {venue.mealPeriods.map((period) => <span key={period} className="rounded-full border border-amber-400/25 bg-amber-400/10 px-3 py-1 text-xs font-semibold text-amber-300">{period}</span>)}
         </div>
-        <h1 className="font-display text-4xl font-semibold leading-tight text-white">{venue.name}</h1>
-        <p className="mt-2 max-w-xl text-sm leading-6 text-[#b3b3c8] sm:text-base">{venue.deal}</p>
+        <h1 className="font-display text-3xl font-semibold leading-tight text-white sm:text-4xl">{venue.name}</h1>
+        <p className="mt-1.5 max-w-xl text-sm leading-5 text-[#b3b3c8] sm:text-base sm:leading-6">{venue.deal}</p>
       </div>
 
-      {gallery.length > 1 && <div className="glass absolute right-5 top-[200px] z-30 max-w-36 rounded-2xl px-3 py-2.5 sm:bottom-7 sm:top-auto sm:max-w-64 sm:px-4 sm:py-3">
+      {gallery.length > 1 && <div className="glass absolute right-5 top-[170px] z-30 max-w-36 rounded-2xl px-3 py-2.5 sm:bottom-6 sm:top-auto sm:max-w-64 sm:px-4 sm:py-3">
         <p className="truncate text-xs font-bold text-white">{gallery[activePhoto]?.label}</p>
         <div className="mt-2 flex gap-2" role="group" aria-label={`Offer photos, showing ${activePhoto + 1} of ${gallery.length}`}>
           {gallery.map((photo, index) => <button key={photo.src} type="button" onClick={() => setActivePhoto(index)} aria-label={`Show ${photo.label} photo ${index + 1}`} aria-current={activePhoto === index ? "true" : undefined} className={`h-2 rounded-full transition-all ${activePhoto === index ? "w-7 bg-amber-400" : "w-2 bg-white/40 hover:bg-white/70"}`} />)}
@@ -189,7 +195,7 @@ export function OfferDetailPage({
       </div>}
     </section>
 
-    <div className="mx-auto grid max-w-6xl gap-7 px-4 py-8 lg:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)] lg:px-8">
+    <div className="mx-auto grid max-w-6xl gap-6 px-4 py-6 lg:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)] lg:px-8 lg:py-7">
       <div className="space-y-7">
         <section className="grid overflow-hidden rounded-2xl border border-white/[.08] bg-card shadow-2xl shadow-black/20 sm:grid-cols-2" aria-label="Offer details">
           <MetaCell icon={<Clock3 size={19} />} iconClass="bg-red-500/10 text-red-400" label="Offer expires" value={venue.open} detail={<span className="font-mono text-sm font-bold tabular-nums text-red-400">{countdown}</span>} />
@@ -213,10 +219,7 @@ export function OfferDetailPage({
             <h2 className="flex items-center gap-2 font-display text-2xl font-semibold"><MapPin size={21} className="text-amber-400" />Find Your Way</h2>
             <p className="text-sm text-muted">{venue.address}</p>
           </div>
-          <div className="overflow-hidden rounded-2xl border border-white/10 bg-card">
-            <iframe title={`Map showing ${venue.name}`} src={embedUrl} className="dark-map h-60 w-full border-0" loading="eager" referrerPolicy="no-referrer-when-downgrade" />
-            <a href={mapUrl} target="_blank" rel="noreferrer" className="flex w-full items-center justify-center gap-2 bg-amber-500 px-4 py-3.5 text-sm font-extrabold text-[#09090e] transition hover:bg-amber-400"><Navigation size={17} />Open in Maps</a>
-          </div>
+          <PremiumVenueMap venue={venue} />
         </section>
 
         <section className="rounded-2xl border border-white/[.08] bg-card p-6">
@@ -233,9 +236,14 @@ export function OfferDetailPage({
         <section className="rounded-2xl border border-amber-400/35 bg-gradient-to-b from-amber-400/[.09] to-card p-6 text-center shadow-2xl shadow-black/25">
           <div className={`mx-auto grid h-14 w-14 place-items-center rounded-full ${confirmed ? "bg-emerald-500/15 text-emerald-400" : "bg-amber-400/15 text-amber-400"}`}>{confirmed ? <Check size={27} strokeWidth={3} /> : <TicketCheck size={26} />}</div>
           <p className="mt-5 text-[10px] font-extrabold uppercase tracking-[.22em] text-muted">Your proof</p>
-          <h2 className="mt-2 font-display text-3xl font-semibold">{confirmed ? "Visit Confirmed" : "Claim Offer"}</h2>
-          <p className="mx-auto mt-4 w-fit rounded-xl border border-white/10 bg-black/25 px-4 py-2 font-mono text-sm font-bold tracking-[.16em] text-amber-300">{code}</p>
-          {confirmed ? <p className="mt-4 rounded-xl border border-emerald-400/20 bg-emerald-400/10 px-3 py-3 text-sm font-semibold text-emerald-300">Your visit has been confirmed successfully.</p> : <button type="button" onClick={() => void confirmVisit()} disabled={busy === "confirm"} className="mt-5 w-full rounded-xl bg-amber-500 px-4 py-3 text-sm font-extrabold text-night transition hover:bg-amber-400 disabled:opacity-55">{busy === "confirm" ? "Confirming…" : "Confirm Visit"}</button>}
+          <h2 className="mt-2 font-display text-3xl font-semibold">{confirmed ? "Visit Confirmed" : claimed ? "Ready to Scan" : "Claim Offer"}</h2>
+          {claimed && qrCodeUrl && <SafeImage src={qrCodeUrl} alt={`QR proof for ${code}`} className="mx-auto mt-4 w-48 rounded-xl border-4 border-white bg-white p-2" />}
+          {claimed && <p className="mx-auto mt-4 w-fit rounded-xl border border-white/10 bg-black/25 px-4 py-2 font-mono text-sm font-bold tracking-[.16em] text-amber-300">{code}</p>}
+          {confirmed
+            ? <p className="mt-4 rounded-xl border border-emerald-400/20 bg-emerald-400/10 px-3 py-3 text-sm font-semibold text-emerald-300">The merchant scanned this proof and confirmed your visit.</p>
+            : claimed
+              ? <p className="mt-4 rounded-xl border border-amber-400/20 bg-amber-400/10 px-3 py-3 text-sm font-semibold text-amber-200">Show this QR code to the merchant. Their scanner confirms the visit and unlocks your spin.</p>
+              : <button type="button" onClick={() => void confirmVisit()} disabled={busy === "confirm"} className="mt-5 w-full rounded-xl bg-amber-500 px-4 py-3 text-sm font-extrabold text-night transition hover:bg-amber-400 disabled:opacity-55">{busy === "confirm" ? "Creating QR…" : "Claim & Show QR"}</button>}
         </section>
 
         <section className="divide-y divide-white/[.07] rounded-2xl border border-white/[.08] bg-card px-5">
@@ -250,6 +258,68 @@ export function OfferDetailPage({
 
     {notice && <button type="button" onClick={() => setNotice("")} className="fixed bottom-6 left-1/2 z-[160] -translate-x-1/2 rounded-xl border border-white/15 bg-[#181821] px-5 py-3 text-sm font-semibold text-white shadow-2xl">{notice}</button>}
   </main>;
+}
+
+function PremiumVenueMap({ venue }: { venue: Venue }) {
+  const apiKey = (import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined)?.trim() || "";
+  const mapId = (import.meta.env.VITE_GOOGLE_MAPS_MAP_ID as string | undefined)?.trim() || "DEMO_MAP_ID";
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [status, setStatus] = useState<"loading" | "ready" | "failed">("loading");
+  const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${venue.lat},${venue.lng}`;
+
+  useEffect(() => {
+    if (!apiKey || !containerRef.current) { setStatus("failed"); return; }
+    let cancelled = false;
+    let marker: google.maps.marker.AdvancedMarkerElement | null = null;
+    const previousAuthFailure = window.gm_authFailure;
+    const handleAuthFailure = () => { if (!cancelled) setStatus("failed"); };
+    window.gm_authFailure = handleAuthFailure;
+    setStatus("loading");
+
+    void loadGoogleMaps(apiKey).then(async () => {
+      if (cancelled || !containerRef.current) return;
+      const [{ Map }, { AdvancedMarkerElement }] = await Promise.all([
+        google.maps.importLibrary("maps") as Promise<google.maps.MapsLibrary>,
+        google.maps.importLibrary("marker") as Promise<google.maps.MarkerLibrary>,
+      ]);
+      if (cancelled || !containerRef.current) return;
+      const map = new Map(containerRef.current, {
+        center: { lat: venue.lat, lng: venue.lng },
+        zoom: 15,
+        mapId,
+        gestureHandling: "greedy",
+        mapTypeControl: false,
+        streetViewControl: false,
+        fullscreenControl: true,
+      });
+      const pin = document.createElement("div");
+      pin.className = "grid h-11 w-11 place-items-center rounded-full border-[3px] border-night bg-amber-500 text-sm font-black text-night shadow-2xl";
+      pin.textContent = "WTG";
+      marker = new AdvancedMarkerElement({ map, position: { lat: venue.lat, lng: venue.lng }, title: venue.name, content: pin });
+      setStatus("ready");
+    }).catch((reason: unknown) => {
+      console.error("WhereToGo offer map failed:", reason);
+      if (!cancelled) setStatus("failed");
+    });
+
+    return () => {
+      cancelled = true;
+      if (marker) marker.map = null;
+      if (window.gm_authFailure === handleAuthFailure) window.gm_authFailure = previousAuthFailure;
+    };
+  }, [apiKey, mapId, venue.lat, venue.lng, venue.name]);
+
+  const bbox = `${venue.lng - 0.02}%2C${venue.lat - 0.012}%2C${venue.lng + 0.02}%2C${venue.lat + 0.012}`;
+  const openStreetMapUrl = `https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&marker=${venue.lat}%2C${venue.lng}`;
+
+  return <div className="overflow-hidden rounded-2xl border border-white/10 bg-card">
+    <div className="relative h-60 bg-[#0d0d15]">
+      {status === "failed"
+        ? <><iframe title={`Map showing ${venue.name}`} src={openStreetMapUrl} className="dark-map h-full w-full border-0" loading="eager" referrerPolicy="no-referrer-when-downgrade" /><span className="absolute right-3 top-3 rounded-full border border-white/10 bg-black/75 px-3 py-1 text-[9px] font-bold uppercase tracking-wider text-white/70">OpenStreetMap fallback</span></>
+        : <><div ref={containerRef} className="h-full w-full" aria-label="Google map of offer venue" />{status === "loading" && <div className="absolute inset-0 grid place-items-center bg-card text-xs font-bold uppercase tracking-[.16em] text-muted">Loading Google Maps…</div>}</>}
+    </div>
+    <a href={googleMapsUrl} target="_blank" rel="noreferrer" className="flex w-full items-center justify-center gap-2 bg-amber-500 px-4 py-3.5 text-sm font-extrabold text-[#09090e] transition hover:bg-amber-400"><Navigation size={17} />Open in Google Maps</a>
+  </div>;
 }
 
 function MetaCell({ icon, iconClass, label, value, detail, valueClass = "text-white" }: { icon: React.ReactNode; iconClass: string; label: string; value: string; detail?: React.ReactNode; valueClass?: string }) {

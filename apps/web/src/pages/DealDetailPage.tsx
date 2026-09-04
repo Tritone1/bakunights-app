@@ -69,6 +69,7 @@ export function DealDetailPage() {
     initiallyFollowed={data.followed}
     initiallyConfirmed={Boolean(data.redemption?.redeemedAt)}
     confirmationCode={data.redemption?.redemptionCode}
+    qrCodeUrl={data.redemption?.qrDataUrl}
     onBack={() => window.history.length > 1 ? navigate(-1) : navigate("/")}
     onSaveChange={saveChanged}
     onFollowChange={followChanged}

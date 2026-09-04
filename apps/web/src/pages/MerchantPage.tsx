@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState, type FormEvent, type InputHTMLAttributes, type ReactNode } from "react";
-import { BarChart3, Bookmark, Check, ChevronDown, Copy, Eye, ImagePlus, Link2, List, LogOut, MapPin, Pencil, Play, Plus, QrCode, Search, Store, TicketCheck, Upload, UserRound, Users, X } from "lucide-react";
+import { useCallback, useEffect, useRef, useState, type FormEvent, type InputHTMLAttributes, type ReactNode } from "react";
+import { BarChart3, Bookmark, Camera, Check, ChevronDown, Copy, Eye, ImagePlus, Link2, List, LogOut, MapPin, Pencil, Play, Plus, QrCode, Search, Store, TicketCheck, Upload, UserRound, Users, X } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { format } from "date-fns";
 import { api } from "../lib/api";
@@ -207,9 +207,9 @@ function RedeemCode({ venues }: { venues: ManagedVenue[] }) {
   const [billAmount, setBillAmount] = useState("");
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
+  const [scanning, setScanning] = useState(false);
 
-  async function submit(event: FormEvent) {
-    event.preventDefault();
+  async function redeem(scannedCode = code) {
     setBusy(true);
     setMessage("");
     try {
@@ -218,7 +218,7 @@ function RedeemCode({ venues }: { venues: ManagedVenue[] }) {
         | { kind: "POINT_REWARD"; reward: { rewardCode: string; discountPct: number; maxBillAzn: number; billAmountAzn: number; discountAmountAzn: number; user: { name: string; email: string } } }
       >("/merchant/redemptions/redeem", {
         method: "POST",
-        body: JSON.stringify({ code, venueId, billAmountAzn: billAmount ? Number(billAmount) : undefined }),
+        body: JSON.stringify({ code: scannedCode, venueId, billAmountAzn: billAmount ? Number(billAmount) : undefined }),
       });
       setMessage(result.kind === "POINT_REWARD"
         ? `Points reward verified for ${result.reward.user.name || result.reward.user.email}. Apply ${result.reward.discountAmountAzn.toFixed(2)} AZN discount to the ${result.reward.billAmountAzn.toFixed(2)} AZN bill.`
@@ -232,8 +232,25 @@ function RedeemCode({ venues }: { venues: ManagedVenue[] }) {
     }
   }
 
+  function submit(event: FormEvent) {
+    event.preventDefault();
+    void redeem();
+  }
+
+  function scanned(value: string) {
+    const scannedCode = normalizeScannedCode(value);
+    setScanning(false);
+    setCode(scannedCode);
+    if (scannedCode.startsWith("GS-")) {
+      setMessage("QR scanned. Verifying visit…");
+      void redeem(scannedCode);
+    } else {
+      setMessage("Reward QR scanned. Enter the bill amount, then press Verify.");
+    }
+  }
+
   return <section className="mt-8 rounded-xl border border-cyan-300/20 bg-cyan-300/[0.07] p-5">
-    <div><p className="text-xs font-bold uppercase tracking-[.2em] text-cyan-300"><QrCode className="mr-1 inline" size={14} />Customer proof</p><h2 className="mt-1 text-xl font-semibold">Verify QR or reward code</h2><p className="mt-1 text-sm text-white/55">Verifying a customer&apos;s GS visit code unlocks one points-wheel spin for them. For a PTS reward code, also enter the bill amount.</p></div>
+    <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"><div><p className="text-xs font-bold uppercase tracking-[.2em] text-cyan-300"><QrCode className="mr-1 inline" size={14} />Customer proof</p><h2 className="mt-1 text-xl font-semibold">Verify QR or reward code</h2><p className="mt-1 text-sm text-white/55">Scan the customer&apos;s GS proof to confirm the visit automatically. Manual entry remains available. PTS rewards also need the bill amount.</p></div><button type="button" onClick={() => setScanning(true)} className="panel-button shrink-0 justify-center"><Camera size={17} />Scan QR</button></div>
     <form onSubmit={submit} className="mt-4 grid max-w-3xl gap-2 sm:grid-cols-[minmax(190px,1fr)_160px_auto]">
       {venues.length > 1 && <select value={venueId} onChange={(event) => setVenueId(event.target.value)} className="form-field sm:col-span-3">{venues.map((venue) => <option key={venue.id} value={venue.id}>{venue.name}</option>)}</select>}
       <input value={code} onChange={(event) => setCode(event.target.value.toUpperCase())} className="form-field font-mono uppercase" placeholder="GS-... or PTS-..." required />
@@ -241,7 +258,52 @@ function RedeemCode({ venues }: { venues: ManagedVenue[] }) {
       <button className="panel-button justify-center" disabled={busy}>{busy ? "Checking..." : "Verify"}</button>
     </form>
     {message && <p className="mt-3 rounded-lg border border-white/10 bg-black/20 p-3 text-sm text-white/75">{message}</p>}
+    {scanning && <QrCameraScanner onDetected={scanned} onClose={() => setScanning(false)} />}
   </section>;
+}
+
+function QrCameraScanner({ onDetected, onClose }: { onDetected: (value: string) => void; onClose: () => void }) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const detectedRef = useRef(onDetected);
+  const [cameraMessage, setCameraMessage] = useState("Point the camera at the customer’s QR code.");
+  useEffect(() => { detectedRef.current = onDetected; }, [onDetected]);
+
+  useEffect(() => {
+    let active = true;
+    let controls: { stop: () => void } | undefined;
+    void import("@zxing/browser").then(async ({ BrowserQRCodeReader }) => {
+      if (!active || !videoRef.current) return;
+      const reader = new BrowserQRCodeReader();
+      controls = await reader.decodeFromConstraints(
+        { audio: false, video: { facingMode: { ideal: "environment" } } },
+        videoRef.current,
+        (result, error, scannerControls) => {
+          if (!active || !result) return;
+          active = false;
+          scannerControls.stop();
+          detectedRef.current(result.getText());
+          if (error) console.debug("QR scan retry", error);
+        },
+      );
+    }).catch((reason: unknown) => {
+      console.error("QR camera could not start:", reason);
+      if (active) setCameraMessage("Camera access failed. Allow camera permission or enter the code manually.");
+    });
+    return () => { active = false; controls?.stop(); };
+  }, []);
+
+  return <div className="fixed inset-0 z-[220] grid place-items-center bg-black/85 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label="Scan customer QR code">
+    <section className="w-full max-w-lg overflow-hidden rounded-2xl border border-cyan-300/25 bg-[#11111a] shadow-2xl">
+      <div className="flex items-start justify-between border-b border-white/10 p-4"><div><p className="text-xs font-bold uppercase tracking-[.18em] text-cyan-300">Camera scanner</p><h2 className="mt-1 text-xl font-semibold">Scan customer proof</h2></div><button type="button" onClick={onClose} className="grid h-10 w-10 place-items-center rounded-full border border-white/10 text-white/65 hover:bg-white/10 hover:text-white" aria-label="Close scanner"><X size={19} /></button></div>
+      <div className="relative aspect-square overflow-hidden bg-black"><video ref={videoRef} autoPlay muted playsInline className="h-full w-full object-cover" /><div className="pointer-events-none absolute inset-[14%] rounded-2xl border-2 border-cyan-300 shadow-[0_0_0_999px_rgba(0,0,0,.38)]" /></div>
+      <p className="p-4 text-center text-sm text-white/60">{cameraMessage}</p>
+    </section>
+  </div>;
+}
+
+function normalizeScannedCode(value: string) {
+  const match = value.trim().toUpperCase().match(/(?:GS|PTS)-[A-Z0-9-]+/);
+  return (match?.[0] || value.trim().toUpperCase()).slice(0, 30);
 }
 
 function StatusPill({ label, tone = "neutral" }: { label: string; tone?: "neutral" | "live" | "scheduled" | "ended" }) {
