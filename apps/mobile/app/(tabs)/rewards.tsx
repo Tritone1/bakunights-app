@@ -3,7 +3,7 @@ import { useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Animated, Easing, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import Svg, { Circle, G, Path, Text as SvgText } from "react-native-svg";
+import Svg, { Circle, Path, Text as SvgText } from "react-native-svg";
 
 import { api } from "@/src/api";
 import { useAuth } from "@/src/AuthContext";
@@ -38,10 +38,7 @@ function WheelFace() {
     {POINT_VALUES.map((points, index) => {
       const label = polar(104, index * SLICE + SLICE / 2);
       const color = points === 60 ? "#17120a" : "#fff5d9";
-      return <G key={`label-${index}`}>
-        <SvgText x={label.x} y={label.y} fill={color} fontSize={points >= 50 ? 13 : 11} fontWeight="900" textAnchor="middle">{points}</SvgText>
-        <SvgText x={label.x} y={label.y + 10} fill={color} fontSize={8} fontWeight="900" textAnchor="middle">+</SvgText>
-      </G>;
+      return <SvgText key={`label-${index}`} x={label.x} y={label.y + 4} fill={color} fontSize={points >= 50 ? 13 : 11} fontWeight="900" textAnchor="middle">{points}</SvgText>;
     })}
     {POINT_VALUES.map((_, index) => {
       const light = polar(141, index * SLICE);
