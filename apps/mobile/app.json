@@ -17,7 +17,7 @@
       },
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "WhereToGo uses your location to show nearby restaurants and deals.",
-        "LSApplicationQueriesSchemes": ["bolt", "waze"]
+        "LSApplicationQueriesSchemes": ["waze"]
       }
     },
     "android": {

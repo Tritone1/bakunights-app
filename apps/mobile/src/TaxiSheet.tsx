@@ -1,7 +1,5 @@
-import * as Clipboard from "expo-clipboard";
 import { Ionicons } from "@expo/vector-icons";
-import { useState } from "react";
-import { Linking, Modal, Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { Linking, Modal, Pressable, StyleSheet, Text, View } from "react-native";
 
 import type { Venue } from "./venues";
 
@@ -11,28 +9,7 @@ type Props = {
 };
 
 export function TaxiSheet({ venue, onClose }: Props) {
-  const [copied, setCopied] = useState(false);
   if (!venue) return null;
-
-  async function copyDestination() {
-    await Clipboard.setStringAsync(`${venue?.name}, ${venue?.address}`);
-    setCopied(true);
-  }
-
-  async function openBolt() {
-    await Clipboard.setStringAsync(`${venue?.name}, ${venue?.address}`);
-    setCopied(true);
-    try {
-      await Linking.openURL("bolt://");
-    } catch {
-      const storeUrl = Platform.select({
-        ios: "https://apps.apple.com/app/bolt-request-a-ride/id675033630",
-        android: "https://play.google.com/store/apps/details?id=ee.mtakso.client",
-        default: "https://bolt.eu/",
-      });
-      await Linking.openURL(storeUrl);
-    }
-  }
 
   async function openGoogleMaps() {
     const destination = `${venue?.latitude},${venue?.longitude}`;
@@ -65,24 +42,6 @@ export function TaxiSheet({ venue, onClose }: Props) {
             <Text style={styles.address}>{venue.address}</Text>
           </View>
 
-          <View style={styles.provider}>
-            <View style={styles.providerRow}>
-              <View style={styles.boltLogo}><Text style={styles.boltText}>bolt</Text></View>
-              <View><Text style={styles.providerName}>Bolt</Text><Text style={styles.providerCaption}>Ride-hailing app</Text></View>
-            </View>
-            <Text style={styles.help}>We copy the destination and open the Bolt app. Paste it into Bolt&apos;s destination field to continue.</Text>
-            <View style={styles.actions}>
-              <Pressable onPress={copyDestination} style={styles.copyButton} accessibilityRole="button">
-                <Ionicons name={copied ? "checkmark" : "copy-outline"} color="#ffffff" size={16} />
-                <Text style={styles.copyText}>{copied ? "Copied" : "Copy destination"}</Text>
-              </Pressable>
-              <Pressable onPress={openBolt} style={styles.boltButton} accessibilityRole="button">
-                <Text style={styles.boltButtonText}>Open Bolt app</Text>
-                <Ionicons name="arrow-forward" color="#07150d" size={16} />
-              </Pressable>
-            </View>
-          </View>
-
           <View style={styles.mapsProvider}>
             <View style={styles.providerRow}>
               <View style={styles.mapsLogo}><Ionicons name="map" color="#ffffff" size={23} /></View>
@@ -104,7 +63,7 @@ export function TaxiSheet({ venue, onClose }: Props) {
               <Ionicons name="arrow-forward" color="#07151a" size={16} />
             </Pressable>
           </View>
-          <Text style={styles.disclaimer}>Your route stays in WhereToGo unless you choose one of these external apps. WhereToGo is not affiliated with either service.</Text>
+          <Text style={styles.disclaimer}>Your route stays in WhereToGo unless you choose one of these external navigation services.</Text>
         </Pressable>
       </Pressable>
     </Modal>
@@ -123,22 +82,14 @@ const styles = StyleSheet.create({
   label: { color: "#777785", fontSize: 10, fontWeight: "800", letterSpacing: 1.6 },
   venue: { color: "#ffffff", fontSize: 16, fontWeight: "700", marginTop: 8 },
   address: { color: "#8f8f9d", fontSize: 13, marginTop: 4 },
-  provider: { marginTop: 14, padding: 16, borderRadius: 18, backgroundColor: "rgba(47,223,132,0.07)", borderWidth: 1, borderColor: "rgba(47,223,132,0.25)" },
-  mapsProvider: { marginTop: 10, padding: 16, borderRadius: 18, backgroundColor: "rgba(66,133,244,0.08)", borderWidth: 1, borderColor: "rgba(66,133,244,0.3)" },
+  mapsProvider: { marginTop: 14, padding: 16, borderRadius: 18, backgroundColor: "rgba(66,133,244,0.08)", borderWidth: 1, borderColor: "rgba(66,133,244,0.3)" },
   wazeProvider: { marginTop: 10, padding: 16, borderRadius: 18, backgroundColor: "rgba(51,204,255,0.08)", borderWidth: 1, borderColor: "rgba(51,204,255,0.3)" },
   providerRow: { flexDirection: "row", alignItems: "center", gap: 12 },
-  boltLogo: { width: 46, height: 46, borderRadius: 13, backgroundColor: "#2fdf84", alignItems: "center", justifyContent: "center" },
-  boltText: { color: "#07150d", fontSize: 18, fontWeight: "900", letterSpacing: -1.5 },
   mapsLogo: { width: 46, height: 46, borderRadius: 13, backgroundColor: "#4285f4", alignItems: "center", justifyContent: "center" },
   wazeLogo: { width: 46, height: 46, borderRadius: 13, backgroundColor: "#33ccff", alignItems: "center", justifyContent: "center" },
   providerName: { color: "#ffffff", fontSize: 16, fontWeight: "700" },
   providerCaption: { color: "#8f8f9d", fontSize: 12, marginTop: 2 },
   help: { color: "#9a9aa7", fontSize: 12, lineHeight: 18, marginTop: 14 },
-  actions: { flexDirection: "row", gap: 8, marginTop: 14 },
-  copyButton: { flex: 1, minHeight: 48, borderRadius: 14, borderWidth: 1, borderColor: "rgba(255,255,255,0.12)", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7 },
-  copyText: { color: "#ffffff", fontWeight: "700", fontSize: 12 },
-  boltButton: { flex: 1, minHeight: 48, borderRadius: 14, backgroundColor: "#2fdf84", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7 },
-  boltButtonText: { color: "#07150d", fontWeight: "800", fontSize: 12 },
   mapsButton: { minHeight: 48, borderRadius: 14, backgroundColor: "#4285f4", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7, marginTop: 14 },
   mapsButtonText: { color: "#ffffff", fontWeight: "800", fontSize: 12 },
   wazeButton: { minHeight: 48, borderRadius: 14, backgroundColor: "#33ccff", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7, marginTop: 14 },

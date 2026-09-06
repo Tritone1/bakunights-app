@@ -14,6 +14,7 @@ import {
   Upload,
 } from "lucide-react";
 import { SafeImage } from "./SafeImage";
+import { NavigationOptionsDialog } from "./NavigationOptionsDialog";
 import { loadGoogleMaps } from "../lib/googleMaps";
 
 export interface Venue {
@@ -266,7 +267,8 @@ function PremiumVenueMap({ venue }: { venue: Venue }) {
   const mapId = (import.meta.env.VITE_GOOGLE_MAPS_MAP_ID as string | undefined)?.trim() || "DEMO_MAP_ID";
   const containerRef = useRef<HTMLDivElement>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "failed">("loading");
-  const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${venue.lat},${venue.lng}`;
+  const [optionsOpen, setOptionsOpen] = useState(false);
+  const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${venue.lat},${venue.lng}&travelmode=driving`;
 
   useEffect(() => {
     if (!apiKey || !containerRef.current) { setStatus("failed"); return; }
@@ -313,14 +315,20 @@ function PremiumVenueMap({ venue }: { venue: Venue }) {
   const bbox = `${venue.lng - 0.02}%2C${venue.lat - 0.012}%2C${venue.lng + 0.02}%2C${venue.lat + 0.012}`;
   const openStreetMapUrl = `https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&marker=${venue.lat}%2C${venue.lng}`;
 
-  return <div className="overflow-hidden rounded-2xl border border-white/10 bg-card">
-    <div className="relative h-60 bg-[#0d0d15]">
-      {status === "failed"
-        ? <><iframe title={`Map showing ${venue.name}`} src={openStreetMapUrl} className="dark-map h-full w-full border-0" loading="eager" referrerPolicy="no-referrer-when-downgrade" /><span className="absolute right-3 top-3 rounded-full border border-white/10 bg-black/75 px-3 py-1 text-[9px] font-bold uppercase tracking-wider text-white/70">OpenStreetMap fallback</span></>
-        : <><div ref={containerRef} className="h-full w-full" aria-label="Google map of offer venue" />{status === "loading" && <div className="absolute inset-0 grid place-items-center bg-card text-xs font-bold uppercase tracking-[.16em] text-muted">Loading Google Maps…</div>}</>}
+  return <>
+    <div className="overflow-hidden rounded-2xl border border-white/10 bg-card">
+      <div className="relative h-60 bg-[#0d0d15]">
+        {status === "failed"
+          ? <><iframe title={`Map showing ${venue.name}`} src={openStreetMapUrl} className="dark-map h-full w-full border-0" loading="eager" referrerPolicy="no-referrer-when-downgrade" /><span className="absolute right-3 top-3 rounded-full border border-white/10 bg-black/75 px-3 py-1 text-[9px] font-bold uppercase tracking-wider text-white/70">OpenStreetMap fallback</span></>
+          : <><div ref={containerRef} className="h-full w-full" aria-label="Google map of offer venue" />{status === "loading" && <div className="absolute inset-0 grid place-items-center bg-card text-xs font-bold uppercase tracking-[.16em] text-muted">Loading Google Maps…</div>}</>}
+      </div>
+      <div className="grid sm:grid-cols-2">
+        <a href={googleMapsUrl} target="_blank" rel="noreferrer" className="flex w-full items-center justify-center gap-2 bg-amber-500 px-4 py-3.5 text-sm font-extrabold text-[#09090e] transition hover:bg-amber-400"><Navigation size={17} />Open in Google Maps</a>
+        <button type="button" onClick={() => setOptionsOpen(true)} className="flex w-full items-center justify-center gap-2 border-t border-white/10 bg-cyan-300 px-4 py-3.5 text-sm font-extrabold text-[#07151a] transition hover:bg-cyan-200 sm:border-l sm:border-t-0"><Navigation size={17} />Navigation options</button>
+      </div>
     </div>
-    <a href={googleMapsUrl} target="_blank" rel="noreferrer" className="flex w-full items-center justify-center gap-2 bg-amber-500 px-4 py-3.5 text-sm font-extrabold text-[#09090e] transition hover:bg-amber-400"><Navigation size={17} />Open in Google Maps</a>
-  </div>;
+    {optionsOpen && <NavigationOptionsDialog destination={venue} onClose={() => setOptionsOpen(false)} />}
+  </>;
 }
 
 function MetaCell({ icon, iconClass, label, value, detail, valueClass = "text-white" }: { icon: React.ReactNode; iconClass: string; label: string; value: string; detail?: React.ReactNode; valueClass?: string }) {

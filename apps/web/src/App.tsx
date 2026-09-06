@@ -16,6 +16,7 @@ import { SafeImage } from "./components/SafeImage";
 import { DailyPointsWheel } from "./components/DailyPointsWheel";
 import { LanguageSwitcher } from "./components/LanguageSwitcher";
 import { Reveal } from "./components/Reveal";
+import { NavigationOptionsDialog } from "./components/NavigationOptionsDialog";
 import { ArrowLeft, Home } from "lucide-react";
 import { loadGoogleMaps } from "./lib/googleMaps";
 
@@ -513,7 +514,7 @@ function GoogleVenueMap({ venues, selected, onSelect, apiKey, mapId, userPositio
   </>;
 }
 
-function MapSection({ venues, selected, onSelect, onTaxi, userPosition, locationStatus, locationMessage, onRequestLocation, routeRequest, routeMode, onStartRoute }: { venues: Venue[]; selected: Venue; onSelect: (venue: Venue) => void; onTaxi: (venue: Venue) => void; userPosition: UserPosition | null; locationStatus: LocationStatus; locationMessage: string; onRequestLocation: () => void; routeRequest: number; routeMode: TravelMode; onStartRoute: (mode: TravelMode) => void }) {
+function MapSection({ venues, selected, onSelect, onNavigationOptions, userPosition, locationStatus, locationMessage, onRequestLocation, routeRequest, routeMode, onStartRoute }: { venues: Venue[]; selected: Venue; onSelect: (venue: Venue) => void; onNavigationOptions: (venue: Venue) => void; userPosition: UserPosition | null; locationStatus: LocationStatus; locationMessage: string; onRequestLocation: () => void; routeRequest: number; routeMode: TravelMode; onStartRoute: (mode: TravelMode) => void }) {
   const navigate = useNavigate();
   const apiKey = (import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined)?.trim() || "";
   const mapId = (import.meta.env.VITE_GOOGLE_MAPS_MAP_ID as string | undefined)?.trim() || "";
@@ -558,7 +559,7 @@ function MapSection({ venues, selected, onSelect, onTaxi, userPosition, location
             <div className="min-w-0 flex-1"><p className="truncate font-display text-lg font-semibold text-white sm:text-xl">{selected.name}</p><p className="truncate text-[10px] text-muted sm:text-xs">{selected.address}</p><p className={`mt-1 truncate text-[10px] font-semibold sm:text-xs ${routeState.status === "failed" ? "text-red-300" : routeState.status === "active" ? "text-cyan-300" : "text-gold"}`}>{routeDescription}</p></div>
             <div className="flex shrink-0 flex-col gap-2 sm:flex-row">
               <button type="button" onClick={() => setModeChooserOpen(true)} disabled={routeState.status === "loading"} className="inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-xl bg-cyan-300 px-3 text-[11px] font-black text-[#07151a] transition hover:bg-cyan-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-200 disabled:cursor-wait disabled:opacity-75" aria-label={`Choose in-app route to ${selected.name}`}><Icon name="location" size={15} />{routeButtonLabel}</button>
-              <button type="button" onClick={() => onTaxi(selected)} className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/[0.07] px-3 text-[11px] font-black text-white transition hover:border-white/30 hover:bg-white/[0.12]" aria-label={`Other navigation options for ${selected.name}`}><Icon name="car" size={15} />Other options</button>
+              <button type="button" onClick={() => onNavigationOptions(selected)} className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/[0.07] px-3 text-[11px] font-black text-white transition hover:border-white/30 hover:bg-white/[0.12]" aria-label={`Other navigation options for ${selected.name}`}><Icon name="car" size={15} />Other options</button>
             </div>
           </div>
         </div>
@@ -578,87 +579,6 @@ function MapSection({ venues, selected, onSelect, onTaxi, userPosition, location
       </section>
     </div>}
   </section>;
-}
-
-function TaxiSheet({ venue, onClose }: { venue: Venue; onClose: () => void }) {
-  const [copyState, setCopyState] = useState<"idle" | "copied" | "failed">("idle");
-  const destination = `${venue.name}, ${venue.address}`;
-  const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${venue.lat},${venue.lng}&travelmode=driving`;
-  const wazeUrl = `https://waze.com/ul?ll=${venue.lat}%2C${venue.lng}&navigate=yes&zoom=17&utm_source=wheretogo`;
-
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => { if (event.key === "Escape") onClose(); };
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    window.addEventListener("keydown", onKeyDown);
-    return () => {
-      document.body.style.overflow = previousOverflow;
-      window.removeEventListener("keydown", onKeyDown);
-    };
-  }, [onClose]);
-
-  async function copyDestination() {
-    try {
-      await navigator.clipboard.writeText(destination);
-      setCopyState("copied");
-    } catch {
-      setCopyState("failed");
-    }
-  }
-
-  async function openBoltApp() {
-    try {
-      await navigator.clipboard.writeText(destination);
-      setCopyState("copied");
-    } catch {
-      setCopyState("failed");
-    }
-
-    const isAndroid = /Android/i.test(navigator.userAgent);
-    const fallbackUrl = isAndroid
-      ? "https://play.google.com/store/apps/details?id=ee.mtakso.client"
-      : "https://apps.apple.com/app/bolt-request-a-ride/id675033630";
-    let leftPage = false;
-    const markHidden = () => {
-      if (document.visibilityState === "hidden") leftPage = true;
-    };
-    document.addEventListener("visibilitychange", markHidden, { once: true });
-    window.location.href = "bolt://";
-    window.setTimeout(() => {
-      document.removeEventListener("visibilitychange", markHidden);
-      if (!leftPage && document.visibilityState === "visible") window.location.href = fallbackUrl;
-    }, 1600);
-  }
-
-  return <div className="fixed inset-0 z-[80] flex items-end justify-center bg-black/70 p-0 backdrop-blur-sm sm:items-center sm:p-5" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
-    <section role="dialog" aria-modal="true" aria-labelledby="taxi-title" className="w-full max-w-lg rounded-t-3xl border border-white/10 bg-[#12121a] p-5 shadow-2xl sm:rounded-3xl sm:p-7">
-      <div className="flex items-start justify-between gap-4">
-        <div><p className="text-[10px] font-bold uppercase tracking-[.2em] text-[#2fdf84]">Optional external apps</p><h2 id="taxi-title" className="mt-1 font-display text-3xl font-semibold text-white">Other navigation options</h2></div>
-        <button type="button" onClick={onClose} className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-white/10 text-muted transition hover:text-white" aria-label="Close navigation options"><Icon name="close" /></button>
-      </div>
-      <div className="mt-6 rounded-2xl border border-white/[0.08] bg-white/[0.035] p-4">
-        <p className="text-[10px] font-bold uppercase tracking-[.16em] text-muted">Destination</p>
-        <p className="mt-2 font-semibold text-white">{venue.name}</p><p className="mt-1 text-sm text-muted">{venue.address}</p>
-      </div>
-      <div className="mt-4 rounded-2xl border border-[#2fdf84]/25 bg-[#2fdf84]/[0.07] p-4">
-        <div className="flex items-center gap-3"><span className="grid h-11 w-11 place-items-center rounded-xl bg-[#2fdf84] text-lg font-black tracking-[-.08em] text-[#07150d]">bolt</span><div><p className="font-semibold text-white">Bolt</p><p className="text-xs text-white/50">Ride-hailing partner app</p></div></div>
-        <p className="mt-4 text-xs leading-5 text-white/55">We copy the destination and open the Bolt app. Paste it into Bolt&apos;s destination field to continue.</p>
-        <div className="mt-4 grid grid-cols-2 gap-2">
-          <button type="button" onClick={copyDestination} className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 px-3 py-3 text-xs font-bold text-white transition hover:border-white/25"><Icon name="copy" size={15} />{copyState === "copied" ? "Copied" : copyState === "failed" ? "Copy failed" : "Copy destination"}</button>
-          <button type="button" onClick={() => void openBoltApp()} className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#2fdf84] px-3 py-3 text-xs font-bold text-[#07150d] transition hover:bg-[#5bed9b]">Open Bolt app<Icon name="arrow" size={15} /></button>
-        </div>
-      </div>
-      <div className="mt-3 rounded-2xl border border-[#4285f4]/25 bg-[#4285f4]/[0.07] p-4">
-        <div className="flex items-center gap-3"><span className="grid h-11 w-11 place-items-center rounded-xl bg-[#4285f4] text-white"><Icon name="pin" size={21} /></span><div><p className="font-semibold text-white">Google Maps</p><p className="text-xs text-white/50">Turn-by-turn driving directions</p></div></div>
-        <a href={googleMapsUrl} target="_blank" rel="noreferrer" className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#4285f4] px-3 py-3 text-xs font-bold text-white transition hover:bg-[#5a95f5]">Open Google Maps<Icon name="arrow" size={15} /></a>
-      </div>
-      <div className="mt-3 rounded-2xl border border-[#33ccff]/25 bg-[#33ccff]/[0.07] p-4">
-        <div className="flex items-center gap-3"><span className="grid h-11 w-11 place-items-center rounded-xl bg-[#33ccff] text-[#07151a]"><Icon name="car" size={21} /></span><div><p className="font-semibold text-white">Waze</p><p className="text-xs text-white/50">Destination ready in the Waze app</p></div></div>
-        <a href={wazeUrl} className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#33ccff] px-3 py-3 text-xs font-bold text-[#07151a] transition hover:bg-[#66dcff]">Open destination in Waze<Icon name="arrow" size={15} /></a>
-      </div>
-      <p className="mt-4 text-center text-[10px] leading-4 text-white/35">Your route stays in WhereToGo unless you choose one of these external apps.</p>
-    </section>
-  </div>;
 }
 
 function useUserLocation() {
@@ -798,7 +718,7 @@ function ConsumerApp() {
   const [dataLoading, setDataLoading] = useState(true);
   const [dataError, setDataError] = useState("");
   const [selectedVenue, setSelectedVenue] = useState<Venue | null>(null);
-  const [taxiVenue, setTaxiVenue] = useState<Venue | null>(null);
+  const [navigationVenue, setNavigationVenue] = useState<Venue | null>(null);
   const [routeRequest, setRouteRequest] = useState(0);
   const [routeMode, setRouteMode] = useState<TravelMode>("driving");
   const { userPosition, locationStatus, locationMessage, requestLocation } = useUserLocation();
@@ -849,10 +769,10 @@ function ConsumerApp() {
       <Reveal><DailyPointsWheel /></Reveal>
       <Reveal><FlashDeals deals={deals} loading={dataLoading} /></Reveal>
       <Reveal><VenueDirectory venues={venues} query={query} setQuery={setQuery} onNavigate={navigateInApp} origin={feedPosition} /></Reveal>
-      <Reveal>{selectedVenue ? <MapSection venues={venues} selected={selectedVenue} onSelect={setSelectedVenue} onTaxi={setTaxiVenue} userPosition={feedPosition} locationStatus={locationStatus} locationMessage={locationMessage} onRequestLocation={requestLocation} routeRequest={routeRequest} routeMode={routeMode} onStartRoute={startRoute} /> : <section id="map" className="border-y border-white/[0.07] bg-[#0c0c14] py-20"><div className="mx-auto max-w-[1400px] px-5 text-center text-muted">No active venues are available to show on the map.</div></section>}</Reveal>
+      <Reveal>{selectedVenue ? <MapSection venues={venues} selected={selectedVenue} onSelect={setSelectedVenue} onNavigationOptions={setNavigationVenue} userPosition={feedPosition} locationStatus={locationStatus} locationMessage={locationMessage} onRequestLocation={requestLocation} routeRequest={routeRequest} routeMode={routeMode} onStartRoute={startRoute} /> : <section id="map" className="border-y border-white/[0.07] bg-[#0c0c14] py-20"><div className="mx-auto max-w-[1400px] px-5 text-center text-muted">No active venues are available to show on the map.</div></section>}</Reveal>
     </main>
     <footer className="px-5 py-9 text-center text-[11px] text-muted"><p>© {new Date().getFullYear()} WhereToGo · Great food. Great deals. Every day.</p></footer>
-    {taxiVenue && <TaxiSheet venue={taxiVenue} onClose={() => setTaxiVenue(null)} />}
+    {navigationVenue && <NavigationOptionsDialog destination={navigationVenue} onClose={() => setNavigationVenue(null)} />}
     {locationPickerOpen && <LocationPickerModal apiKey={mapsApiKey} detectedPosition={userPosition} currentPosition={feedPosition} onClose={() => setLocationPickerOpen(false)} onConfirm={(position, label) => { setManualPosition(position); setLocationLabel(label); setLocationPickerOpen(false); }} />}
   </div>;
 }
