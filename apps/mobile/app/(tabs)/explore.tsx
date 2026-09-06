@@ -21,10 +21,13 @@ export default function MapScreen() {
   const locationAllowed = Boolean(coords);
 
   useEffect(() => {
-    setSelected(initialVenue ?? null);
-    setNavigationActive(Boolean(initialVenue) && params.navigate === "1");
-    if (!initialVenue) return;
-    mapRef.current?.animateToRegion({ latitude: initialVenue.latitude, longitude: initialVenue.longitude, latitudeDelta: 0.025, longitudeDelta: 0.025 }, 500);
+    const timer = setTimeout(() => {
+      setSelected(initialVenue ?? null);
+      setNavigationActive(Boolean(initialVenue) && params.navigate === "1");
+      if (!initialVenue) return;
+      mapRef.current?.animateToRegion({ latitude: initialVenue.latitude, longitude: initialVenue.longitude, latitudeDelta: 0.025, longitudeDelta: 0.025 }, 500);
+    }, 0);
+    return () => clearTimeout(timer);
   }, [initialVenue, params.navigate]);
 
   useEffect(() => {

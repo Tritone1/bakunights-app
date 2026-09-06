@@ -24,7 +24,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     finally { setLoading(false); }
   }
 
-  useEffect(() => { void refresh(); }, []);
+  useEffect(() => {
+    const timer = setTimeout(() => void refresh(), 0);
+    return () => clearTimeout(timer);
+  }, []);
 
   async function login(email: string, password: string, expectedRole: MobileUser["role"]) {
     const result = await api<{ user: MobileUser }>("/auth/login", { method: "POST", body: JSON.stringify({ email, password, expectedRole }) });

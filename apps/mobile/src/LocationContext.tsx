@@ -62,11 +62,12 @@ export function LocationProvider({ children }: { children: ReactNode }) {
   }, [startWatching, stopWatching]);
 
   useEffect(() => {
-    void syncLocation(true);
+    const startupTimer = setTimeout(() => void syncLocation(true), 0);
     const appStateSubscription = AppState.addEventListener("change", (state) => {
       if (state === "active") void syncLocation(false);
     });
     return () => {
+      clearTimeout(startupTimer);
       appStateSubscription.remove();
       stopWatching();
     };
