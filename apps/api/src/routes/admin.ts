@@ -5,6 +5,7 @@ import { asyncRoute, HttpError } from "../lib/http.js";
 import { requireAdmin } from "../middleware/auth.js";
 import { recomputeVenueTrust } from "../lib/trust.js";
 import { persistImage } from "../lib/image-storage.js";
+import { syncDealTranslationsBestEffort } from "../lib/deal-translation.js";
 
 export const adminRouter = Router();
 const imageValue = z.string().trim().max(3_000_000).refine((value) => /^https?:\/\//i.test(value) || /^data:image\/(jpeg|png|webp);base64,/i.test(value), "Use an image URL or uploaded image");
@@ -207,6 +208,7 @@ adminRouter.post("/deals", asyncRoute(async (req, res) => {
       reviewedAt: now,
     },
   });
+  await syncDealTranslationsBestEffort(deal.id, deal);
   await audit(req.user!.id, "deal_auto_approved", "deal", deal.id, "Admin-created deal");
   res.status(201).json({ deal });
 }));
@@ -218,6 +220,9 @@ adminRouter.patch("/deals/:id", asyncRoute(async (req, res) => {
     where: { id: dealId },
     data: { ...input, photoUrl: input.photoUrl === undefined ? undefined : await persistImage(input.photoUrl, "offers"), status: "approved", isActive: true, reviewedByUserId: req.user!.id, reviewedAt: new Date(), reviewNotes: null },
   });
+  if (input.title !== undefined || input.description !== undefined) {
+    await syncDealTranslationsBestEffort(deal.id, { title: deal.title, description: deal.description });
+  }
   await audit(req.user!.id, "deal_auto_approved", "deal", deal.id, "Admin saved deal");
   res.json({ deal });
 }));

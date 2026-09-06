@@ -3,6 +3,7 @@ import { CheckCircle2, ExternalLink, Heart, MapPin, Navigation, Star } from "luc
 import { useLocation, useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
+import { useLanguage } from "../context/LanguageContext";
 import { DealCard } from "../components/DealCard";
 import { ErrorState, LoadingState } from "../components/States";
 import { SafeImage } from "../components/SafeImage";
@@ -21,6 +22,7 @@ export function VenuePage() {
   const id = pathname.match(/^\/venues\/([^/]+)$/)?.[1];
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { language } = useLanguage();
   const [data, setData] = useState<DetailResponse | null>(null);
   const [reviews, setReviews] = useState<ReviewsResponse | null>(null);
   const [reviewError, setReviewError] = useState("");
@@ -30,16 +32,16 @@ export function VenuePage() {
 
   const load = useCallback(async () => {
     if (!id) return;
-    try { setData(await api<DetailResponse>(`/restaurants/${id}`)); setError(""); }
+    try { setData(await api<DetailResponse>(`/restaurants/${id}?lang=${language}`)); setError(""); }
     catch (reason) { setError(reason instanceof Error ? reason.message : "Could not load venue"); }
-  }, [id]);
+  }, [id, language]);
 
   useEffect(() => { void load(); }, [load]);
   useEffect(() => {
     if (!id) return;
-    api<ReviewsResponse>(`/restaurants/${id}/reviews`).then((result) => { setReviews(result); setReviewError(""); })
+    api<ReviewsResponse>(`/restaurants/${id}/reviews?lang=${language}`).then((result) => { setReviews(result); setReviewError(""); })
       .catch((reason) => setReviewError(reason instanceof Error ? reason.message : "Google reviews are temporarily unavailable."));
-  }, [id]);
+  }, [id, language]);
 
   function requireCustomer() {
     if (user) return true;

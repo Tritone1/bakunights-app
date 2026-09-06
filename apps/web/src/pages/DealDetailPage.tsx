@@ -4,6 +4,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { OfferDetailPage, type OfferPhoto, type Venue } from "../components/OfferDetailPage";
 import { ErrorState, LoadingState } from "../components/States";
 import { useAuth } from "../context/AuthContext";
+import { useLanguage } from "../context/LanguageContext";
 import { api } from "../lib/api";
 import type { Deal, Redemption } from "../types";
 
@@ -14,14 +15,15 @@ export function DealDetailPage() {
   const id = pathname.match(/^\/deals\/([^/]+)$/)?.[1];
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { language } = useLanguage();
   const [data, setData] = useState<DetailResponse | null>(null);
   const [error, setError] = useState("");
 
   const load = useCallback(async () => {
     if (!id) return;
-    try { setData(await api<DetailResponse>(`/deals/${id}`)); setError(""); }
+    try { setData(await api<DetailResponse>(`/deals/${id}?lang=${language}`)); setError(""); }
     catch (reason) { setError(reason instanceof Error ? reason.message : "Could not load offer"); }
-  }, [id]);
+  }, [id, language]);
 
   useEffect(() => { void load(); }, [load]);
   const presentation = useMemo(() => data ? toOfferPresentation(data.deal) : null, [data]);
@@ -125,6 +127,7 @@ function toOfferPresentation(deal: Deal): { venue: Venue; photos: OfferPhoto[] }
       lat: restaurant.lat,
       lng: restaurant.lng,
       priceRange,
+      isMachineTranslated: deal.isMachineTranslated,
     },
     photos,
   };

@@ -146,6 +146,8 @@ model Deal {
   restaurant        Restaurant        @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
   title             String
   description       String
+  sourceLanguage    String?           @map("source_language")
+  translations      Json?
   menuItem          String?           @map("menu_item")
   photoUrl          String?           @map("photo_url") @db.Text
   scope             OfferScope        @default(WHOLE_MENU)

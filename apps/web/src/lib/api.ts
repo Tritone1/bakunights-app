@@ -9,10 +9,12 @@ export class ApiError extends Error {
 export async function api<T = unknown>(endpoint: string, options?: RequestInit): Promise<T> {
   const headers = new Headers(options?.headers);
   if (!(options?.body instanceof FormData) && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
+  const language = document.documentElement.dataset.language || document.documentElement.lang || "en";
+  headers.set("X-App-Language", language);
   const response = await fetch(`${apiUrl}${endpoint}`, {
+    ...options,
     credentials: "include",
     headers,
-    ...options,
   });
 
   if (!response.ok) {

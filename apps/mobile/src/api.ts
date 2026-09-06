@@ -13,6 +13,8 @@ export class ApiError extends Error {
 export async function api<T = unknown>(endpoint: string, options?: RequestInit): Promise<T> {
   const headers = new Headers(options?.headers);
   if (!(options?.body instanceof FormData) && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
+  const locale = Intl.DateTimeFormat().resolvedOptions().locale.toLowerCase();
+  headers.set("X-App-Language", locale.startsWith("az") ? "az" : locale.startsWith("ru") ? "ru" : "en");
   const response = await fetch(`${apiUrl}${endpoint}`, { ...options, headers, credentials: "include" });
   if (!response.ok) {
     const payload = await response.json().catch(() => ({ error: `API Error: ${response.status}` })) as Record<string, unknown>;

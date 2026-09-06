@@ -8,6 +8,7 @@ import { DealMap } from "../components/DealMap";
 import { EmptyState, ErrorState, LoadingState } from "../components/States";
 import { LocationDialog } from "../components/LocationDialog";
 import { useAuth } from "../context/AuthContext";
+import { useLanguage } from "../context/LanguageContext";
 import { useNavigate } from "react-router-dom";
 
 type Location = { lat: number; lng: number; label: string };
@@ -35,12 +36,14 @@ export function FeedPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const { user } = useAuth();
+  const { language } = useLanguage();
   const navigate = useNavigate();
 
   const loadDeals = useCallback(async () => {
     try {
       setLoading(true); setError("");
       const params = new URLSearchParams({ lat: String(location.lat), lng: String(location.lng), radius: String(filters.radius), minDiscount: String(filters.minDiscount), sort: filters.sort });
+      params.set("lang", language);
       if (filters.cuisine) params.set("cuisine", filters.cuisine);
       if (filters.dietary) params.set("dietary", filters.dietary);
       if (filters.endingSoon) params.set("endingSoon", "true");
@@ -48,7 +51,7 @@ export function FeedPage() {
       setDeals(result.deals); setCuisines(result.cuisines);
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Unknown error"); }
     finally { setLoading(false); }
-  }, [location, filters]);
+  }, [location, filters, language]);
 
   useEffect(() => { void loadDeals(); }, [loadDeals]);
   useEffect(() => {

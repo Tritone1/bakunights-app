@@ -35,6 +35,7 @@ export interface Venue {
   lat: number;
   lng: number;
   priceRange: string;
+  isMachineTranslated?: boolean;
 }
 
 export interface OfferPhoto {
@@ -192,6 +193,7 @@ export function OfferDetailPage({
           </div>
           <h1 className="font-display text-3xl font-semibold leading-tight text-white sm:text-4xl">{venue.name}</h1>
           <p className="mt-1.5 text-sm leading-5 text-[#b3b3c8] sm:text-base sm:leading-6">{venue.deal}</p>
+          {venue.isMachineTranslated && <p className="mt-2 text-[10px] font-bold uppercase tracking-[.16em] text-amber-300/80">Automatically translated</p>}
         </div>
       </div>
     </section>

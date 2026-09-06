@@ -6,6 +6,7 @@ import { requireAuth, requireMerchant } from "../middleware/auth.js";
 import multer from "multer";
 import { env } from "../env.js";
 import { persistImage } from "../lib/image-storage.js";
+import { syncDealTranslationsBestEffort } from "../lib/deal-translation.js";
 
 export const merchantRouter = Router();
 const venueType = z.enum(["Restaurant", "Pub", "Bar", "Lounge", "Cafe"]);
@@ -455,6 +456,7 @@ merchantRouter.post("/deals", asyncRoute(async (req, res) => {
       reviewNotes: "Published automatically. Admin monitoring only.",
     },
   });
+  await syncDealTranslationsBestEffort(deal.id, deal);
   res.status(201).json({ deal });
 }));
 
@@ -492,6 +494,9 @@ merchantRouter.patch("/deals/:id", asyncRoute(async (req, res) => {
       },
     });
   });
+  if (input.title !== undefined || input.description !== undefined) {
+    await syncDealTranslationsBestEffort(deal.id, { title: deal.title, description: deal.description });
+  }
   res.json({ deal });
 }));
 

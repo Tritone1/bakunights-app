@@ -3,13 +3,14 @@ import { Link } from "react-router-dom";
 import { Bookmark } from "lucide-react";
 import { api } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
+import { useLanguage } from "../context/LanguageContext";
 import type { Deal } from "../types";
 import { DealCard } from "../components/DealCard";
 import { EmptyState, ErrorState, LoadingState } from "../components/States";
 
 export function SavedPage() {
-  const { user, loading: authLoading } = useAuth(); const [deals, setDeals] = useState<Deal[]>([]); const [loading, setLoading] = useState(true); const [error, setError] = useState("");
-  const load = useCallback(async () => { if (!user) { setLoading(false); return; } try { setLoading(true); setDeals((await api<{ deals: Deal[] }>("/users/me/saved")).deals); setError(""); } catch (reason) { setError(reason instanceof Error ? reason.message : "Could not load saves"); } finally { setLoading(false); } }, [user]);
+  const { user, loading: authLoading } = useAuth(); const { language } = useLanguage(); const [deals, setDeals] = useState<Deal[]>([]); const [loading, setLoading] = useState(true); const [error, setError] = useState("");
+  const load = useCallback(async () => { if (!user) { setLoading(false); return; } try { setLoading(true); setDeals((await api<{ deals: Deal[] }>(`/users/me/saved?lang=${language}`)).deals); setError(""); } catch (reason) { setError(reason instanceof Error ? reason.message : "Could not load saves"); } finally { setLoading(false); } }, [language, user]);
   useEffect(() => { void load(); }, [load]);
   async function remove(deal: Deal) { setDeals((items) => items.filter((item) => item.id !== deal.id)); await api(`/deals/${deal.id}/save`, { method: "DELETE" }).catch(() => void load()); }
   if (authLoading || loading) return <LoadingState />;

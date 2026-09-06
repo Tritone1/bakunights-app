@@ -11,6 +11,7 @@ import { SavedPage } from "./pages/SavedPage";
 import { VenuePage } from "./pages/VenuePage";
 import { api } from "./lib/api";
 import { useAuth } from "./context/AuthContext";
+import { useLanguage } from "./context/LanguageContext";
 import type { Deal } from "./types";
 import { SafeImage } from "./components/SafeImage";
 import { DailyPointsWheel } from "./components/DailyPointsWheel";
@@ -266,14 +267,15 @@ function VenueCard({ venue, saved, onToggleSave, onNavigate }: { venue: Venue; s
 
 function VenueDirectory({ venues, query, setQuery, onNavigate, origin }: { venues: Venue[]; query: string; setQuery: (value: string) => void; onNavigate: (venue: Venue) => void; origin: UserPosition | null }) {
   const { user } = useAuth();
+  const { language } = useLanguage();
   const navigate = useNavigate();
   const [category, setCategory] = useState<CategoryFilter>("All");
   const [saved, setSaved] = useState<Set<string>>(new Set());
   const [saveNotice, setSaveNotice] = useState("");
   useEffect(() => {
     if (!user) { setSaved(new Set()); return; }
-    api<{ deals: Deal[] }>("/users/me/saved").then(({ deals }) => setSaved(new Set(deals.map((deal) => deal.id)))).catch(() => setSaveNotice("Saved deals could not be loaded."));
-  }, [user]);
+    api<{ deals: Deal[] }>(`/users/me/saved?lang=${language}`).then(({ deals }) => setSaved(new Set(deals.map((deal) => deal.id)))).catch(() => setSaveNotice("Saved deals could not be loaded."));
+  }, [language, user]);
   const filtered = useMemo(() => {
     const search = query.trim().toLowerCase();
     return venues
@@ -725,6 +727,7 @@ function ConsumerApp() {
   const [locationPickerOpen, setLocationPickerOpen] = useState(false);
   const [manualPosition, setManualPosition] = useState<UserPosition | null>(null);
   const [locationLabel, setLocationLabel] = useState("Baku, AZ");
+  const { language } = useLanguage();
   const feedPosition = manualPosition || userPosition;
   const mapsApiKey = (import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined)?.trim() || "";
   const venues = useMemo(() => restaurants.map((restaurant) => toVenue(restaurant, feedPosition)), [restaurants, feedPosition]);
@@ -735,16 +738,16 @@ function ConsumerApp() {
     const lat = feedPosition?.lat ?? 40.3719;
     const lng = feedPosition?.lng ?? 49.8412;
     Promise.all([
-      api<{ restaurants: HomepageRestaurant[] }>("/restaurants"),
+      api<{ restaurants: HomepageRestaurant[] }>(`/restaurants?lang=${language}`),
       api<{ stats: HomepageStats }>("/restaurants/stats/home"),
-      api<{ deals: Deal[] }>(`/deals?lat=${lat}&lng=${lng}&radius=100&all=true&sort=ending`),
+      api<{ deals: Deal[] }>(`/deals?lat=${lat}&lng=${lng}&radius=100&all=true&sort=ending&lang=${language}`),
     ]).then(([venueData, statsData, dealData]) => {
       if (cancelled) return;
       setRestaurants(venueData.restaurants); setStats(statsData.stats); setDeals(dealData.deals); setDataError("");
     }).catch((reason) => { if (!cancelled) setDataError(reason instanceof Error ? reason.message : "Could not load homepage data"); })
       .finally(() => { if (!cancelled) setDataLoading(false); });
     return () => { cancelled = true; };
-  }, [feedPosition?.lat, feedPosition?.lng]);
+  }, [feedPosition?.lat, feedPosition?.lng, language]);
 
   useEffect(() => {
     setSelectedVenue((current) => venues.find((venue) => venue.id === current?.id) ?? venues[0] ?? null);

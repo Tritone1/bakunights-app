@@ -6,6 +6,7 @@ import { z } from "zod";
 import { prisma } from "../db.js";
 import { asyncRoute, HttpError } from "../lib/http.js";
 import { requireAuth } from "../middleware/auth.js";
+import { getOfferLanguage, localizeDeal } from "../lib/deal-translation.js";
 
 export const usersRouter = Router();
 usersRouter.use(requireAuth);
@@ -140,13 +141,15 @@ usersRouter.get("/me/saved", asyncRoute(async (req, res) => {
     orderBy: { savedAt: "desc" },
     include: { deal: { include: { restaurant: true, ratings: { select: { value: true } } } } },
   });
-  res.json({ deals: rows.map(({ deal, savedAt }) => ({
-    ...deal,
-    savedAt,
-    dealRating: deal.ratings.length
-      ? deal.ratings.reduce((sum, rating) => sum + rating.value, 0) / deal.ratings.length : null,
-    ratings: undefined,
-  })) });
+  res.json({ deals: rows.map(({ deal, savedAt }) => {
+    const { ratings, ...rest } = deal;
+    return {
+      ...localizeDeal(rest, getOfferLanguage(req)),
+      savedAt,
+      dealRating: ratings.length
+        ? ratings.reduce((sum, rating) => sum + rating.value, 0) / ratings.length : null,
+    };
+  }) });
 }));
 
 usersRouter.get("/me/redemptions", asyncRoute(async (req, res) => {

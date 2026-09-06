@@ -4,6 +4,7 @@ import { prisma } from "../db.js";
 import { asyncRoute, HttpError } from "../lib/http.js";
 import { requireAuth } from "../middleware/auth.js";
 import { env } from "../env.js";
+import { getOfferLanguage, localizeDeal, type OfferLanguage } from "../lib/deal-translation.js";
 
 export const restaurantsRouter = Router();
 
@@ -14,10 +15,10 @@ function assertGooglePlacesConfigured() {
   if (!env.GOOGLE_MAPS_SERVER_API_KEY) throw new HttpError(503, "Google reviews are not configured yet.");
 }
 
-function serializeLiveDeal(deal: any) {
+function serializeLiveDeal(deal: any, language: OfferLanguage) {
   const { ratings, ...rest } = deal;
   return {
-    ...rest,
+    ...localizeDeal(rest, language),
     dealRating: ratings.length ? ratings.reduce((sum: number, rating: { value: number }) => sum + rating.value, 0) / ratings.length : null,
     ratingCount: ratings.length,
   };
@@ -124,12 +125,7 @@ restaurantsRouter.get("/", asyncRoute(async (req, res) => {
     const deal = deals[0];
     return {
       ...restaurant,
-      liveDeal: deal ? {
-        ...deal,
-        dealRating: deal.ratings.length ? deal.ratings.reduce((sum, rating) => sum + rating.value, 0) / deal.ratings.length : null,
-        ratingCount: deal.ratings.length,
-        ratings: undefined,
-      } : null,
+      liveDeal: deal ? serializeLiveDeal(deal, getOfferLanguage(req)) : null,
     };
   }) });
 }));
@@ -186,7 +182,7 @@ restaurantsRouter.get("/:id", asyncRoute(async (req, res) => {
     prisma.savedDeal.findMany({ where: { userId: req.user.id, dealId: { in: dealIds } }, select: { dealId: true } }),
   ]) : [null, []];
   res.json({
-    restaurant: { ...publicRestaurant, menuCategories: categories, deals: deals.map(serializeLiveDeal) },
+    restaurant: { ...publicRestaurant, menuCategories: categories, deals: deals.map((deal) => serializeLiveDeal(deal, getOfferLanguage(req))) },
     followed: Boolean(followed),
     savedDealIds: savedRows.map((row) => row.dealId),
   });

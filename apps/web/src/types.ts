@@ -25,6 +25,9 @@ export type Deal = {
   id: string;
   title: string;
   description: string;
+  sourceLanguage?: string | null;
+  contentLanguage?: "en" | "az" | "ru" | string | null;
+  isMachineTranslated?: boolean;
   menuItem?: string | null;
   photoUrl?: string | null;
   scope?: "WHOLE_MENU" | "CATEGORY" | "SPECIFIC_ITEMS";

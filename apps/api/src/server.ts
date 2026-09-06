@@ -24,6 +24,7 @@ import { sendSavedDealExpiryNotifications } from "./lib/push.js";
 import { recomputeAllVenueTrust } from "./lib/trust.js";
 import { isImageStorageConfigured } from "./lib/image-storage.js";
 import { isEmailDeliveryConfigured } from "./lib/email.js";
+import { backfillDealTranslations, translationConfigured } from "./lib/deal-translation.js";
 
 const app = express();
 const PgSession = connectPgSimple(session);
@@ -117,6 +118,7 @@ const server = app.listen(env.PORT, env.API_HOST, () => {
   if (!env.GOOGLE_MAPS_SERVER_API_KEY) console.warn("[configuration] GOOGLE_MAPS_SERVER_API_KEY is unset; server-side place search is disabled.");
   if (!isImageStorageConfigured()) console.warn("[configuration] Cloudinary is unset; uploaded images use the persistent PostgreSQL fallback.");
   if (!isEmailDeliveryConfigured()) console.warn("[configuration] Gmail verification delivery is disabled; configure the Gmail API OAuth variables.");
+  if (!translationConfigured()) console.warn("[configuration] GOOGLE_TRANSLATE_API_KEY is unset; merchant offer text will not be translated.");
 });
 
 async function expireStaleDeals() {
@@ -128,6 +130,7 @@ async function expireStaleDeals() {
 void expireStaleDeals().catch(console.error);
 const expiryTimer = setInterval(() => void expireStaleDeals().catch(console.error), 15 * 60 * 1000);
 void recomputeAllVenueTrust().catch(console.error);
+void backfillDealTranslations().catch((error) => console.error("[translation] Backfill failed:", error));
 const trustTimer = setInterval(() => void recomputeAllVenueTrust().catch(console.error), 24 * 60 * 60 * 1000);
 
 async function shutdown() {

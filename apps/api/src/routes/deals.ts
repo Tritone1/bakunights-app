@@ -7,6 +7,7 @@ import { requireAuth } from "../middleware/auth.js";
 import QRCode from "qrcode";
 import type { Prisma } from "@prisma/client";
 import { recomputeVenueTrust } from "../lib/trust.js";
+import { getOfferLanguage, localizeDeal } from "../lib/deal-translation.js";
 
 export const dealsRouter = Router();
 
@@ -32,13 +33,13 @@ const include = {
 
 type IncludedDeal = Prisma.DealGetPayload<{ include: typeof include }>;
 
-function serializeDeal(deal: IncludedDeal, lat?: number, lng?: number) {
+function serializeDeal(deal: IncludedDeal, language: ReturnType<typeof getOfferLanguage>, lat?: number, lng?: number) {
   const { ratings: ratingValues, ...rest } = deal;
   const dealRating = ratingValues.length
     ? ratingValues.reduce((sum, item) => sum + item.value, 0) / ratingValues.length
     : null;
   return {
-    ...rest,
+    ...localizeDeal(rest, language),
     dealRating,
     ratingCount: ratingValues.length,
     distanceMiles: lat !== undefined && lng !== undefined
@@ -49,6 +50,7 @@ function serializeDeal(deal: IncludedDeal, lat?: number, lng?: number) {
 
 dealsRouter.get("/", asyncRoute(async (req, res) => {
   const query = feedQuery.parse(req.query);
+  const language = getOfferLanguage(req);
   const now = new Date();
   const deals = await prisma.deal.findMany({
     where: {
@@ -68,7 +70,7 @@ dealsRouter.get("/", asyncRoute(async (req, res) => {
   });
 
   const visible = deals
-    .map((deal) => serializeDeal(deal, query.lat, query.lng))
+    .map((deal) => serializeDeal(deal, language, query.lat, query.lng))
     .filter((deal) => query.all === "true" || (deal.distanceMiles ?? Infinity) <= query.radius);
 
   visible.sort((a, b) => {
@@ -100,7 +102,7 @@ dealsRouter.get("/:id", asyncRoute(async (req, res) => {
     include: { feedback: true },
   }) : null;
   const redemptionWithQr = redemption ? { ...redemption, qrDataUrl: await QRCode.toDataURL(redemption.redemptionCode, { width: 320, margin: 2 }) } : null;
-  res.json({ deal: serializeDeal(deal), saved, followed, redemption: redemptionWithQr });
+  res.json({ deal: serializeDeal(deal, getOfferLanguage(req)), saved, followed, redemption: redemptionWithQr });
 }));
 
 dealsRouter.put("/:id/save", requireAuth, asyncRoute(async (req, res) => {
