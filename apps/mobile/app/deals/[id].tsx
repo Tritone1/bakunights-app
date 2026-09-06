@@ -1,13 +1,14 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Image, Linking, Pressable, ScrollView, Share, StyleSheet, Text, View, type LayoutChangeEvent, type NativeScrollEvent, type NativeSyntheticEvent } from "react-native";
+import { ActivityIndicator, Image, Linking, Pressable, ScrollView, Share, StyleSheet, View, type LayoutChangeEvent, type NativeScrollEvent, type NativeSyntheticEvent } from "react-native";
 import MapView, { Marker } from "react-native-maps";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { api } from "@/src/api";
 import { useAuth } from "@/src/AuthContext";
 import { useLanguage } from "@/src/LanguageContext";
+import { LocalizedText as Text } from "@/src/LocalizedText";
 import { displayFont, palette } from "@/src/theme";
 import type { Deal, Redemption } from "@/src/types";
 

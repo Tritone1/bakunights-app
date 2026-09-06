@@ -1,12 +1,14 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
-import { ActivityIndicator, Animated, Easing, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Animated, Easing, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Svg, { Circle, Path, Text as SvgText } from "react-native-svg";
 
 import { api } from "@/src/api";
 import { useAuth } from "@/src/AuthContext";
+import { useLanguage } from "@/src/LanguageContext";
+import { LocalizedText as Text } from "@/src/LocalizedText";
 import { displayFont, palette } from "@/src/theme";
 import type { PointReward, PointsStatus } from "@/src/types";
 
@@ -52,6 +54,7 @@ function WheelFace() {
 export default function RewardsScreen() {
   const router = useRouter();
   const { user } = useAuth();
+  const { translate } = useLanguage();
   const [status, setStatus] = useState<PointsStatus | null>(null);
   const [loading, setLoading] = useState(false);
   const [spinning, setSpinning] = useState(false);
@@ -97,16 +100,16 @@ export default function RewardsScreen() {
     </View>
 
     {!user ? <View style={styles.loginCard}><Ionicons name="lock-closed" size={20} color={palette.gold} /><Text style={styles.cardTitle}>Log in to collect points</Text><Text style={styles.cardBody}>Your verified visits, spins, balance, and rewards stay with your customer account.</Text><Pressable onPress={() => router.push("/login/customer" as never)} style={styles.primary}><Text style={styles.primaryText}>Customer login</Text></Pressable></View>
-      : loading ? <ActivityIndicator color={palette.gold} /> : <View style={styles.balanceCard}><View style={styles.balanceTop}><View><Text style={styles.label}>CURRENT BALANCE</Text><Text style={styles.balance}>{status?.pointsBalance ?? 0} <Text style={styles.points}>points</Text></Text></View><Text style={styles.toReward}>{status?.pointsToReward ?? 500}{"\n"}to reward</Text></View><View style={styles.progress}><View style={[styles.progressFill, { width: `${progress}%` }]} /></View><Text style={styles.lifetime}>{status?.lifetimePoints ?? 0} lifetime points · {status?.pendingSpins ?? 0} spins ready</Text></View>}
+      : loading ? <ActivityIndicator color={palette.gold} /> : <View style={styles.balanceCard}><View style={styles.balanceTop}><View><Text style={styles.label}>CURRENT BALANCE</Text><Text style={styles.balance}>{status?.pointsBalance ?? 0} <Text style={styles.points}>points</Text></Text></View><Text style={styles.toReward}>{status?.pointsToReward ?? 500}{"\n"}to reward</Text></View><View style={styles.progress}><View style={[styles.progressFill, { width: `${progress}%` }]} /></View><Text style={styles.lifetime}>{`${status?.lifetimePoints ?? 0} lifetime points · ${status?.pendingSpins ?? 0} spins ready`}</Text></View>}
     {error ? <Text style={styles.error}>{error}</Text> : null}
-    {earned != null && <View style={styles.success}><Ionicons name="trophy" size={22} color={palette.cyan} /><View><Text style={styles.successTitle}>You earned {earned} points!</Text><Text style={styles.cardBody}>Your new balance is {status?.pointsBalance ?? 0} points.</Text></View></View>}
+    {earned != null && <View style={styles.success}><Ionicons name="trophy" size={22} color={palette.cyan} /><View><Text style={styles.successTitle}>{translate(`You earned ${earned} points!`)}</Text><Text style={styles.cardBody}>{translate(`Your new balance is ${status?.pointsBalance ?? 0} points.`)}</Text></View></View>}
     {unlocked && <RewardCard reward={unlocked} title="New reward unlocked" />}
     {status?.activeRewards.map((reward) => <RewardCard key={reward.id} reward={reward} title="Ready to use" />)}
   </ScrollView></SafeAreaView>;
 }
 
 function Step({ number, text, color }: { number: string; text: string; color: string }) { return <View style={[styles.step, { borderColor: `${color}55`, backgroundColor: `${color}14` }]}><Text style={[styles.stepNumber, { color }]}>{number}</Text><Text style={styles.stepText}>{text}</Text></View>; }
-function RewardCard({ reward, title }: { reward: PointReward; title: string }) { return <View style={styles.reward}><Text style={styles.label}>{title.toUpperCase()}</Text><Text style={styles.cardTitle}>{reward.discountPct}% off bills up to {reward.maxBillAzn} AZN</Text><Text selectable style={styles.code}>{reward.rewardCode}</Text></View>; }
+function RewardCard({ reward, title }: { reward: PointReward; title: string }) { return <View style={styles.reward}><Text style={styles.label}>{title.toUpperCase()}</Text><Text style={styles.cardTitle}>{`${reward.discountPct}% off bills up to ${reward.maxBillAzn} AZN`}</Text><Text selectable style={styles.code}>{reward.rewardCode}</Text></View>; }
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: palette.night }, content: { paddingHorizontal: 18, paddingBottom: 35 }, heading: { paddingTop: 24 }, eyebrow: { color: palette.cyan, fontSize: 9, fontWeight: "900", letterSpacing: 1.9 }, title: { color: palette.white, fontFamily: displayFont, fontWeight: "700", fontSize: 39, marginTop: 6 }, body: { color: palette.muted, fontSize: 13, lineHeight: 20, marginTop: 10 }, steps: { flexDirection: "row", flexWrap: "wrap", gap: 7, marginTop: 18 }, step: { flexDirection: "row", alignItems: "center", gap: 6, borderWidth: 1, borderRadius: 16, paddingHorizontal: 10, paddingVertical: 7 }, stepNumber: { fontSize: 10, fontWeight: "900" }, stepText: { color: "#c5c5d2", fontSize: 9, fontWeight: "800" },

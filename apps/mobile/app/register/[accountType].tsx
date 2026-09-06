@@ -3,10 +3,11 @@ import * as ImagePicker from "expo-image-picker";
 import * as Location from "expo-location";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useState, type ComponentProps } from "react";
-import { Image, KeyboardAvoidingView, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Image, KeyboardAvoidingView, Linking, Platform, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { api } from "@/src/api";
+import { LocalizedText as Text, LocalizedTextInput as TextInput } from "@/src/LocalizedText";
 
 type PickedImage = { uri: string; name: string; type: string; size?: number };
 const venueTypes = ["Restaurant", "Pub", "Bar", "Lounge", "Cafe"] as const;

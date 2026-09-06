@@ -1,11 +1,12 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useState, type ComponentProps } from "react";
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { useAuth } from "@/src/AuthContext";
 import { api, ApiError } from "@/src/api";
+import { LocalizedText as Text, LocalizedTextInput as TextInput } from "@/src/LocalizedText";
 
 export default function MobileLoginScreen() {
   const router = useRouter();

@@ -1,13 +1,14 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import MapView, { Marker, Polyline } from "react-native-maps";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { api } from "@/src/api";
 import { useLanguage } from "@/src/LanguageContext";
 import { useUserLocation } from "@/src/LocationContext";
+import { LocalizedText as Text } from "@/src/LocalizedText";
 import { TaxiSheet } from "@/src/TaxiSheet";
 import { displayFont, palette } from "@/src/theme";
 import type { Restaurant } from "@/src/types";

@@ -1,6 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
-import { Linking, Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { Linking, Modal, Pressable, StyleSheet, View } from "react-native";
 
+import { LocalizedText as Text } from "./LocalizedText";
+import { useLanguage } from "./LanguageContext";
 import type { Restaurant } from "./types";
 
 type Props = {
@@ -9,6 +11,7 @@ type Props = {
 };
 
 export function TaxiSheet({ venue, onClose }: Props) {
+  const { translate } = useLanguage();
   if (!venue) return null;
 
   async function openGoogleMaps() {
@@ -23,7 +26,7 @@ export function TaxiSheet({ venue, onClose }: Props) {
 
   return (
     <Modal transparent animationType="slide" visible onRequestClose={onClose}>
-      <Pressable style={styles.backdrop} onPress={onClose} accessibilityRole="button" accessibilityLabel="Close navigation options">
+      <Pressable style={styles.backdrop} onPress={onClose} accessibilityRole="button" accessibilityLabel={translate("Close navigation options")}>
         <Pressable style={styles.sheet} onPress={(event) => event.stopPropagation()}>
           <View style={styles.handle} />
           <View style={styles.headingRow}>
@@ -31,7 +34,7 @@ export function TaxiSheet({ venue, onClose }: Props) {
               <Text style={styles.eyebrow}>OPTIONAL EXTERNAL APPS</Text>
               <Text style={styles.title}>Other navigation options</Text>
             </View>
-            <Pressable onPress={onClose} style={styles.closeButton} accessibilityRole="button" accessibilityLabel="Close">
+            <Pressable onPress={onClose} style={styles.closeButton} accessibilityRole="button" accessibilityLabel={translate("Close")}>
               <Ionicons name="close" color="#ffffff" size={22} />
             </Pressable>
           </View>

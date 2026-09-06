@@ -1,0 +1,385 @@
+import type { AppLanguage } from "./language";
+
+type Translation = readonly [az: string, ru: string];
+
+const messages: Record<string, Translation> = {
+  // Navigation and shared actions
+  "Home": ["Ana səhifə", "Главная"],
+  "Rewards": ["Mükafatlar", "Награды"],
+  "Map": ["Xəritə", "Карта"],
+  "Account": ["Hesab", "Аккаунт"],
+  "Back": ["Geri", "Назад"],
+  "Cancel": ["Ləğv et", "Отмена"],
+  "Close": ["Bağla", "Закрыть"],
+  "Save": ["Yadda saxla", "Сохранить"],
+  "Saved": ["Yadda saxlanılıb", "Сохранено"],
+  "Follow": ["İzlə", "Подписаться"],
+  "Following": ["İzlənilir", "Вы подписаны"],
+  "Share": ["Paylaş", "Поделиться"],
+  "Submit": ["Göndər", "Отправить"],
+  "Retry": ["Yenidən cəhd et", "Повторить"],
+  "Try again": ["Yenidən cəhd et", "Попробовать снова"],
+  "Working...": ["İcra olunur...", "Выполняется..."],
+  "Saving...": ["Yadda saxlanılır...", "Сохранение..."],
+  "Sending...": ["Göndərilir...", "Отправка..."],
+  "Updating...": ["Yenilənir...", "Обновление..."],
+  "Verifying...": ["Təsdiqlənir...", "Проверка..."],
+  "Change language": ["Dili dəyiş", "Изменить язык"],
+  "Use my location": ["Məkanımı istifadə et", "Использовать моё местоположение"],
+  "Customer": ["Müştəri", "Клиент"],
+  "Merchant": ["Tərəfdaş", "Партнёр"],
+  "Admin": ["Admin", "Администратор"],
+  "Login": ["Giriş", "Вход"],
+
+  // Home and discovery
+  "Customer login": ["Müştəri girişi", "Вход для клиентов"],
+  "Merchant login": ["Tərəfdaş girişi", "Вход для партнёров"],
+  "Live": ["Canlı", "Сейчас"],
+  "Great food.": ["Möhtəşəm yemək.", "Отличная еда."],
+  "Great deals.": ["Möhtəşəm təkliflər.", "Выгодные предложения."],
+  "Every day.": ["Hər gün.", "Каждый день."],
+  "Venues": ["Məkanlar", "Заведения"],
+  "Deals": ["Təkliflər", "Предложения"],
+  "Areas": ["Ərazilər", "Районы"],
+  "Tap to retry.": ["Yenidən cəhd üçün toxun.", "Нажмите, чтобы повторить."],
+  "Happening now": ["Hazırda aktivdir", "Сейчас актуально"],
+  "Live offers from restaurants": ["Restoranlardan canlı təkliflər", "Активные предложения ресторанов"],
+  "No live offers right now": ["Hazırda canlı təklif yoxdur", "Сейчас нет активных предложений"],
+  "New merchant offers will appear here as soon as they go live.": ["Yeni tərəfdaş təklifləri aktiv olan kimi burada görünəcək.", "Новые предложения партнёров появятся здесь после запуска."],
+  "Verified visit rewards": ["Təsdiqlənmiş ziyarət mükafatları", "Награды за подтверждённые визиты"],
+  "Spin. Earn. Save.": ["Fırlat. Qazan. Qənaət et.", "Крути. Зарабатывай. Экономь."],
+  "Verify an in-store visit, spin for points, and unlock rewards.": ["Məkandakı ziyarətini təsdiqlət, xal üçün fırlat və mükafatlar aç.", "Подтвердите визит, крутите колесо за баллы и открывайте награды."],
+  "Ending soon": ["Tezliklə bitir", "Скоро закончится"],
+  "Flash deals": ["Sürətli təkliflər", "Срочные предложения"],
+  "No flash deals yet": ["Hələ sürətli təklif yoxdur", "Срочных предложений пока нет"],
+  "Check again when venues publish limited-time offers.": ["Məkanlar məhdud müddətli təklif paylaşanda yenidən bax.", "Проверьте снова, когда заведения опубликуют срочные предложения."],
+  "Curated for tonight": ["Bu axşam üçün seçilib", "Подобрано на сегодня"],
+  "Find your next stop": ["Növbəti məkanını tap", "Найдите следующее место"],
+  "Search venues, vibes, or districts": ["Məkan, ab-hava və ya rayon axtar", "Искать заведения, атмосферу или районы"],
+  "All": ["Hamısı", "Все"],
+  "Restaurant": ["Restoran", "Ресторан"],
+  "Cafe": ["Kafe", "Кафе"],
+  "Bar": ["Bar", "Бар"],
+  "Pub": ["Pub", "Паб"],
+  "Lounge": ["Lounc", "Лаунж"],
+  "New": ["Yeni", "Новое"],
+  "Offer": ["Təklif", "Предложение"],
+  "Discount": ["Endirim", "Скидка"],
+  "Set menu": ["Set menyu", "Сет-меню"],
+  "Combo": ["Kombo", "Комбо"],
+  "Bundle": ["Paket", "Набор"],
+  "Perk": ["Üstünlük", "Бонус"],
+  "Event": ["Tədbir", "Событие"],
+  "Other": ["Digər", "Другое"],
+  "Breakfast": ["Səhər yeməyi", "Завтрак"],
+  "Lunch": ["Nahar", "Обед"],
+  "Dinner": ["Şam yeməyi", "Ужин"],
+  "Happy hour": ["Xoş saat", "Счастливый час"],
+  "All day": ["Bütün gün", "Весь день"],
+  "Alcohol": ["Alkoqol", "Алкоголь"],
+  "Mains": ["Əsas yeməklər", "Основные блюда"],
+  "Navigate": ["Marşrut", "Маршрут"],
+  "No venues found": ["Məkan tapılmadı", "Заведения не найдены"],
+  "Try another search or category.": ["Başqa axtarış və ya kateqoriya yoxla.", "Попробуйте другой запрос или категорию."],
+  "km away": ["km uzaqlıqda", "км отсюда"],
+  "WhereToGo · Great food. Great deals. Every day.": ["WhereToGo · Möhtəşəm yemək. Möhtəşəm təkliflər. Hər gün.", "WhereToGo · Отличная еда. Выгодные предложения. Каждый день."],
+
+  // Rewards
+  "Visit a participating venue and show your offer QR. After the merchant verifies it, one spin unlocks.": ["İştirakçı məkana get və təklif QR-ını göstər. Tərəfdaş təsdiqlədikdən sonra bir fırlatma açılır.", "Посетите заведение и покажите QR предложения. После подтверждения партнёром откроется одно вращение."],
+  "Visit venue": ["Məkana get", "Посетить место"],
+  "Show QR": ["QR göstər", "Показать QR"],
+  "Get verified": ["Təsdiqlət", "Подтвердить"],
+  "Spin": ["Fırlat", "Крутить"],
+  "Spinning": ["Fırlanır", "Вращение"],
+  "Locked": ["Bağlıdır", "Заблокировано"],
+  "Log in to collect points": ["Xal toplamaq üçün daxil ol", "Войдите, чтобы собирать баллы"],
+  "Your verified visits, spins, balance, and rewards stay with your customer account.": ["Təsdiqlənmiş ziyarətlərin, fırlatmaların, balansın və mükafatların müştəri hesabında saxlanılır.", "Подтверждённые визиты, вращения, баланс и награды сохраняются в аккаунте клиента."],
+  "Current balance": ["Cari balans", "Текущий баланс"],
+  "points": ["xal", "баллов"],
+  "to reward": ["mükafata qalıb", "до награды"],
+  "lifetime points": ["ümumi xal", "баллов за всё время"],
+  "spins ready": ["fırlatma hazırdır", "вращений доступно"],
+  "New reward unlocked": ["Yeni mükafat açıldı", "Открыта новая награда"],
+  "Ready to use": ["İstifadəyə hazırdır", "Готово к использованию"],
+  "The spin could not be completed.": ["Fırlatmanı tamamlamaq mümkün olmadı.", "Не удалось завершить вращение."],
+  "Could not load your points.": ["Xallarını yükləmək mümkün olmadı.", "Не удалось загрузить ваши баллы."],
+  "You earned": ["Qazandın:", "Вы заработали"],
+  "Your new balance is": ["Yeni balansın:", "Ваш новый баланс:"],
+
+  // Map and navigation
+  "WhereToGo navigation": ["WhereToGo naviqasiyası", "Навигация WhereToGo"],
+  "Your route": ["Sənin marşrutun", "Ваш маршрут"],
+  "Find your way": ["Yolunu tap", "Найдите дорогу"],
+  "Finding your position...": ["Mövqeyin tapılır...", "Определяем ваше местоположение..."],
+  "Tap to show your position": ["Mövqeyini göstərmək üçün toxun", "Нажмите, чтобы показать местоположение"],
+  "In-app route": ["Tətbiqdaxili marşrut", "Маршрут в приложении"],
+  "Selected destination": ["Seçilmiş istiqamət", "Выбранное место"],
+  "Route active": ["Marşrut aktivdir", "Маршрут активен"],
+  "Navigate in WhereToGo": ["WhereToGo-da marşrut qur", "Построить маршрут в WhereToGo"],
+  "No venues available": ["Mövcud məkan yoxdur", "Нет доступных заведений"],
+  "Map venues could not load.": ["Xəritədəki məkanları yükləmək mümkün olmadı.", "Не удалось загрузить заведения на карте."],
+  "Optional external apps": ["Əlavə xarici tətbiqlər", "Дополнительные приложения"],
+  "Other navigation options": ["Digər naviqasiya seçimləri", "Другие варианты навигации"],
+  "Destination": ["İstiqamət", "Место назначения"],
+  "Driving directions": ["Avtomobil marşrutu", "Маршрут на автомобиле"],
+  "Open driving directions to this venue using its exact map coordinates.": ["Məkanın dəqiq koordinatları ilə avtomobil marşrutunu aç.", "Откройте автомобильный маршрут по точным координатам заведения."],
+  "Open Google Maps": ["Google Maps-i aç", "Открыть Google Maps"],
+  "Destination ready in the Waze app": ["İstiqamət Waze tətbiqində hazırdır", "Место назначения готово в Waze"],
+  "Open destination in Waze": ["İstiqaməti Waze-də aç", "Открыть место в Waze"],
+  "Your route stays in WhereToGo unless you choose one of these external navigation services.": ["Bu xarici xidmətlərdən birini seçməsən, marşrutun WhereToGo-da qalacaq.", "Маршрут останется в WhereToGo, пока вы не выберете внешний сервис."],
+  "Close navigation options": ["Naviqasiya seçimlərini bağla", "Закрыть варианты навигации"],
+  "Location permission is off. Enable Precise Location for Expo Go in iPhone Settings.": ["Məkan icazəsi bağlıdır. iPhone Ayarlarında Expo Go üçün Dəqiq Məkanı aktiv et.", "Доступ к геолокации отключён. Включите точную геолокацию для Expo Go в настройках iPhone."],
+  "Your location could not be read. Check Location Services and try again.": ["Məkanını oxumaq mümkün olmadı. Məkan Xidmətlərini yoxla və yenidən cəhd et.", "Не удалось определить местоположение. Проверьте службы геолокации и повторите."],
+
+  // Offer details
+  "Preparing your offer...": ["Təklifin hazırlanır...", "Подготавливаем предложение..."],
+  "Offer unavailable": ["Təklif əlçatan deyil", "Предложение недоступно"],
+  "This offer could not load.": ["Bu təklifi yükləmək mümkün olmadı.", "Не удалось загрузить предложение."],
+  "Automatically translated": ["Avtomatik tərcümə edilib", "Переведено автоматически"],
+  "Offer expires": ["Təklif bitir", "Предложение заканчивается"],
+  "Rating": ["Reytinq", "Рейтинг"],
+  "Price range": ["Qiymət aralığı", "Диапазон цен"],
+  "Price varies": ["Qiymət dəyişir", "Цена варьируется"],
+  "Distance": ["Məsafə", "Расстояние"],
+  "Nearby": ["Yaxınlıqda", "Рядом"],
+  "Navigate in app": ["Tətbiqdə marşrut qur", "Маршрут в приложении"],
+  "Maps": ["Xəritələr", "Карты"],
+  "Your proof": ["Sənin təsdiqin", "Ваше подтверждение"],
+  "Visit Confirmed": ["Ziyarət təsdiqləndi", "Визит подтверждён"],
+  "Show this QR": ["Bu QR-ı göstər", "Покажите этот QR"],
+  "Claim Offer": ["Təklifi al", "Получить предложение"],
+  "Creating QR...": ["QR yaradılır...", "Создание QR..."],
+  "Claim offer & create QR": ["Təklifi al və QR yarat", "Получить предложение и создать QR"],
+  "The merchant scans this QR to verify your visit—no manual typing needed.": ["Tərəfdaş ziyarətini təsdiqləmək üçün bu QR-ı skan edir—əl ilə yazmağa ehtiyac yoxdur.", "Партнёр сканирует QR для подтверждения визита—ручной ввод не нужен."],
+  "Claiming creates a unique QR that the merchant scans at the venue.": ["Təklifi aldıqda tərəfdaşın məkanda skan edəcəyi unikal QR yaranır.", "После получения создаётся уникальный QR, который партнёр сканирует в заведении."],
+  "Rate this offer": ["Bu təklifi qiymətləndir", "Оцените предложение"],
+  "Was this offer worth it?": ["Bu təklif buna dəyərdimi?", "Стоило ли это предложение того?"],
+  "Always confirm offer details with the venue before ordering.": ["Sifarişdən əvvəl təklif detallarını həmişə məkanla dəqiqləşdir.", "Всегда уточняйте детали предложения в заведении перед заказом."],
+  "QR proof created. Show it to the merchant for verification.": ["QR təsdiqi yaradıldı. Təsdiqləmə üçün tərəfdaşa göstər.", "QR-подтверждение создано. Покажите его партнёру."],
+  "Could not create QR proof.": ["QR təsdiqini yaratmaq mümkün olmadı.", "Не удалось создать QR-подтверждение."],
+  "Rating saved. Thank you!": ["Qiymətləndirmə saxlanıldı. Təşəkkürlər!", "Оценка сохранена. Спасибо!"],
+  "Could not save your rating.": ["Qiymətləndirməni saxlamaq mümkün olmadı.", "Не удалось сохранить оценку."],
+  "Could not update saved offer.": ["Yadda saxlanılan təklifi yeniləmək mümkün olmadı.", "Не удалось обновить сохранённое предложение."],
+  "Could not update followed venue.": ["İzlənilən məkanı yeniləmək mümkün olmadı.", "Не удалось обновить подписку на заведение."],
+
+  // Account
+  "Consumer account": ["Müştəri hesabı", "Аккаунт клиента"],
+  "Merchant account": ["Tərəfdaş hesabı", "Аккаунт партнёра"],
+  "Admin account": ["Admin hesabı", "Аккаунт администратора"],
+  "Member since": ["Üzvlük tarixi", "Участник с"],
+  "Points and spins": ["Xallar və fırlatmalar", "Баллы и вращения"],
+  "Explore map": ["Xəritəyə bax", "Открыть карту"],
+  "Offers near you": ["Yaxınındakı təkliflər", "Предложения рядом"],
+  "Your shortlist": ["Seçilmişlərin", "Ваш список"],
+  "Saved offers": ["Yadda saxlanılan təkliflər", "Сохранённые предложения"],
+  "No saved offers yet": ["Hələ təklif saxlamamısan", "Сохранённых предложений пока нет"],
+  "Tap Save on an offer and it will appear here.": ["Təklifdə “Yadda saxla” düyməsinə toxun və o burada görünsün.", "Нажмите «Сохранить» на предложении, и оно появится здесь."],
+  "WhereToGo operations": ["WhereToGo əməliyyatları", "Управление WhereToGo"],
+  "Use the web dashboard for the full moderation workspace.": ["Tam moderasiya üçün veb idarə panelindən istifadə et.", "Используйте веб-панель для полной модерации."],
+  "Account settings": ["Hesab ayarları", "Настройки аккаунта"],
+  "Personal information": ["Şəxsi məlumatlar", "Личная информация"],
+  "Your details": ["Məlumatların", "Ваши данные"],
+  "Name, email and home location": ["Ad, e-poçt və ev məkanı", "Имя, почта и домашнее местоположение"],
+  "Display name": ["Görünən ad", "Отображаемое имя"],
+  "Your name": ["Adın", "Ваше имя"],
+  "Account email": ["Hesab e-poçtu", "Почта аккаунта"],
+  "Home latitude": ["Ev enliyi", "Домашняя широта"],
+  "Home longitude": ["Ev uzunluğu", "Домашняя долгота"],
+  "Use my current location": ["Cari məkanımı istifadə et", "Использовать моё местоположение"],
+  "Finding location...": ["Məkan tapılır...", "Определяем местоположение..."],
+  "Save profile": ["Profili yadda saxla", "Сохранить профиль"],
+  "Recommendations": ["Tövsiyələr", "Рекомендации"],
+  "Deal preferences": ["Təklif seçimləri", "Настройки предложений"],
+  "Radius, cuisine, discount and sorting": ["Radius, mətbəx, endirim və sıralama", "Радиус, кухня, скидка и сортировка"],
+  "Search radius": ["Axtarış radiusu", "Радиус поиска"],
+  "Preferred cuisine": ["Üstünlük verilən mətbəx", "Предпочитаемая кухня"],
+  "Any cuisine": ["İstənilən mətbəx", "Любая кухня"],
+  "Minimum discount": ["Minimum endirim", "Минимальная скидка"],
+  "Any": ["İstənilən", "Любое"],
+  "Dietary preference": ["Qidalanma seçimi", "Пищевые предпочтения"],
+  "Halal": ["Halal", "Халяль"],
+  "Vegan": ["Veqan", "Веганское"],
+  "Vegetarian": ["Vegetarian", "Вегетарианское"],
+  "Gluten-free": ["Qlüten­siz", "Без глютена"],
+  "Sort offers by": ["Təklifləri sırala", "Сортировать предложения"],
+  "Nearest": ["Ən yaxın", "Ближайшие"],
+  "Biggest discount": ["Ən böyük endirim", "Самая большая скидка"],
+  "Top rated": ["Ən yüksək reytinq", "Лучший рейтинг"],
+  "Prioritize ending soon": ["Tez bitənləri önə çək", "Сначала заканчивающиеся"],
+  "Show urgent offers earlier": ["Təcili təklifləri daha əvvəl göstər", "Показывать срочные предложения раньше"],
+  "Save preferences": ["Seçimləri yadda saxla", "Сохранить настройки"],
+  "Security": ["Təhlükəsizlik", "Безопасность"],
+  "Change password": ["Şifrəni dəyiş", "Изменить пароль"],
+  "Update your account password": ["Hesab şifrəsini yenilə", "Обновить пароль аккаунта"],
+  "Current password": ["Cari şifrə", "Текущий пароль"],
+  "New password": ["Yeni şifrə", "Новый пароль"],
+  "At least 8 characters": ["Ən azı 8 simvol", "Не менее 8 символов"],
+  "Confirm new password": ["Yeni şifrəni təsdiqlə", "Подтвердите новый пароль"],
+  "Update password": ["Şifrəni yenilə", "Обновить пароль"],
+  "Venue owners": ["Məkan sahibləri", "Владельцам заведений"],
+  "Application pending": ["Müraciət gözləyir", "Заявка рассматривается"],
+  "Application approved": ["Müraciət təsdiqləndi", "Заявка одобрена"],
+  "Application": ["Müraciət", "Заявка"],
+  "Admin note:": ["Admin qeydi:", "Примечание администратора:"],
+  "Pending": ["Gözləyir", "На рассмотрении"],
+  "Approved": ["Təsdiqlənib", "Одобрено"],
+  "Rejected": ["Rədd edilib", "Отклонено"],
+  "Apply as a merchant": ["Tərəfdaş kimi müraciət et", "Подать заявку партнёра"],
+  "List and manage your venue on WhereToGo": ["Məkanını WhereToGo-da yerləşdir və idarə et", "Разместите заведение и управляйте им в WhereToGo"],
+  "Venue name": ["Məkanın adı", "Название заведения"],
+  "Venue type": ["Məkan növü", "Тип заведения"],
+  "Full venue address": ["Məkanın tam ünvanı", "Полный адрес заведения"],
+  "Latitude": ["Enlik", "Широта"],
+  "Longitude": ["Uzunluq", "Долгота"],
+  "Use venue's current location": ["Məkanın cari mövqeyini istifadə et", "Использовать текущее местоположение заведения"],
+  "Contact phone": ["Əlaqə telefonu", "Контактный телефон"],
+  "Contact email": ["Əlaqə e-poçtu", "Контактная почта"],
+  "Proof you manage this venue": ["Məkanı idarə etdiyinə dair sübut", "Подтверждение управления заведением"],
+  "Tell our review team how we can verify ownership...": ["Sahibliyi necə yoxlaya biləcəyimizi komandamıza bildir...", "Расскажите, как наша команда может проверить владение..."],
+  "Send for review": ["Yoxlamaya göndər", "Отправить на проверку"],
+  "Account actions": ["Hesab əməliyyatları", "Действия аккаунта"],
+  "Merchant workspace": ["Tərəfdaş iş sahəsi", "Рабочая область партнёра"],
+  "Manage venues and offers from Home": ["Məkanları və təklifləri Ana səhifədən idarə et", "Управляйте заведениями и предложениями с Главной"],
+  "App language": ["Tətbiq dili", "Язык приложения"],
+  "Device permissions": ["Cihaz icazələri", "Разрешения устройства"],
+  "Camera, location and notifications": ["Kamera, məkan və bildirişlər", "Камера, геолокация и уведомления"],
+  "Log out": ["Çıxış", "Выйти"],
+  "Sign out on this device": ["Bu cihazda hesabdan çıx", "Выйти из аккаунта на этом устройстве"],
+  "Delete account": ["Hesabı sil", "Удалить аккаунт"],
+  "Permanently remove your account and data": ["Hesabını və məlumatlarını həmişəlik sil", "Навсегда удалить аккаунт и данные"],
+  "Delete your account?": ["Hesabın silinsin?", "Удалить аккаунт?"],
+  "This cannot be undone. Enter your current password to permanently remove your account and personal data.": ["Bunu geri qaytarmaq olmaz. Hesabını və şəxsi məlumatlarını həmişəlik silmək üçün cari şifrəni daxil et.", "Это действие необратимо. Введите текущий пароль, чтобы навсегда удалить аккаунт и личные данные."],
+  "Delete owned venues": ["Sahibi olduğun məkanları sil", "Удалить принадлежащие заведения"],
+  "Required if venues still belong to you": ["Məkanlar hələ sənə məxsusdursa tələb olunur", "Требуется, если заведения всё ещё принадлежат вам"],
+  "Delete permanently": ["Həmişəlik sil", "Удалить навсегда"],
+  "Deleting...": ["Silinir...", "Удаление..."],
+  "Your WhereToGo account": ["WhereToGo hesabın", "Ваш аккаунт WhereToGo"],
+  "Log in to save offers, create visit QR codes, collect points, and manage your venue.": ["Təklifləri saxlamaq, QR yaratmaq, xal toplamaq və məkanını idarə etmək üçün daxil ol.", "Войдите, чтобы сохранять предложения, создавать QR, получать баллы и управлять заведением."],
+  "Customer proof": ["Müştəri təsdiqi", "Подтверждение клиента"],
+  "Verify QR or reward": ["QR və ya mükafatı təsdiqlə", "Проверить QR или награду"],
+  "Scan the customer's QR. Manual entry remains available below.": ["Müştərinin QR-ını skan et. Aşağıda əl ilə daxil etmək də mümkündür.", "Отсканируйте QR клиента. Ниже также доступен ручной ввод."],
+  "Scan customer QR": ["Müştəri QR-ını skan et", "Сканировать QR клиента"],
+  "QR or code": ["QR və ya kod", "QR или код"],
+  "Bill amount (AZN)": ["Hesab məbləği (AZN)", "Сумма счёта (AZN)"],
+  "Verify code": ["Kodu təsdiqlə", "Проверить код"],
+  "Camera scanner": ["Kamera skaneri", "Сканер камеры"],
+  "Scan customer proof": ["Müştəri təsdiqini skan et", "Сканировать подтверждение клиента"],
+  "Camera permission is required to scan customer QR codes.": ["Müştəri QR kodlarını skan etmək üçün kamera icazəsi tələb olunur.", "Для сканирования QR клиентов требуется доступ к камере."],
+  "Allow camera": ["Kameraya icazə ver", "Разрешить камеру"],
+  "Place the customer's QR inside the frame": ["Müştərinin QR-ını çərçivənin içinə yerləşdir", "Поместите QR клиента внутрь рамки"],
+  "Profile details saved.": ["Profil məlumatları saxlanıldı.", "Данные профиля сохранены."],
+  "Deal preferences saved.": ["Təklif seçimləri saxlanıldı.", "Настройки предложений сохранены."],
+  "Password updated.": ["Şifrə yeniləndi.", "Пароль обновлён."],
+  "Location captured. Save the form to keep it.": ["Məkan götürüldü. Saxlamaq üçün formanı yadda saxla.", "Местоположение получено. Сохраните форму."],
+  "Merchant application sent for review.": ["Tərəfdaş müraciəti yoxlamaya göndərildi.", "Заявка партнёра отправлена на проверку."],
+  "Display name is required.": ["Görünən ad tələb olunur.", "Укажите отображаемое имя."],
+  "Enter valid latitude and longitude values.": ["Düzgün enlik və uzunluq daxil et.", "Введите корректные широту и долготу."],
+  "New passwords do not match.": ["Yeni şifrələr uyğun gəlmir.", "Новые пароли не совпадают."],
+  "Location permission was denied.": ["Məkan icazəsi rədd edildi.", "Доступ к геолокации отклонён."],
+  "Complete all merchant application fields.": ["Tərəfdaş müraciətinin bütün xanalarını doldur.", "Заполните все поля заявки партнёра."],
+  "This QR/code could not be verified.": ["Bu QR/kodu təsdiqləmək mümkün olmadı.", "Не удалось проверить этот QR/код."],
+
+  // Authentication and registration
+  "Welcome back": ["Yenidən xoş gəldin", "С возвращением"],
+  "Manage your venue and offers.": ["Məkanını və təkliflərini idarə et.", "Управляйте заведением и предложениями."],
+  "Save deals and receive QR codes.": ["Təklifləri saxla və QR kodları al.", "Сохраняйте предложения и получайте QR-коды."],
+  "Email": ["E-poçt", "Электронная почта"],
+  "Password": ["Şifrə", "Пароль"],
+  "Resend verification email": ["Təsdiq e-poçtunu yenidən göndər", "Отправить письмо подтверждения снова"],
+  "Log in": ["Daxil ol", "Войти"],
+  "New partner? Register your venue": ["Yeni tərəfdaşsan? Məkanını qeydiyyatdan keçir", "Новый партнёр? Зарегистрируйте заведение"],
+  "New here? Register as a customer": ["Yenisən? Müştəri kimi qeydiyyatdan keç", "Впервые здесь? Зарегистрируйтесь"],
+  "Venue partners": ["Məkan tərəfdaşları", "Партнёры-заведения"],
+  "Great deals every day": ["Hər gün möhtəşəm təkliflər", "Выгодные предложения каждый день"],
+  "Register your venue": ["Məkanını qeydiyyatdan keçir", "Зарегистрировать заведение"],
+  "Create account": ["Hesab yarat", "Создать аккаунт"],
+  "Verify your email before logging in.": ["Daxil olmadan əvvəl e-poçtunu təsdiqlə.", "Подтвердите почту перед входом."],
+  "Venue location": ["Məkanın yeri", "Местоположение заведения"],
+  "Use your position while at the venue, or enter the exact address and coordinates manually.": ["Məkanda olarkən mövqeyini istifadə et və ya ünvanla koordinatları əl ilə daxil et.", "Используйте местоположение в заведении или введите адрес и координаты вручную."],
+  "Street, building, district, Baku": ["Küçə, bina, rayon, Bakı", "Улица, здание, район, Баку"],
+  "For manual entry, copy the coordinates from the venue pin in Google Maps.": ["Əl ilə daxil etmək üçün Google Maps-dəki məkan nişanından koordinatları kopyala.", "Для ручного ввода скопируйте координаты метки из Google Maps."],
+  "Venue logo or photo": ["Məkan loqosu və ya fotosu", "Логотип или фото заведения"],
+  "Change image": ["Şəkli dəyiş", "Изменить изображение"],
+  "Choose image": ["Şəkil seç", "Выбрать изображение"],
+  "Optional · JPG, PNG or WebP · max 2 MB": ["İstəyə bağlı · JPG, PNG və ya WebP · maks. 2 MB", "Необязательно · JPG, PNG или WebP · до 2 МБ"],
+  "8+ characters with uppercase and lowercase letters.": ["Böyük və kiçik hərflərlə ən azı 8 simvol.", "Не менее 8 символов с заглавными и строчными буквами."],
+  "Already registered? Log in": ["Artıq qeydiyyatdan keçmisən? Daxil ol", "Уже зарегистрированы? Войти"],
+  "Registration received": ["Qeydiyyat qəbul edildi", "Регистрация получена"],
+  "Check your email": ["E-poçtunu yoxla", "Проверьте почту"],
+  "We sent a verification link to": ["Təsdiq keçidini bu ünvana göndərdik:", "Мы отправили ссылку подтверждения на"],
+  "Open it within 24 hours. Check spam or junk if it is not in your inbox.": ["24 saat ərzində aç. Gələnlərdə yoxdursa, spam qovluğunu yoxla.", "Откройте письмо в течение 24 часов. Проверьте папку «Спам»."],
+  "Open development verification link": ["Test təsdiq keçidini aç", "Открыть тестовую ссылку подтверждения"],
+  "Back to login": ["Girişə qayıt", "Вернуться ко входу"],
+  "Contact name": ["Əlaqədar şəxsin adı", "Имя контактного лица"],
+  "Name": ["Ad", "Имя"],
+  "Retype password": ["Şifrəni təkrar yaz", "Повторите пароль"],
+  "Allow location access or enter the venue address and coordinates manually.": ["Məkan icazəsi ver və ya ünvanla koordinatları əl ilə daxil et.", "Разрешите геолокацию или введите адрес и координаты вручную."],
+  "Could not find the venue location. Enter its address and coordinates manually.": ["Məkanın yerini tapmaq mümkün olmadı. Ünvan və koordinatları əl ilə daxil et.", "Не удалось найти заведение. Введите адрес и координаты вручную."],
+  "Allow photo-library access to choose a venue image.": ["Məkan şəkli seçmək üçün foto kitabxanaya icazə ver.", "Разрешите доступ к фото, чтобы выбрать изображение заведения."],
+  "Venue image must be 2 MB or smaller.": ["Məkan şəkli 2 MB və ya daha kiçik olmalıdır.", "Изображение заведения должно быть не больше 2 МБ."],
+  "Venue image must be a JPG, PNG, or WebP file.": ["Məkan şəkli JPG, PNG və ya WebP olmalıdır.", "Изображение должно быть в формате JPG, PNG или WebP."],
+  "Venue name is required.": ["Məkanın adı tələb olunur.", "Укажите название заведения."],
+  "Venue address is required.": ["Məkanın ünvanı tələb olunur.", "Укажите адрес заведения."],
+  "Use your current location or enter the venue coordinates manually.": ["Cari məkanını istifadə et və ya koordinatları əl ilə daxil et.", "Используйте текущее местоположение или введите координаты вручную."],
+  "Could not create account": ["Hesab yaratmaq mümkün olmadı", "Не удалось создать аккаунт"],
+  "Could not log in": ["Daxil olmaq mümkün olmadı", "Не удалось войти"],
+  "Could not resend email": ["E-poçtu yenidən göndərmək mümkün olmadı", "Не удалось повторно отправить письмо"],
+};
+
+function translated(pair: Translation, language: Exclude<AppLanguage, "en">) {
+  return pair[language === "az" ? 0 : 1];
+}
+
+function preserveCase(source: string, result: string, language: Exclude<AppLanguage, "en">) {
+  if (source === source.toUpperCase() && source !== source.toLowerCase()) {
+    return result.toLocaleUpperCase(language === "az" ? "az-AZ" : "ru-RU");
+  }
+  return result;
+}
+
+function dynamicTranslation(source: string, language: Exclude<AppLanguage, "en">): string | null {
+  const choose = (az: string, ru: string) => language === "az" ? az : ru;
+  let match = source.match(/^(\d+) venues?$/i);
+  if (match) return choose(`${match[1]} məkan`, `${match[1]} заведений`);
+  match = source.match(/^([\d.]+) km away$/i);
+  if (match) return choose(`${match[1]} km uzaqlıqda`, `${match[1]} км отсюда`);
+  match = source.match(/^Route active(?: · ([\d.]+) km)?$/i);
+  if (match) return choose(`Marşrut aktivdir${match[1] ? ` · ${match[1]} km` : ""}`, `Маршрут активен${match[1] ? ` · ${match[1]} км` : ""}`);
+  match = source.match(/^You earned (\d+) points!$/i);
+  if (match) return choose(`${match[1]} xal qazandın!`, `Вы заработали ${match[1]} баллов!`);
+  match = source.match(/^Your new balance is (\d+) points\.$/i);
+  if (match) return choose(`Yeni balansın ${match[1]} xaldır.`, `Ваш новый баланс: ${match[1]} баллов.`);
+  match = source.match(/^(\d+) lifetime points · (\d+) spins ready$/i);
+  if (match) return choose(`Ümumi ${match[1]} xal · ${match[2]} fırlatma hazırdır`, `${match[1]} баллов за всё время · доступно вращений: ${match[2]}`);
+  match = source.match(/^(\d+)% off bills up to ([\d.]+) AZN$/i);
+  if (match) return choose(`${match[2]} AZN-dək hesablara ${match[1]}% endirim`, `Скидка ${match[1]}% на счета до ${match[2]} AZN`);
+  match = source.match(/^(\d+)% OFF$/i);
+  if (match) return choose(`${match[1]}% ENDİRİM`, `СКИДКА ${match[1]}%`);
+  match = source.match(/^Location captured \(approximately (\d+) m accuracy\)\.$/i);
+  if (match) return choose(`Məkan götürüldü (təxminən ${match[1]} m dəqiqlik).`, `Местоположение получено (точность около ${match[1]} м).`);
+  match = source.match(/^Visit verified(?: for (.+))?\. One reward spin is now unlocked\.$/i);
+  if (match) return choose(`Ziyarət təsdiqləndi${match[1] ? `: ${match[1]}` : ""}. Bir mükafat fırlatması açıldı.`, `Визит подтверждён${match[1] ? `: ${match[1]}` : ""}. Доступно одно вращение.`);
+  match = source.match(/^Reward verified\. Apply ([\d.]+) AZN discount\.$/i);
+  if (match) return choose(`Mükafat təsdiqləndi. ${match[1]} AZN endirim tətbiq et.`, `Награда подтверждена. Примените скидку ${match[1]} AZN.`);
+  match = source.match(/^Currently (EN|AZ|RU) · tap to change$/i);
+  if (match) return choose(`Hazırda ${match[1].toUpperCase()} · dəyişmək üçün toxun`, `Сейчас ${match[1].toUpperCase()} · нажмите для смены`);
+  match = source.match(/^Application (pending|approved|rejected)$/i);
+  if (match) {
+    const states: Record<string, Translation> = { pending: ["gözləyir", "рассматривается"], approved: ["təsdiqləndi", "одобрена"], rejected: ["rədd edildi", "отклонена"] };
+    return choose(`Müraciət ${states[match[1].toLowerCase()]?.[0]}`, `Заявка ${states[match[1].toLowerCase()]?.[1]}`);
+  }
+  return null;
+}
+
+const caseInsensitiveMessages = new Map(Object.entries(messages).map(([key, value]) => [key.toLocaleLowerCase("en-US"), value]));
+
+export function translateUiText(value: string, language: AppLanguage) {
+  if (language === "en" || !value.trim()) return value;
+  const leading = value.match(/^\s*/)?.[0] ?? "";
+  const trailing = value.match(/\s*$/)?.[0] ?? "";
+  const source = value.trim();
+  const normalized = source.replaceAll("…", "...").replaceAll("’", "'");
+  const pair = messages[source] ?? messages[normalized] ?? caseInsensitiveMessages.get(normalized.toLocaleLowerCase("en-US"));
+  const result = pair ? preserveCase(source, translated(pair, language), language) : dynamicTranslation(normalized, language) ?? source;
+  return `${leading}${result}${trailing}`;
+}

@@ -13,8 +13,6 @@ import {
   ScrollView,
   StyleSheet,
   Switch,
-  Text,
-  TextInput,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -22,6 +20,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { api } from "@/src/api";
 import { useAuth } from "@/src/AuthContext";
 import { useLanguage } from "@/src/LanguageContext";
+import { LocalizedText as Text, LocalizedTextInput as TextInput } from "@/src/LocalizedText";
 import { displayFont, palette } from "@/src/theme";
 import type { Deal, Restaurant } from "@/src/types";
 
@@ -84,7 +83,7 @@ const SORT_OPTIONS: { value: Preferences["sort"]; label: string }[] = [
 export default function AccountScreen() {
   const router = useRouter();
   const { user, loading: authLoading, refresh, logout } = useAuth();
-  const { language, cycleLanguage } = useLanguage();
+  const { language, cycleLanguage, translate } = useLanguage();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [saved, setSaved] = useState<Deal[]>([]);
   const [venues, setVenues] = useState<Restaurant[]>([]);
@@ -171,7 +170,7 @@ export default function AccountScreen() {
     }
     Promise.all(requests).catch((reason) => active && showMessage(reason instanceof Error ? reason.message : "Account details could not load.", true));
     return () => { active = false; };
-  }, [showMessage, user]);
+  }, [language, showMessage, user]);
 
   function toggleSection(section: SectionKey) {
     setOpenSection((current) => current === section ? null : section);
@@ -277,14 +276,14 @@ export default function AccountScreen() {
   if (authLoading) return <SafeAreaView style={styles.center}><ActivityIndicator color={palette.gold} /></SafeAreaView>;
   if (!user) return <GuestAccount onCustomer={() => router.push("/login/customer" as never)} onMerchant={() => router.push("/login/merchant" as never)} />;
 
-  const memberSince = profile?.createdAt ? new Date(profile.createdAt).toLocaleDateString(undefined, { month: "long", year: "numeric" }) : "";
+  const memberSince = profile?.createdAt ? new Date(profile.createdAt).toLocaleDateString(language === "az" ? "az-AZ" : language === "ru" ? "ru-RU" : "en-US", { month: "long", year: "numeric" }) : "";
   return <SafeAreaView style={styles.safe} edges={["top"]}>
     <KeyboardAvoidingView style={styles.safe} behavior={Platform.OS === "ios" ? "padding" : undefined}>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
         <View style={styles.profileHero}>
           <View style={styles.heroGlow} />
           <View style={styles.avatar}><Text style={styles.avatarText}>{user.name.slice(0, 1).toUpperCase()}</Text></View>
-          <View style={styles.profileCopy}><Text style={styles.role}>{user.role} ACCOUNT</Text><Text style={styles.name}>{user.name}</Text><Text style={styles.email}>{user.email}</Text>{memberSince ? <Text style={styles.memberSince}>Member since {memberSince}</Text> : null}</View>
+          <View style={styles.profileCopy}><Text style={styles.role}>{translate(`${user.role[0]}${user.role.slice(1).toLowerCase()} account`).toLocaleUpperCase(language === "az" ? "az-AZ" : language === "ru" ? "ru-RU" : "en-US")}</Text><Text style={styles.name}>{user.name}</Text><Text style={styles.email}>{user.email}</Text>{memberSince ? <Text style={styles.memberSince}>{translate("Member since")} {memberSince}</Text> : null}</View>
         </View>
 
         {(notice || error) ? <Pressable onPress={() => { setNotice(""); setError(""); }} style={[styles.message, error ? styles.errorMessage : styles.successMessage]}><Ionicons name={error ? "alert-circle" : "checkmark-circle"} size={18} color={error ? "#fca5a5" : "#6ee7b7"} /><Text style={[styles.messageText, { color: error ? "#fecaca" : "#a7f3d0" }]}>{error || notice}</Text><Ionicons name="close" size={16} color={palette.muted} /></Pressable> : null}
@@ -342,7 +341,7 @@ export default function AccountScreen() {
 
         <Text style={styles.groupLabel}>ACCOUNT ACTIONS</Text>
         {user.role === "MERCHANT" && <Pressable onPress={() => router.push("/(tabs)" as never)} style={styles.actionRow}><View style={styles.actionIcon}><Ionicons name="storefront-outline" size={19} color={palette.cyan} /></View><View style={styles.actionCopy}><Text style={styles.actionTitle}>Merchant workspace</Text><Text style={styles.actionDetail}>Manage venues and offers from Home</Text></View><Ionicons name="chevron-forward" size={18} color={palette.muted} /></Pressable>}
-        <Pressable onPress={cycleLanguage} style={styles.actionRow}><View style={styles.actionIcon}><Ionicons name="language-outline" size={19} color={palette.cyan} /></View><View style={styles.actionCopy}><Text style={styles.actionTitle}>Offer language</Text><Text style={styles.actionDetail}>Currently {language.toUpperCase()} · tap to change</Text></View><Text style={styles.actionValue}>{language.toUpperCase()}</Text></Pressable>
+        <Pressable onPress={cycleLanguage} style={styles.actionRow}><View style={styles.actionIcon}><Ionicons name="language-outline" size={19} color={palette.cyan} /></View><View style={styles.actionCopy}><Text style={styles.actionTitle}>App language</Text><Text style={styles.actionDetail}>{`Currently ${language.toUpperCase()} · tap to change`}</Text></View><Text style={styles.actionValue}>{language.toUpperCase()}</Text></Pressable>
         <Pressable onPress={() => void Linking.openSettings()} style={styles.actionRow}><View style={styles.actionIcon}><Ionicons name="settings-outline" size={19} color={palette.cyan} /></View><View style={styles.actionCopy}><Text style={styles.actionTitle}>Device permissions</Text><Text style={styles.actionDetail}>Camera, location and notifications</Text></View><Ionicons name="open-outline" size={18} color={palette.muted} /></Pressable>
         <Pressable onPress={() => void logout()} style={styles.actionRow}><View style={styles.actionIcon}><Ionicons name="log-out-outline" size={19} color="#fca5a5" /></View><View style={styles.actionCopy}><Text style={styles.actionTitle}>Log out</Text><Text style={styles.actionDetail}>Sign out on this device</Text></View><Ionicons name="chevron-forward" size={18} color={palette.muted} /></Pressable>
         <Pressable onPress={() => setShowDelete(true)} style={[styles.actionRow, styles.dangerRow]}><View style={[styles.actionIcon, styles.dangerIcon]}><Ionicons name="trash-outline" size={19} color="#f87171" /></View><View style={styles.actionCopy}><Text style={styles.dangerTitle}>Delete account</Text><Text style={styles.actionDetail}>Permanently remove your account and data</Text></View><Ionicons name="chevron-forward" size={18} color="#f87171" /></Pressable>

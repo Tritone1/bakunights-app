@@ -1,13 +1,14 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Alert, Image, ImageBackground, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Alert, Image, ImageBackground, Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { api, appUrl } from "@/src/api";
 import { useAuth } from "@/src/AuthContext";
 import { useLanguage } from "@/src/LanguageContext";
 import { useUserLocation } from "@/src/LocationContext";
+import { LocalizedText as Text, LocalizedTextInput as TextInput } from "@/src/LocalizedText";
 import { displayFont, palette } from "@/src/theme";
 import type { Deal, HomepageStats, Restaurant } from "@/src/types";
 
@@ -34,7 +35,7 @@ function openDeal(router: ReturnType<typeof useRouter>, deal: Deal) {
 export default function HomeScreen() {
   const router = useRouter();
   const { user, loading: authLoading, logout } = useAuth();
-  const { language, cycleLanguage } = useLanguage();
+  const { language, cycleLanguage, translate } = useLanguage();
   const { coords, loading: locating, error: locationError, requestLocation } = useUserLocation();
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<(typeof CATEGORIES)[number]>("All");
@@ -85,13 +86,13 @@ export default function HomeScreen() {
     try { await api(`/deals/${deal.id}/save`, { method: wasSaved ? "DELETE" : "PUT" }); }
     catch (reason) {
       setSaved((current) => { const next = new Set(current); if (wasSaved) next.add(deal.id); else next.delete(deal.id); return next; });
-      Alert.alert("Could not update saved offers", reason instanceof Error ? reason.message : "Try again.");
+      Alert.alert(translate("Could not update saved offers"), reason instanceof Error ? reason.message : translate("Try again."));
     }
   }
 
   function account() {
     if (!user) { router.push("/login/customer" as never); return; }
-    Alert.alert(user.name, user.email, [{ text: "Cancel", style: "cancel" }, { text: "Log out", style: "destructive", onPress: () => void logout() }]);
+    Alert.alert(user.name, user.email, [{ text: translate("Cancel"), style: "cancel" }, { text: translate("Log out"), style: "destructive", onPress: () => void logout() }]);
   }
 
   const today = new Intl.DateTimeFormat(language === "az" ? "az-AZ" : language === "ru" ? "ru-RU" : "en-US", { weekday: "long", month: "long", day: "numeric" }).format(new Date());
@@ -101,9 +102,9 @@ export default function HomeScreen() {
       <View style={styles.header}>
         <View style={styles.brand}><View style={styles.logo}><Ionicons name="location" size={23} color={palette.night} /></View><Text style={styles.brandText}>Where<Text style={styles.gold}>ToGo</Text></Text></View>
         <View style={styles.headerActions}>
-          <Pressable onPress={cycleLanguage} style={styles.roundButton} accessibilityLabel="Change language"><Text style={styles.language}>{language.toUpperCase()}</Text></Pressable>
-          <Pressable onPress={() => void requestLocation()} style={[styles.roundButton, coords && styles.roundButtonActive]} accessibilityLabel="Use my location"><Ionicons name={locating ? "hourglass-outline" : "navigate"} size={17} color={coords ? palette.night : palette.gold} /></Pressable>
-          <Pressable onPress={account} style={styles.accountButton} accessibilityLabel="Account"><Ionicons name={user ? "person" : "person-outline"} size={17} color={palette.white} /></Pressable>
+          <Pressable onPress={cycleLanguage} style={styles.roundButton} accessibilityLabel={translate("Change language")}><Text style={styles.language}>{language.toUpperCase()}</Text></Pressable>
+          <Pressable onPress={() => void requestLocation()} style={[styles.roundButton, coords && styles.roundButtonActive]} accessibilityLabel={translate("Use my location")}><Ionicons name={locating ? "hourglass-outline" : "navigate"} size={17} color={coords ? palette.night : palette.gold} /></Pressable>
+          <Pressable onPress={account} style={styles.accountButton} accessibilityLabel={translate("Account")}><Ionicons name={user ? "person" : "person-outline"} size={17} color={palette.white} /></Pressable>
         </View>
       </View>
       {!authLoading && !user && <View style={styles.loginRow}><Pressable onPress={() => router.push("/login/customer" as never)} style={styles.secondaryButton}><Text style={styles.secondaryButtonText}>Customer login</Text></Pressable><Pressable onPress={() => router.push("/login/merchant" as never)} style={styles.goldButton}><Text style={styles.goldButtonText}>Merchant login</Text></Pressable></View>}
@@ -111,7 +112,7 @@ export default function HomeScreen() {
       <ImageBackground source={{ uri: `${appUrl}/wheretogo-hero.png` }} style={styles.hero} imageStyle={styles.heroImage}>
         <View style={styles.heroShade} />
         <View style={styles.heroBottom}>
-          <View style={styles.livePill}><View style={styles.liveDot} /><Text style={styles.liveLabel}>LIVE · {today.toUpperCase()}</Text></View>
+          <View style={styles.livePill}><View style={styles.liveDot} /><Text style={styles.liveLabel}>{translate("Live").toLocaleUpperCase(language === "az" ? "az-AZ" : language === "ru" ? "ru-RU" : "en-US")} · {today.toUpperCase()}</Text></View>
           <Text style={styles.heroTitle}>Great food.{"\n"}<Text style={styles.gold}>Great deals.</Text>{"\n"}Every day.</Text>
           <View style={styles.statsRow}><Stat value={stats.activeVenues} label="Venues" /><Stat value={stats.liveDeals} label="Deals" accent /><Stat value={stats.areas} label="Areas" /></View>
         </View>
