@@ -491,6 +491,7 @@ merchantRouter.patch("/deals/:id", asyncRoute(async (req, res) => {
       reviewedByUserId: null,
       reviewedAt: now,
       reviewNotes: "Published automatically. Admin monitoring only.",
+      liveCycle: existing.status === "expired" || !existing.isActive || existing.endsAt <= now ? { increment: 1 } : undefined,
       },
     });
   });
@@ -517,7 +518,13 @@ merchantRouter.post("/deals/:id/go-live", asyncRoute(async (req, res) => {
   const now = new Date();
   const deal = await prisma.deal.update({
     where: { id: existing.id },
-    data: { status: "approved", isActive: true, startsAt: now, endsAt: existing.endsAt > now ? existing.endsAt : new Date(now.getTime() + 24 * 60 * 60 * 1000) },
+    data: {
+      status: "approved",
+      isActive: true,
+      startsAt: now,
+      endsAt: existing.endsAt > now ? existing.endsAt : new Date(now.getTime() + 24 * 60 * 60 * 1000),
+      liveCycle: { increment: 1 },
+    },
   });
   res.json({ deal, visibility: "live" });
 }));

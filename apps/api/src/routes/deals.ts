@@ -98,7 +98,7 @@ dealsRouter.get("/:id", asyncRoute(async (req, res) => {
     where: { userId_restaurantId: { userId: req.user.id, restaurantId: deal.restaurantId } },
   })) : false;
   const redemption = req.user ? await prisma.redemption.findUnique({
-    where: { userId_dealId: { userId: req.user.id, dealId: deal.id } },
+    where: { userId_dealId_dealCycle: { userId: req.user.id, dealId: deal.id, dealCycle: deal.liveCycle } },
     include: { feedback: true },
   }) : null;
   const redemptionWithQr = redemption ? { ...redemption, qrDataUrl: await QRCode.toDataURL(redemption.redemptionCode, { width: 320, margin: 2 }) } : null;
@@ -125,11 +125,12 @@ dealsRouter.post("/:id/claim", requireAuth, asyncRoute(async (req, res) => {
   const deal = await prisma.deal.findUnique({ where: { id: dealId } });
   if (!deal || deal.status !== "approved" || !deal.isActive || deal.endsAt <= new Date()) throw new HttpError(410, "This offer is no longer available.");
   const redemption = await prisma.redemption.upsert({
-    where: { userId_dealId: { userId: req.user!.id, dealId: deal.id } },
+    where: { userId_dealId_dealCycle: { userId: req.user!.id, dealId: deal.id, dealCycle: deal.liveCycle } },
     update: {},
     create: {
       userId: req.user!.id,
       dealId: deal.id,
+      dealCycle: deal.liveCycle,
       redemptionCode: `GS-${crypto.randomUUID().slice(0, 8).toUpperCase()}`,
     },
   });
@@ -140,9 +141,10 @@ dealsRouter.post("/:id/claim", requireAuth, asyncRoute(async (req, res) => {
 dealsRouter.post("/:id/feedback", requireAuth, asyncRoute(async (req, res) => {
   const dealId = z.string().parse(req.params.id);
   const input = z.object({ wasHonored: z.boolean(), comment: z.string().trim().max(500).nullable().optional() }).parse(req.body);
+  const deal = await prisma.deal.findUnique({ where: { id: dealId }, select: { liveCycle: true, restaurantId: true } });
+  if (!deal) throw new HttpError(404, "Offer not found.");
   const redemption = await prisma.redemption.findUnique({
-    where: { userId_dealId: { userId: req.user!.id, dealId } },
-    include: { deal: { select: { restaurantId: true } } },
+    where: { userId_dealId_dealCycle: { userId: req.user!.id, dealId, dealCycle: deal.liveCycle } },
   });
   if (!redemption?.redeemedAt) throw new HttpError(403, "Feedback becomes available after the venue verifies your QR/code.");
   const feedback = await prisma.redemptionFeedback.upsert({
@@ -150,13 +152,15 @@ dealsRouter.post("/:id/feedback", requireAuth, asyncRoute(async (req, res) => {
     create: { redemptionId: redemption.id, wasHonored: input.wasHonored, comment: input.wasHonored ? null : input.comment || null },
     update: { wasHonored: input.wasHonored, comment: input.wasHonored ? null : input.comment || null },
   });
-  await recomputeVenueTrust(redemption.deal.restaurantId);
+  await recomputeVenueTrust(deal.restaurantId);
   res.json({ feedback });
 }));
 
 dealsRouter.post("/:id/feedback/skip", requireAuth, asyncRoute(async (req, res) => {
   const dealId = z.string().parse(req.params.id);
-  const redemption = await prisma.redemption.findUnique({ where: { userId_dealId: { userId: req.user!.id, dealId } } });
+  const deal = await prisma.deal.findUnique({ where: { id: dealId }, select: { liveCycle: true } });
+  if (!deal) throw new HttpError(404, "Offer not found.");
+  const redemption = await prisma.redemption.findUnique({ where: { userId_dealId_dealCycle: { userId: req.user!.id, dealId, dealCycle: deal.liveCycle } } });
   if (!redemption?.redeemedAt) throw new HttpError(403, "There is no completed redemption to dismiss.");
   await prisma.redemption.update({ where: { id: redemption.id }, data: { feedbackSkippedAt: new Date() } });
   res.status(204).end();
@@ -165,8 +169,10 @@ dealsRouter.post("/:id/feedback/skip", requireAuth, asyncRoute(async (req, res) 
 dealsRouter.put("/:id/rating", requireAuth, asyncRoute(async (req, res) => {
   const dealId = z.string().parse(req.params.id);
   const input = z.object({ value: z.number().int().min(1).max(5), comment: z.string().trim().max(500).optional() }).parse(req.body);
+  const deal = await prisma.deal.findUnique({ where: { id: dealId }, select: { liveCycle: true } });
+  if (!deal) throw new HttpError(404, "Offer not found.");
   const hasClaimed = await prisma.redemption.findUnique({
-    where: { userId_dealId: { userId: req.user!.id, dealId } },
+    where: { userId_dealId_dealCycle: { userId: req.user!.id, dealId, dealCycle: deal.liveCycle } },
   });
   if (!hasClaimed) throw new HttpError(403, "Claim this offer before rating it.");
   const rating = await prisma.dealRating.upsert({

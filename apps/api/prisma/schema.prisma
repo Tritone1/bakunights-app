@@ -159,6 +159,7 @@ model Deal {
   dietaryTags       String[]          @default([]) @map("dietary_tags")
   startsAt          DateTime          @map("starts_at")
   endsAt            DateTime          @map("ends_at")
+  liveCycle         Int               @default(1) @map("live_cycle")
   isActive          Boolean           @default(true) @map("is_active")
   isRecurring       Boolean           @default(false) @map("is_recurring")
   recurrenceRule    String?           @map("recurrence_rule")
@@ -270,6 +271,7 @@ model Redemption {
   id                String              @id @default(cuid())
   userId            String              @map("user_id")
   dealId            String              @map("deal_id")
+  dealCycle         Int                 @default(1) @map("deal_cycle")
   claimedAt         DateTime            @default(now()) @map("claimed_at")
   redeemedAt        DateTime?           @map("redeemed_at")
   feedbackSkippedAt DateTime?           @map("feedback_skipped_at")
@@ -279,7 +281,7 @@ model Redemption {
   feedback          RedemptionFeedback?
   pointSpin         PointSpin?
 
-  @@unique([userId, dealId])
+  @@unique([userId, dealId, dealCycle])
   @@map("redemptions")
 }
 
