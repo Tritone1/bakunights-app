@@ -188,7 +188,7 @@ export function AuthPage() {
   </AuthShell>;
 }
 
-function Brand() { return <Link to="/" className="inline-flex items-center gap-3 text-white"><span className="grid h-11 w-11 place-items-center rounded-xl bg-gold text-night"><Moon size={23} /></span><span className="text-xl font-bold">Baku<span className="text-gold">Nights</span></span></Link>; }
+function Brand() { return <Link to="/" className="inline-flex items-center gap-3 text-white"><span className="grid h-11 w-11 place-items-center rounded-xl bg-gold text-night"><Moon size={23} /></span><span className="text-xl font-bold">Where<span className="text-gold">ToGo</span></span></Link>; }
 
 function PasswordField({ name, label, visible, setVisible, autoComplete }: { name: string; label: string; visible: boolean; setVisible: (value: boolean) => void; autoComplete: string }) {
   return <label className="block"><span className="form-label">{label}</span><span className="relative block"><input className="form-field pr-12" name={name} type={visible ? "text" : "password"} autoComplete={autoComplete} required minLength={8} maxLength={128} placeholder="At least 8 characters" /><button type="button" onClick={() => setVisible(!visible)} className="absolute right-2 top-1/2 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-lg text-white/60 transition hover:bg-white/10 hover:text-white" aria-label={visible ? "Hide password" : "Show password"}>{visible ? <EyeOff size={18} /> : <Eye size={18} />}</button></span></label>;

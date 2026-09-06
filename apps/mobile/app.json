@@ -1,7 +1,8 @@
 {
   "expo": {
     "name": "WhereToGo",
-    "slug": "haragedek",
+    "slug": "exp19216801018081",
+    "owner": "tritone",
     "version": "1.0.0",
     "orientation": "portrait",
     "platforms": [
@@ -9,7 +10,7 @@
       "android"
     ],
     "icon": "./assets/images/icon.png",
-    "scheme": "haragedek",
+    "scheme": "wheretogo",
     "userInterfaceStyle": "dark",
     "ios": {
       "supportsTablet": true,
@@ -25,10 +26,12 @@
       }
     },
     "android": {
+      "blockedPermissions": [
+        "android.permission.RECORD_AUDIO"
+      ],
       "adaptiveIcon": {
-        "backgroundColor": "#f0f4f9",
+        "backgroundColor": "#09090e",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
@@ -54,14 +57,21 @@
         }
       ],
       [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow WhereToGo merchants to scan customer offer QR codes.",
+          "recordAudioAndroid": false
+        }
+      ],
+      [
         "expo-splash-screen",
         {
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#2e5ba8",
+          "backgroundColor": "#09090e",
           "dark": {
-            "backgroundColor": "#1e3f7f"
+            "backgroundColor": "#09090e"
           }
         }
       ],
@@ -73,6 +83,11 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": "c674cdab-0eda-4a02-a15b-8994b7cc5a4f"
+      }
     }
   }
 }

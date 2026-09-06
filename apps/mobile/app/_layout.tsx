@@ -5,25 +5,29 @@ import "react-native-reanimated";
 
 import { LocationProvider } from "@/src/LocationContext";
 import { AuthProvider } from "@/src/AuthContext";
+import { LanguageProvider } from "@/src/LanguageContext";
 
-const haragedekTheme = {
+const whereToGoTheme = {
   ...DarkTheme,
-  colors: { ...DarkTheme.colors, primary: "#e67e35", background: "#1f2937", card: "#2d3748", border: "rgba(230,126,53,0.2)" },
+  colors: { ...DarkTheme.colors, primary: "#f59e0b", background: "#09090e", card: "#12121c", border: "rgba(255,255,255,0.09)" },
 };
 
 export default function RootLayout() {
   return (
-    <ThemeProvider value={haragedekTheme}>
-      <AuthProvider>
-        <LocationProvider>
-          <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: "#1f2937" } }}>
+    <ThemeProvider value={whereToGoTheme}>
+      <LanguageProvider>
+        <AuthProvider>
+          <LocationProvider>
+          <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: "#09090e" } }}>
             <Stack.Screen name="(tabs)" />
+            <Stack.Screen name="deals/[id]" />
             <Stack.Screen name="login/[accountType]" options={{ presentation: "modal" }} />
             <Stack.Screen name="register/[accountType]" options={{ presentation: "modal" }} />
           </Stack>
           <StatusBar style="light" />
-        </LocationProvider>
-      </AuthProvider>
+          </LocationProvider>
+        </AuthProvider>
+      </LanguageProvider>
     </ThemeProvider>
   );
 }

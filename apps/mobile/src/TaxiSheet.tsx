@@ -1,10 +1,10 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Linking, Modal, Pressable, StyleSheet, Text, View } from "react-native";
 
-import type { Venue } from "./venues";
+import type { Restaurant } from "./types";
 
 type Props = {
-  venue: Venue | null;
+  venue: Restaurant | null;
   onClose: () => void;
 };
 
@@ -12,12 +12,12 @@ export function TaxiSheet({ venue, onClose }: Props) {
   if (!venue) return null;
 
   async function openGoogleMaps() {
-    const destination = `${venue?.latitude},${venue?.longitude}`;
+    const destination = `${venue?.lat},${venue?.lng}`;
     await Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(destination)}&travelmode=driving`);
   }
 
   async function openWaze() {
-    const destination = `${venue?.latitude},${venue?.longitude}`;
+    const destination = `${venue?.lat},${venue?.lng}`;
     await Linking.openURL(`https://waze.com/ul?ll=${encodeURIComponent(destination)}&navigate=yes&zoom=17&utm_source=wheretogo`);
   }
 

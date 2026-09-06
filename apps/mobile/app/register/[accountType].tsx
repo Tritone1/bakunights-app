@@ -9,6 +9,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { api } from "@/src/api";
 
 type PickedImage = { uri: string; name: string; type: string; size?: number };
+const venueTypes = ["Restaurant", "Pub", "Bar", "Lounge", "Cafe"] as const;
 
 export default function MobileRegisterScreen() {
   const router = useRouter();
@@ -16,6 +17,7 @@ export default function MobileRegisterScreen() {
   const isMerchant = params.accountType === "merchant";
   const [name, setName] = useState("");
   const [venueName, setVenueName] = useState("");
+  const [venueType, setVenueType] = useState<(typeof venueTypes)[number] | "">("");
   const [venueAddress, setVenueAddress] = useState("");
   const [venueLat, setVenueLat] = useState("");
   const [venueLng, setVenueLng] = useState("");
@@ -95,6 +97,7 @@ export default function MobileRegisterScreen() {
     const validation = passwordProblem();
     if (validation) { setError(validation); return; }
     if (isMerchant && !venueName.trim()) { setError("Venue name is required."); return; }
+    if (isMerchant && !venueType) { setError("Choose whether your venue is a restaurant, pub, bar, lounge, or cafe."); return; }
     if (isMerchant && !venueAddress.trim()) { setError("Venue address is required."); return; }
     if (isMerchant && (!venueLat.trim() || !venueLng.trim())) {
       setError("Use your current location or enter the venue coordinates manually.");
@@ -112,6 +115,7 @@ export default function MobileRegisterScreen() {
       form.append("confirmPassword", confirmPassword);
       if (isMerchant) {
         form.append("venueName", venueName.trim());
+        form.append("venueType", venueType);
         form.append("venueAddress", venueAddress.trim());
         form.append("venueLat", venueLat.trim());
         form.append("venueLng", venueLng.trim());
@@ -128,7 +132,7 @@ export default function MobileRegisterScreen() {
     }
   }
 
-  const registrationDisabled = busy || !name || !email || (isMerchant && (!venueName || !venueAddress || !venueLat || !venueLng));
+  const registrationDisabled = busy || !name || !email || (isMerchant && (!venueName || !venueType || !venueAddress || !venueLat || !venueLng));
 
   async function resendRegistration() {
     setBusy(true); setError("");
@@ -149,14 +153,15 @@ export default function MobileRegisterScreen() {
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
           <View style={styles.top}>
             <Pressable onPress={() => router.back()} style={styles.close}><Ionicons name="close" color="#fff" size={22} /></Pressable>
-            <View style={styles.logo}><Ionicons name="moon" color="#09090e" size={22} /></View>
+            <View style={styles.brand}><View style={styles.logo}><Ionicons name="location" color="#09090e" size={22} /></View><Text style={styles.brandText}>Where<Text style={styles.brandAccent}>ToGo</Text></Text></View>
           </View>
-          <Text style={styles.eyebrow}>{isMerchant ? "VENUE PARTNERS" : "BAKU AFTER DARK"}</Text>
+          <Text style={styles.eyebrow}>{isMerchant ? "VENUE PARTNERS" : "GREAT DEALS EVERY DAY"}</Text>
           <Text style={styles.title}>{isMerchant ? "Register your venue" : "Create account"}</Text>
           <Text style={styles.body}>Verify your email before logging in.</Text>
           {notice ? <View style={styles.notice}><Text style={styles.noticeText}>{notice}</Text>{devVerificationUrl ? <Pressable onPress={() => Linking.openURL(devVerificationUrl)}><Text style={styles.verifyLink}>Open development verification link</Text></Pressable> : null}</View> : null}
           <Field label={isMerchant ? "Contact name" : "Name"} value={name} onChangeText={setName} autoCapitalize="words" />
           {isMerchant && <Field label="Venue name" value={venueName} onChangeText={setVenueName} autoCapitalize="words" />}
+          {isMerchant && <View><Text style={styles.label}>VENUE TYPE</Text><View style={styles.venueTypes}>{venueTypes.map((type) => <Pressable key={type} onPress={() => setVenueType(type)} style={[styles.venueType, venueType === type && styles.venueTypeActive]}><Text style={[styles.venueTypeText, venueType === type && styles.venueTypeTextActive]}>{type}</Text></Pressable>)}</View></View>}
           {isMerchant && <View style={styles.locationCard}>
             <Text style={styles.locationTitle}>VENUE LOCATION</Text>
             <Text style={styles.locationHelp}>Use your position while at the venue, or enter the exact address and coordinates manually.</Text>
@@ -195,6 +200,9 @@ const styles = StyleSheet.create({
   top: { flexDirection: "row", justifyContent: "space-between", marginBottom: 18 },
   close: { width: 42, height: 42, borderRadius: 21, borderWidth: 1, borderColor: "rgba(255,255,255,.12)", alignItems: "center", justifyContent: "center" },
   logo: { width: 44, height: 44, borderRadius: 14, backgroundColor: "#f59e0b", alignItems: "center", justifyContent: "center" },
+  brand: { flexDirection: "row", alignItems: "center", gap: 9 },
+  brandText: { color: "#fff", fontSize: 18, fontWeight: "900" },
+  brandAccent: { color: "#f59e0b" },
   eyebrow: { color: "#67e8f9", fontSize: 10, fontWeight: "800", letterSpacing: 2 },
   title: { color: "#fff", fontSize: 36, fontWeight: "900", letterSpacing: -1 },
   body: { color: "#8f8f9d", fontSize: 14, marginBottom: 4 },
@@ -206,6 +214,11 @@ const styles = StyleSheet.create({
   successHint: { color: "#777785", fontSize: 12, lineHeight: 18, marginBottom: 5 },
   label: { color: "#777785", fontSize: 10, fontWeight: "800", letterSpacing: 1.5, marginBottom: 7 },
   input: { height: 52, borderRadius: 14, borderWidth: 1, borderColor: "rgba(255,255,255,.12)", backgroundColor: "#15151e", color: "#fff", paddingHorizontal: 15 },
+  venueTypes: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  venueType: { borderRadius: 18, borderWidth: 1, borderColor: "rgba(255,255,255,.12)", backgroundColor: "#15151e", paddingHorizontal: 13, paddingVertical: 10 },
+  venueTypeActive: { borderColor: "#f59e0b", backgroundColor: "rgba(245,158,11,.14)" },
+  venueTypeText: { color: "#8f8f9d", fontSize: 12, fontWeight: "800" },
+  venueTypeTextActive: { color: "#fbbf24" },
   passwordRow: { height: 52, borderRadius: 14, borderWidth: 1, borderColor: "rgba(255,255,255,.12)", backgroundColor: "#15151e", paddingHorizontal: 15, flexDirection: "row", alignItems: "center" },
   passwordInput: { flex: 1, color: "#fff", height: "100%" },
   hint: { color: "#5f5f6c", fontSize: 10, marginTop: 6 },

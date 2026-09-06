@@ -1,50 +1,44 @@
-# Welcome to your Expo app 👋
+# WhereToGo mobile
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+The native Android and iOS app uses Expo SDK 57 and the same live WhereToGo data as the web app.
 
-## Get started
+## Run on a phone with Expo Go
 
-1. Install dependencies
+From the repository root:
 
-   ```bash
-   npm install
-   ```
-
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
-
-```bash
-npm run reset-project
+```powershell
+npm run dev:mobile -- --clear
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+Or from this directory:
 
-## Learn more
+```powershell
+npm install
+npm run start:lan
+```
 
-To learn more about developing your project with Expo, look at the following resources:
+Scan the QR code with Expo Go on Android, or with the iPhone Camera app and open it in Expo Go. The computer and phone must normally be on the same network. Start with LAN mode; use a tunnel only when the network blocks LAN traffic.
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+The installed Expo Go app must support SDK 57. App icons and splash screens belong to a standalone development/production build; Expo Go itself keeps the Expo Go launcher icon.
 
-## Join the community
+## API
 
-Join our community of developers creating universal apps.
+By default, the app uses the production API:
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+```text
+https://bakunights-app-production.up.railway.app/api
+```
+
+The legacy word in this server hostname is internal only; all user-facing branding is WhereToGo. To test against another server, set `EXPO_PUBLIC_API_URL` before starting Expo. A physical phone cannot reach a server through the computer's `localhost`; use the computer's LAN IP or a public HTTPS URL.
+
+## Validation
+
+```powershell
+npm run typecheck
+npm run lint
+npx expo-doctor
+npx expo export --platform android --output-dir dist/android-check --clear
+npx expo export --platform ios --output-dir dist/ios-check --clear
+```
+
+The EAS project is linked in `app.json`. Native store/test builds can be created with EAS after adding the desired build profiles.
