@@ -31,6 +31,9 @@
   "engines": {
     "node": ">=20"
   },
+  "dependencies": {
+    "expo": "~57.0.20"
+  },
   "optionalDependencies": {
     "@emnapi/wasi-threads": "^1.2.1"
   }
