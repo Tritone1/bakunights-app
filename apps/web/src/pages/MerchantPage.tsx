@@ -13,7 +13,7 @@ type MerchantDeal = {
   scope: OfferScope; scopeCategoryId?: string | null; offerMenuItems: { menuItemId: string; overridePriceAzn?: string | number | null; menuItem: MenuItem }[];
   _count: { views: number; savedBy: number; redemptions: number };
 };
-type ManagedVenue = { id: string; name: string; address: string; cuisine: string; lat: number; lng: number; phone?: string | null; photoUrl: string | null; googlePlaceId?: string | null; deals: MerchantDeal[]; _count: { followers: number } };
+type ManagedVenue = { id: string; name: string; address: string; cuisine: string; lat: number; lng: number; phone?: string | null; photoUrl: string | null; googlePlaceId?: string | null; hoursJson?: { open?: string | null; close?: string | null } | null; deals: MerchantDeal[]; _count: { followers: number } };
 type MenuCategory = { id: string; name: string; sortOrder: number; isGlobal: boolean; createdByVenueId?: string | null };
 type VenueMenuCategory = { venueId: string; categoryId: string; sortOrder: number; category: MenuCategory };
 type VenueMenuCategoryOptions = { selected: VenueMenuCategory[]; available: MenuCategory[] };
@@ -47,12 +47,39 @@ const FLASH_MIN_DISCOUNT = 25;
 const FLASH_MAX_DURATION_MS = 6 * 60 * 60 * 1000;
 const FLASH_ELIGIBLE_OFFER_TYPES: OfferType[] = ["discount", "combo", "set_menu", "bundle"];
 // Keep in sync with DAYPART_HOURS in apps/api/src/routes/merchant.ts.
-const DAYPART_HOURS: Record<string, { startHour: number; endHour: number; label: string }> = {
-  breakfast: { startHour: 6, endHour: 11, label: "6:00 AM\u201311:00 AM" },
-  lunch: { startHour: 11, endHour: 16, label: "11:00 AM\u20134:00 PM" },
-  "happy hour": { startHour: 16, endHour: 19, label: "4:00 PM\u20137:00 PM" },
-  dinner: { startHour: 19, endHour: 23, label: "7:00 PM\u201311:00 PM" },
+// Breakfast has no fixed start hour since venues open at different times - it defaults to 8:00 AM
+// but adapts to each venue's declared opening time (venue.hoursJson.open) when available.
+const DAYPART_HOURS: Record<string, { startMinutes: number; endMinutes: number; label: string }> = {
+  breakfast: { startMinutes: 8 * 60, endMinutes: 12 * 60, label: "8:00 AM\u201312:00 PM" },
+  lunch: { startMinutes: 12 * 60, endMinutes: 16 * 60, label: "12:00 PM\u20134:00 PM" },
+  "happy hour": { startMinutes: 16 * 60, endMinutes: 19 * 60, label: "4:00 PM\u20137:00 PM" },
+  dinner: { startMinutes: 19 * 60, endMinutes: 23 * 60, label: "7:00 PM\u201311:00 PM" },
 };
+
+function formatMinutesOfDay(totalMinutes: number) {
+  const hour24 = Math.floor(totalMinutes / 60) % 24;
+  const minute = totalMinutes % 60;
+  const period = hour24 < 12 ? "AM" : "PM";
+  const hour12 = hour24 % 12 === 0 ? 12 : hour24 % 12;
+  return `${hour12}:${String(minute).padStart(2, "0")} ${period}`;
+}
+
+function venueOpenTimeMinutes(hoursJson: { open?: string | null; close?: string | null } | null | undefined) {
+  const open = hoursJson?.open;
+  if (typeof open !== "string") return null;
+  const match = /^([01]?\d|2[0-3]):([0-5]\d)$/.exec(open);
+  if (!match) return null;
+  return Number(match[1]) * 60 + Number(match[2]);
+}
+
+function resolveDaypartWindow(tag: string, venueHoursJson?: { open?: string | null; close?: string | null } | null) {
+  const base = DAYPART_HOURS[tag];
+  if (!base) return null;
+  if (tag !== "breakfast") return base;
+  const openMinutes = venueOpenTimeMinutes(venueHoursJson);
+  if (openMinutes == null || openMinutes >= base.endMinutes) return base;
+  return { startMinutes: openMinutes, endMinutes: base.endMinutes, label: `${formatMinutesOfDay(openMinutes)}\u2013${formatMinutesOfDay(base.endMinutes)}` };
+}
 
 function toLocalInputValue(date: Date) {
   const value = new Date(date);
@@ -60,29 +87,27 @@ function toLocalInputValue(date: Date) {
   return value.toISOString().slice(0, 16);
 }
 
-function daypartWindow(referenceValue: string, tag: string) {
-  const hours = DAYPART_HOURS[tag];
-  if (!hours || !referenceValue) return null;
+function daypartWindow(referenceValue: string, tag: string, venueHoursJson?: { open?: string | null; close?: string | null } | null) {
+  const window = resolveDaypartWindow(tag, venueHoursJson);
+  if (!window || !referenceValue) return null;
   const base = new Date(referenceValue);
   const start = new Date(base);
-  start.setHours(hours.startHour, 0, 0, 0);
+  start.setHours(Math.floor(window.startMinutes / 60), window.startMinutes % 60, 0, 0);
   const end = new Date(base);
-  end.setHours(hours.endHour, 0, 0, 0);
+  end.setHours(Math.floor(window.endMinutes / 60), window.endMinutes % 60, 0, 0);
   return { startsAt: toLocalInputValue(start), endsAt: toLocalInputValue(end) };
 }
 
-function daypartValidationError(tag: string, startsAt: string, endsAt: string) {
-  const hours = DAYPART_HOURS[tag];
-  if (!hours) return null;
+function daypartValidationError(tag: string, startsAt: string, endsAt: string, venueHoursJson?: { open?: string | null; close?: string | null } | null) {
+  const window = resolveDaypartWindow(tag, venueHoursJson);
+  if (!window) return null;
   const start = new Date(startsAt);
   const end = new Date(endsAt);
-  const windowStart = new Date(start);
-  windowStart.setHours(hours.startHour, 0, 0, 0);
-  const windowEnd = new Date(start);
-  windowEnd.setHours(hours.endHour, 0, 0, 0);
+  const startMinutes = start.getHours() * 60 + start.getMinutes();
+  const endMinutes = end.getHours() * 60 + end.getMinutes();
   const sameDay = start.toDateString() === end.toDateString();
-  if (!sameDay || start < windowStart || end > windowEnd) {
-    return `${tag.charAt(0).toUpperCase() + tag.slice(1)} offers must run within that day's ${tag} hours (${hours.label}).`;
+  if (!sameDay || startMinutes < window.startMinutes || endMinutes > window.endMinutes) {
+    return `${tag.charAt(0).toUpperCase() + tag.slice(1)} offers must run within that day's ${tag} hours (${window.label}).`;
   }
   return null;
 }
@@ -588,8 +613,11 @@ function DealForm({ venues, categoryOptions, menuItems, editing, onOpenMenu, onC
   const isSpendReward = offerType === "perk" || (offerType === "bundle" && bundleRewardMode);
   const minimumItems = offerType === "bundle" && bundleRewardMode ? 1 : typeConfig.minimumItems;
   const usesItemPrices = offerType === "bundle" && !bundleRewardMode;
+  const showReprice = usesItemPrices || (offerType === "discount" && scope === "SPECIFIC_ITEMS");
   const selectedCategories = (categoryOptions[venueId]?.selected ?? []).map((row) => ({ ...row.category, sortOrder: row.sortOrder }));
   const activeItems = menuItems.filter((item) => item.venueId === venueId && item.isActive);
+  const selectedVenue = venues.find((venue) => venue.id === venueId);
+  const venueHoursJson = selectedVenue?.hoursJson;
   const selectedMenuItems = activeItems.filter((item) => selectedItems.includes(item.id));
   const scopedItemPhotos = scope === "SPECIFIC_ITEMS"
     ? selectedMenuItems.filter((item) => item.photoUrl)
@@ -614,11 +642,32 @@ function DealForm({ venues, categoryOptions, menuItems, editing, onOpenMenu, onC
   const flashCapableType = FLASH_ELIGIBLE_OFFER_TYPES.includes(offerType) && !isSpendReward;
   const activeCategoryIds = new Set(activeItems.map((item) => item.categoryId));
   const offerCategories = selectedCategories.filter((category) => activeCategoryIds.has(category.id));
+  useEffect(() => {
+    if (!isSpendReward || scope !== "SPECIFIC_ITEMS") return;
+    const total = selectedMenuItems.filter((item) => item.id !== freeMenuItemId).reduce((sum, item) => sum + item.priceAzn, 0);
+    if (total > 0) setMinimumSpend(String(total));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isSpendReward, scope, selectedItems, freeMenuItemId]);
+  useEffect(() => {
+    if (offerType !== "discount" || scope !== "SPECIFIC_ITEMS") return;
+    const hasReprice = selectedMenuItems.some((item) => itemOverrides[item.id] !== undefined && itemOverrides[item.id] !== "");
+    if (hasReprice && regularTotal > 0 && offerTotal < regularTotal) setManualDiscount(String(Math.round(((regularTotal - offerTotal) / regularTotal) * 100)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [offerType, scope, itemOverrides, selectedItems]);
+  function clearFieldError(...fields: string[]) {
+    setFieldErrors((current) => {
+      if (!fields.some((field) => field in current)) return current;
+      const next = { ...current };
+      fields.forEach((field) => delete next[field]);
+      return next;
+    });
+    setFormError("");
+  }
   function handleTagChange(nextTag: string) {
     setTag(nextTag);
-    const window = daypartWindow(startsAt, nextTag);
+    const window = daypartWindow(startsAt, nextTag, venueHoursJson);
     if (window) { setStartsAt(window.startsAt); setEndsAt(window.endsAt); }
-    setFieldErrors((current) => { const { tag: _t, startsAt: _s, endsAt: _e, ...rest } = current; return rest; });
+    clearFieldError("tag", "startsAt", "endsAt");
   }
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -637,7 +686,7 @@ function DealForm({ venues, categoryOptions, menuItems, editing, onOpenMenu, onC
     if (isSpendReward && !freeMenuItemId) return fail("Choose the item the customer receives free.", ["freeMenuItemId"]);
     if (usesItemPrices && offerTotal >= regularTotal) return fail("Reduce at least one bundle item price or mark an item as free.", ["menuItemOverrides"]);
     if (new Date(endsAt).getTime() <= new Date(startsAt).getTime()) return fail("End time must be after start time.", ["endsAt"]);
-    const daypartError = daypartValidationError(tag, startsAt, endsAt);
+    const daypartError = daypartValidationError(tag, startsAt, endsAt, venueHoursJson);
     if (daypartError) return fail(daypartError, ["tag", "startsAt", "endsAt"]);
     if (isFlash && !flashEligible) return fail("Flash deals need an effective discount of 25% or more and a window of 6 hours or less.", ["isFlash"]);
     const body = { restaurantId: String(form.get("restaurantId")), scope, scopeCategoryId: scope === "CATEGORY" ? scopeCategoryId : null, menuItemIds: scope === "SPECIFIC_ITEMS" ? selectedItems : [], menuItemOverrides: usesItemPrices ? Object.fromEntries(Object.entries(itemOverrides).filter(([id, value]) => selectedItems.includes(id) && value !== "").map(([id, value]) => [id, Number(value)])) : {}, offerPriceAzn: typeConfig.usesTotalPrice ? numericOfferPrice : usesItemPrices ? offerTotal : null, minimumSpendAzn: isSpendReward ? Number(minimumSpend) : null, freeMenuItemId: isSpendReward ? freeMenuItemId : null, photoUrl: selectedItemPhotos.length ? null : photoUrl || null, title: String(form.get("title")), description: String(form.get("description")), menuItem: menuItem || null, offerType: String(form.get("offerType")), discountPct: discountValue ? Number(discountValue) : null, isFlash: flashCapableType && isFlash, tag, dietaryTags: typeConfig.showDietaryTags ? String(form.get("dietaryTags") || "").split(",").map((item) => item.trim()).filter(Boolean) : [], startsAt: new Date(startsAt).toISOString(), endsAt: new Date(endsAt).toISOString(), isRecurring: false };
@@ -661,22 +710,22 @@ function DealForm({ venues, categoryOptions, menuItems, editing, onOpenMenu, onC
       <div className="md:col-span-2 rounded-xl border border-gold/20 bg-gold/[0.06] p-3"><strong className="text-sm text-amber-100">{typeConfig.label}</strong><p className="mt-1 text-sm leading-5 text-white/55">{typeConfig.description}</p></div>
       {offerType === "bundle" && <fieldset className="md:col-span-2"><legend className="form-label">Bundle style</legend><div className="grid gap-2 sm:grid-cols-2"><button type="button" onClick={() => { setBundleRewardMode(false); setMinimumSpend(""); setFreeMenuItemId(""); setItemOverrides({}); setFormError(""); }} className={`rounded-xl border p-3 text-left transition ${!bundleRewardMode ? "border-gold/50 bg-gold/10 text-amber-100" : "border-white/10 bg-white/[0.025] text-white/60"}`}><strong className="block text-sm">Fixed bundle</strong><span className="mt-1 block text-xs">Set each included item’s offer price or mark it free.</span></button><button type="button" onClick={() => { setBundleRewardMode(true); setItemOverrides({}); setOfferPrice(""); setFormError(""); }} className={`rounded-xl border p-3 text-left transition ${bundleRewardMode ? "border-gold/50 bg-gold/10 text-amber-100" : "border-white/10 bg-white/[0.025] text-white/60"}`}><strong className="block text-sm">Spend & get one free</strong><span className="mt-1 block text-xs">Example: spend 30 AZN on pizza and get one pizza free.</span></button></div></fieldset>}
       {offerType !== "event" && <label><span className="form-label">What does it cover?</span><select value={scope} disabled={typeConfig.allowedScopes.length === 1} onChange={(event) => { setScope(event.target.value as OfferScope); setScopeCategoryId(""); setSelectedItems([]); setItemOverrides({}); setFreeMenuItemId(""); }} className="form-field disabled:cursor-not-allowed disabled:opacity-75">{typeConfig.allowedScopes.includes("WHOLE_MENU") && <option value="WHOLE_MENU">Whole menu</option>}{typeConfig.allowedScopes.includes("CATEGORY") && <option value="CATEGORY">One menu category</option>}{typeConfig.allowedScopes.includes("SPECIFIC_ITEMS") && <option value="SPECIFIC_ITEMS">Selected menu items</option>}</select>{typeConfig.allowedScopes.length === 1 && <span className="mt-1 block text-xs text-cyan-200">{isSpendReward ? "Choose the item the customer must buy." : `${typeConfig.label} offers require at least ${minimumItems} specific menu items.`}</span>}</label>}
-      {scope === "CATEGORY" && <label className="md:col-span-2"><span className="form-label">Covered category</span><select name="scopeCategoryId" value={scopeCategoryId} onChange={(event) => setScopeCategoryId(event.target.value)} className={`form-field ${fieldErrors.scopeCategoryId ? "border-red-400/70 ring-2 ring-red-400/20" : ""}`} required><option value="">Choose an enabled section with active items</option>{offerCategories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select><FieldNote message={fieldErrors.scopeCategoryId} />{!offerCategories.length && <span className="mt-2 block text-xs text-amber-200">No selected section has active menu items. Add or activate items from the Menu tab first.</span>}</label>}
+      {scope === "CATEGORY" && <label className="md:col-span-2"><span className="form-label">Covered category</span><select name="scopeCategoryId" value={scopeCategoryId} onChange={(event) => { setScopeCategoryId(event.target.value); clearFieldError("scopeCategoryId"); }} className={`form-field ${fieldErrors.scopeCategoryId ? "border-red-400/70 ring-2 ring-red-400/20" : ""}`} required><option value="">Choose an enabled section with active items</option>{offerCategories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select><FieldNote message={fieldErrors.scopeCategoryId} />{!offerCategories.length && <span className="mt-2 block text-xs text-amber-200">No selected section has active menu items. Add or activate items from the Menu tab first.</span>}</label>}
       {scope === "SPECIFIC_ITEMS" && <div className="md:col-span-2 rounded-xl border border-white/10 p-3">
         <div className="mb-2 flex items-end justify-between gap-3"><p className="form-label mb-0">{isSpendReward ? "Qualifying items" : typeConfig.itemLabel}</p><span className="text-xs text-white/40">Choose at least {minimumItems}</span></div>
-        {activeItems.length ? <><input value={itemSearch} onChange={(event) => setItemSearch(event.target.value)} className="form-field mb-2" placeholder={`Search items for this ${typeConfig.label.toLowerCase()}...`} /><div className="max-h-60 space-y-1 overflow-y-auto">{activeItems.filter((item) => item.name.toLowerCase().includes(itemSearch.toLowerCase())).map((item) => <div key={item.id} className="flex flex-wrap items-center gap-2 rounded-lg p-2 hover:bg-white/5"><label className="flex min-w-0 flex-1 items-center gap-2"><input type="checkbox" checked={selectedItems.includes(item.id)} onChange={() => { setSelectedItems((ids) => ids.includes(item.id) ? ids.filter((id) => id !== item.id) : [...ids, item.id]); if (isSpendReward && freeMenuItemId === item.id) setFreeMenuItemId(""); }} /><span className="flex-1 truncate">{item.name}</span>{item.photoUrl && <span className="text-xs text-cyan-300">photo</span>}<span className="text-gold">{item.priceAzn.toFixed(2)} AZN</span></label>{selectedItems.includes(item.id) && usesItemPrices && <div className="flex items-center gap-1.5"><input aria-label={`Bundle price for ${item.name}`} value={itemOverrides[item.id] ?? ""} onChange={(event) => setItemOverrides((values) => ({ ...values, [item.id]: event.target.value }))} type="number" min="0" step="0.01" className="w-28 rounded-lg border border-white/10 bg-black/20 px-2 py-1 text-sm" placeholder="Offer AZN" /><button type="button" onClick={() => setItemOverrides((values) => ({ ...values, [item.id]: "0" }))} className={`rounded-lg border px-2 py-1 text-xs font-bold ${itemOverrides[item.id] === "0" ? "border-emerald-400/50 bg-emerald-400/15 text-emerald-200" : "border-white/10 text-white/55"}`}>Free</button></div>}</div>)}</div>{usesItemPrices && selectedMenuItems.length > 0 && <div className="mt-3 rounded-lg bg-black/20 p-3 text-sm"><div className="flex justify-between text-white/55"><span>Regular total</span><span>{regularTotal.toFixed(2)} AZN</span></div><div className="mt-1 flex justify-between font-bold text-emerald-200"><span>Bundle total</span><span>{offerTotal.toFixed(2)} AZN</span></div>{savingsAmount > 0 && <div className="mt-1 flex justify-between text-amber-200"><span>Total saving</span><span>{savingsAmount.toFixed(2)} AZN ({savingsPercent}%)</span></div>}</div>}</> : <p className="text-sm text-white/55">No active items yet. <button type="button" onClick={onOpenMenu} className="font-bold text-cyan-300 underline">Add menu items</button> before creating this offer.</p>}
+        {activeItems.length ? <><input value={itemSearch} onChange={(event) => setItemSearch(event.target.value)} className="form-field mb-2" placeholder={`Search items for this ${typeConfig.label.toLowerCase()}...`} /><div className="max-h-60 space-y-1 overflow-y-auto">{activeItems.filter((item) => item.name.toLowerCase().includes(itemSearch.toLowerCase())).map((item) => <div key={item.id} className="flex flex-wrap items-center gap-2 rounded-lg p-2 hover:bg-white/5"><label className="flex min-w-0 flex-1 items-center gap-2"><input type="checkbox" checked={selectedItems.includes(item.id)} onChange={() => { setSelectedItems((ids) => ids.includes(item.id) ? ids.filter((id) => id !== item.id) : [...ids, item.id]); if (isSpendReward && freeMenuItemId === item.id) setFreeMenuItemId(""); }} /><span className="flex-1 truncate">{item.name}</span>{item.photoUrl && <span className="text-xs text-cyan-300">photo</span>}<span className="text-gold">{item.priceAzn.toFixed(2)} AZN</span></label>{selectedItems.includes(item.id) && showReprice && <div className="flex items-center gap-1.5"><input aria-label={`Reprice ${item.name}`} value={itemOverrides[item.id] ?? ""} onChange={(event) => setItemOverrides((values) => ({ ...values, [item.id]: event.target.value }))} type="number" min="0" step="0.01" className="w-28 rounded-lg border border-white/10 bg-black/20 px-2 py-1 text-sm" placeholder="New price" /><button type="button" onClick={() => setItemOverrides((values) => ({ ...values, [item.id]: "0" }))} className={`rounded-lg border px-2 py-1 text-xs font-bold ${itemOverrides[item.id] === "0" ? "border-emerald-400/50 bg-emerald-400/15 text-emerald-200" : "border-white/10 text-white/55"}`}>Free</button></div>}</div>)}</div>{showReprice && selectedMenuItems.length > 0 && <div className="mt-3 rounded-lg bg-black/20 p-3 text-sm"><div className="flex justify-between text-white/55"><span>Regular total</span><span>{regularTotal.toFixed(2)} AZN</span></div><div className="mt-1 flex justify-between font-bold text-emerald-200"><span>Bundle total</span><span>{offerTotal.toFixed(2)} AZN</span></div>{savingsAmount > 0 && <div className="mt-1 flex justify-between text-amber-200"><span>Total saving</span><span>{savingsAmount.toFixed(2)} AZN ({savingsPercent}%)</span></div>}</div>}</> : <p className="text-sm text-white/55">No active items yet. <button type="button" onClick={onOpenMenu} className="font-bold text-cyan-300 underline">Add menu items</button> before creating this offer.</p>}
       </div>}
-      {offerType === "discount" && <label><span className="form-label">Discount percentage</span><input name="discountPct" className="form-field" type="number" min={1} max={100} value={manualDiscount} required onChange={(event) => setManualDiscount(event.target.value)} placeholder="25" /><span className="mt-1 block text-xs text-white/40">Enter a value from 1 to 100.</span></label>}
-      {typeConfig.usesTotalPrice && <div className="md:col-span-2 rounded-xl border border-white/10 bg-white/[0.025] p-3"><label><span className="form-label">Total {typeConfig.label.toLowerCase()} price</span><span className="relative block"><input value={offerPrice} onChange={(event) => setOfferPrice(event.target.value)} className={`form-field pr-16 ${fieldErrors.offerPriceAzn ? "border-red-400/70 ring-2 ring-red-400/20" : ""}`} type="number" min="0.01" step="0.01" required placeholder="Enter one total price" /><span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-xs font-black text-gold">AZN</span></span><FieldNote message={fieldErrors.offerPriceAzn} /></label>{selectedMenuItems.length >= minimumItems && <div className="mt-3 grid gap-1 rounded-lg bg-black/20 p-3 text-sm sm:grid-cols-3"><p><span className="block text-xs text-white/40">Regular total</span><strong>{regularTotal.toFixed(2)} AZN</strong></p><p><span className="block text-xs text-white/40">Offer total</span><strong className="text-emerald-200">{numericOfferPrice > 0 ? `${numericOfferPrice.toFixed(2)} AZN` : "—"}</strong></p><p><span className="block text-xs text-white/40">Total discount</span><strong className="text-amber-200">{savingsAmount > 0 ? `${savingsAmount.toFixed(2)} AZN (${savingsPercent}%)` : "Enter a lower price"}</strong></p></div>}</div>}
-      {isSpendReward && <div className="md:col-span-2 rounded-xl border border-emerald-300/20 bg-emerald-300/[0.06] p-3"><p className="form-label text-emerald-200">Spend & get one free</p><div className="grid gap-3 sm:grid-cols-2"><label><span className="mb-1 block text-xs text-white/50">Minimum purchase amount</span><span className="relative block"><input value={minimumSpend} onChange={(event) => setMinimumSpend(event.target.value)} className={`form-field pr-16 ${fieldErrors.minimumSpendAzn ? "border-red-400/70 ring-2 ring-red-400/20" : ""}`} type="number" min="0.01" step="0.01" required placeholder="30" /><span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-xs font-black text-gold">AZN</span></span><FieldNote message={fieldErrors.minimumSpendAzn} /></label><label><span className="mb-1 block text-xs text-white/50">Customer receives free</span><select value={freeMenuItemId} onChange={(event) => setFreeMenuItemId(event.target.value)} className={`form-field ${fieldErrors.freeMenuItemId ? "border-red-400/70 ring-2 ring-red-400/20" : ""}`} required><option value="">{scope === "SPECIFIC_ITEMS" && !freeItemOptions.length ? "Choose qualifying items first" : "Choose the free item"}</option>{freeItemOptions.map((item) => <option key={item.id} value={item.id}>{item.name} — {item.priceAzn.toFixed(2)} AZN</option>)}</select><FieldNote message={fieldErrors.freeMenuItemId} />{scope === "SPECIFIC_ITEMS" && <span className="mt-1 block text-xs text-white/40">Only the qualifying items selected above can be the free item.</span>}</label></div>{Number(minimumSpend) > 0 && freeMenuItemId && <p className="mt-3 rounded-lg bg-black/20 p-3 text-sm font-semibold text-emerald-100">Customer spends at least {Number(minimumSpend).toFixed(2)} AZN{scope === "SPECIFIC_ITEMS" && selectedMenuItems.length ? ` on ${selectedMenuItems.map((item) => item.name).join(", ")}` : scope === "CATEGORY" ? " in the selected category" : " at the venue"} and receives {freeItemOptions.find((item) => item.id === freeMenuItemId)?.name ?? "the selected item"} free.</p>}</div>}
+      {offerType === "discount" && <label><span className="form-label">Discount percentage</span><input name="discountPct" className="form-field" type="number" min={1} max={100} value={manualDiscount} required onChange={(event) => setManualDiscount(event.target.value)} placeholder="25" /><span className="mt-1 block text-xs text-white/40">{scope === "SPECIFIC_ITEMS" ? "Enter a value, or set a new price per item below to calculate it automatically." : "Enter a value from 1 to 100."}</span></label>}
+      {typeConfig.usesTotalPrice && <div className="md:col-span-2 rounded-xl border border-white/10 bg-white/[0.025] p-3"><label><span className="form-label">Total {typeConfig.label.toLowerCase()} price</span><span className="relative block"><input value={offerPrice} onChange={(event) => { setOfferPrice(event.target.value); clearFieldError("offerPriceAzn"); }} className={`form-field pr-16 ${fieldErrors.offerPriceAzn ? "border-red-400/70 ring-2 ring-red-400/20" : ""}`} type="number" min="0.01" step="0.01" required placeholder="Enter one total price" /><span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-xs font-black text-gold">AZN</span></span><FieldNote message={fieldErrors.offerPriceAzn} /></label>{selectedMenuItems.length >= minimumItems && <div className="mt-3 grid gap-1 rounded-lg bg-black/20 p-3 text-sm sm:grid-cols-3"><p><span className="block text-xs text-white/40">Regular total</span><strong>{regularTotal.toFixed(2)} AZN</strong></p><p><span className="block text-xs text-white/40">Offer total</span><strong className="text-emerald-200">{numericOfferPrice > 0 ? `${numericOfferPrice.toFixed(2)} AZN` : "—"}</strong></p><p><span className="block text-xs text-white/40">Total discount</span><strong className="text-amber-200">{savingsAmount > 0 ? `${savingsAmount.toFixed(2)} AZN (${savingsPercent}%)` : "Enter a lower price"}</strong></p></div>}</div>}
+      {isSpendReward && <div className="md:col-span-2 rounded-xl border border-emerald-300/20 bg-emerald-300/[0.06] p-3"><p className="form-label text-emerald-200">Spend & get one free</p><div className="grid gap-3 sm:grid-cols-2"><label><span className="mb-1 block text-xs text-white/50">Minimum purchase amount</span><span className="relative block"><input value={minimumSpend} onChange={(event) => { setMinimumSpend(event.target.value); clearFieldError("minimumSpendAzn"); }} className={`form-field pr-16 ${fieldErrors.minimumSpendAzn ? "border-red-400/70 ring-2 ring-red-400/20" : ""}`} type="number" min="0.01" step="0.01" required placeholder="30" /><span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-xs font-black text-gold">AZN</span></span><FieldNote message={fieldErrors.minimumSpendAzn} />{scope === "SPECIFIC_ITEMS" && <span className="mt-1 block text-xs text-white/40">Auto-filled from the qualifying items total; edit if needed.</span>}</label><label><span className="mb-1 block text-xs text-white/50">Customer receives free</span><select value={freeMenuItemId} onChange={(event) => { setFreeMenuItemId(event.target.value); clearFieldError("freeMenuItemId"); }} className={`form-field ${fieldErrors.freeMenuItemId ? "border-red-400/70 ring-2 ring-red-400/20" : ""}`} required><option value="">{scope === "SPECIFIC_ITEMS" && !freeItemOptions.length ? "Choose qualifying items first" : "Choose the free item"}</option>{freeItemOptions.map((item) => <option key={item.id} value={item.id}>{item.name} — {item.priceAzn.toFixed(2)} AZN</option>)}</select><FieldNote message={fieldErrors.freeMenuItemId} />{scope === "SPECIFIC_ITEMS" && <span className="mt-1 block text-xs text-white/40">Only the qualifying items selected above can be the free item.</span>}</label></div>{Number(minimumSpend) > 0 && freeMenuItemId && <p className="mt-3 rounded-lg bg-black/20 p-3 text-sm font-semibold text-emerald-100">Customer spends at least {Number(minimumSpend).toFixed(2)} AZN{scope === "SPECIFIC_ITEMS" && selectedMenuItems.length ? ` on ${selectedMenuItems.map((item) => item.name).join(", ")}` : scope === "CATEGORY" ? " in the selected category" : " at the venue"} and receives {freeItemOptions.find((item) => item.id === freeMenuItemId)?.name ?? "the selected item"} free.</p>}</div>}
       <Input name="title" label={typeConfig.titleLabel} defaultValue={editing?.title} placeholder={typeConfig.titlePlaceholder} error={fieldErrors.title} wide />
       {offerType !== "event" && typeConfig.allowedScopes.length > 1 && <Input name="menuItem" label="Extra coverage note (optional)" defaultValue={editing?.menuItem ?? ""} placeholder="Add a short clarification only if needed..." wide required={false} />}
       {selectedItemPhotos.length ? <div className="md:col-span-2 rounded-xl border border-emerald-300/20 bg-emerald-300/10 p-3"><span className="form-label text-emerald-200">Offer photos</span><div className="no-scrollbar flex snap-x gap-3 overflow-x-auto pb-2">{selectedItemPhotos.map((item) => <figure key={item.id} className="w-28 shrink-0 snap-start"><SafeImage src={item.photoUrl!} alt={item.name} className="h-20 w-28 rounded-lg object-cover" /><figcaption className="mt-1 truncate text-xs text-emerald-100">{item.name}</figcaption></figure>)}</div><p className="mt-1 text-sm text-emerald-100">Customers can swipe through every saved item photo in this gallery.</p>{selectedMenuItems.some((item) => !item.photoUrl) && <p className="mt-2 rounded-lg border border-amber-300/20 bg-amber-300/10 p-2 text-sm text-amber-100">Items without photos: {selectedMenuItems.filter((item) => !item.photoUrl).map((item) => item.name).join(", ")}. <button type="button" onClick={onOpenMenu} className="font-bold underline">Add their photos in Menu</button>.</p>}</div> : <label className="md:col-span-2"><span className="form-label">{offerType === "event" ? "Event photo" : "Offer photo"}</span>{scope === "SPECIFIC_ITEMS" && selectedMenuItems.length > 0 && <p className="mb-2 rounded-lg border border-amber-300/20 bg-amber-300/10 p-2 text-sm text-amber-100">{selectedMenuItems.map((item) => item.name).join(", ")} {selectedMenuItems.length === 1 ? "does" : "do"} not have a saved menu photo. <button type="button" onClick={onOpenMenu} className="font-bold underline">Add the photo in Menu</button> to reuse it automatically.</p>}<input type="file" accept="image/jpeg,image/png,image/webp" className="form-field" onChange={(event) => { const file = event.target.files?.[0]; if (file) void readImage(file).then(setPhotoUrl).catch((reason) => setFormError(reason.message)); }} />{photoUrl && <SafeImage src={photoUrl} alt="Offer preview" className="mt-2 h-32 w-48 rounded-lg object-cover" />}<p className="mt-1 text-xs text-white/45">{offerType === "event" ? "Required. Event offers use their own image and never pull unrelated menu photos." : "Required when none of the covered menu items has a saved photo."}</p></label>}
       <label className="md:col-span-2"><span className="form-label">{offerType === "event" ? "Event details" : `${typeConfig.label} details`}</span><textarea name="description" className={`form-field min-h-24 ${fieldErrors.description ? "border-red-400/70 ring-2 ring-red-400/20" : ""}`} required defaultValue={editing?.description} placeholder={typeConfig.descriptionPlaceholder} /><FieldNote message={fieldErrors.description} /></label>
-      <label><span className="form-label">Daypart</span><select name="tag" value={tag} onChange={(event) => handleTagChange(event.target.value)} className={`form-field ${fieldErrors.tag ? "border-red-400/70 ring-2 ring-red-400/20" : ""}`}>{["breakfast", "lunch", "dinner", "happy hour", "all day"].map((option) => <option key={option}>{option}</option>)}</select><FieldNote message={fieldErrors.tag} />{DAYPART_HOURS[tag] && <span className="mt-1 block text-xs text-cyan-200">Automatically sets the start/end time to that day's {tag} hours ({DAYPART_HOURS[tag]!.label}).</span>}</label>
+      <label><span className="form-label">Daypart</span><select name="tag" value={tag} onChange={(event) => handleTagChange(event.target.value)} className={`form-field ${fieldErrors.tag ? "border-red-400/70 ring-2 ring-red-400/20" : ""}`}>{["breakfast", "lunch", "dinner", "happy hour", "all day"].map((option) => <option key={option}>{option}</option>)}</select><FieldNote message={fieldErrors.tag} />{resolveDaypartWindow(tag, venueHoursJson) && <span className="mt-1 block text-xs text-cyan-200">Automatically sets the start/end time to that day's {tag} hours ({resolveDaypartWindow(tag, venueHoursJson)!.label}).</span>}</label>
       {typeConfig.showDietaryTags && <Input name="dietaryTags" label="Dietary tags" defaultValue={editing?.dietaryTags.join(", ") ?? ""} placeholder="vegan, halal, gluten-free" required={false} />}
-      <Input name="startsAt" label="Starts (date and time)" type="datetime-local" value={startsAt} onChange={(event) => setStartsAt(event.target.value)} error={fieldErrors.startsAt} />
-      <Input name="endsAt" label="Ends (date and time)" type="datetime-local" value={endsAt} onChange={(event) => setEndsAt(event.target.value)} error={fieldErrors.endsAt} />
+      <Input name="startsAt" label="Starts (date and time)" type="datetime-local" value={startsAt} onChange={(event) => { setStartsAt(event.target.value); clearFieldError("startsAt"); }} error={fieldErrors.startsAt} />
+      <Input name="endsAt" label="Ends (date and time)" type="datetime-local" value={endsAt} onChange={(event) => { setEndsAt(event.target.value); clearFieldError("endsAt"); }} error={fieldErrors.endsAt} />
       {flashCapableType && <label className={`md:col-span-2 flex gap-3 rounded-xl border p-4 transition ${isFlash ? "border-gold/45 bg-gold/[0.08]" : "border-white/10 bg-white/[0.025]"}`}>
         <input type="checkbox" checked={isFlash} disabled={!flashEligible && !isFlash} onChange={(event) => setIsFlash(event.target.checked)} className="mt-1 h-4 w-4 accent-amber-500 disabled:cursor-not-allowed" />
         <span>

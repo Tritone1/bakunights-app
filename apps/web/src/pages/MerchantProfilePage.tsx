@@ -15,6 +15,7 @@ export type MerchantProfileVenue = {
   lng: number;
   phone?: string | null;
   photoUrl: string | null;
+  hoursJson?: { open?: string | null; close?: string | null } | null;
 };
 
 type AccountProfile = {
@@ -174,6 +175,8 @@ function VenueProfileForm({ venue, busy, setBusy, onSaved, onError }: { venue: M
     event.preventDefault();
     setBusy(busyKey);
     const form = new FormData(event.currentTarget);
+    const openTime = String(form.get("openTime") || "").trim();
+    const closeTime = String(form.get("closeTime") || "").trim();
     try {
       await api(`/merchant/venues/${venue.id}/profile`, {
         method: "PATCH",
@@ -185,6 +188,7 @@ function VenueProfileForm({ venue, busy, setBusy, onSaved, onError }: { venue: M
           lat: Number(form.get("lat")),
           lng: Number(form.get("lng")),
           photoUrl,
+          hoursJson: openTime && closeTime ? { open: openTime, close: closeTime } : null,
         }),
       });
       await onSaved();
@@ -211,6 +215,9 @@ function VenueProfileForm({ venue, busy, setBusy, onSaved, onError }: { venue: M
       <div className="hidden md:block" />
       <MerchantField name="lat" label="Latitude" type="number" step="any" defaultValue={venue.lat} />
       <MerchantField name="lng" label="Longitude" type="number" step="any" defaultValue={venue.lng} />
+      <label><span className="form-label">Opening time</span><input name="openTime" type="time" defaultValue={venue.hoursJson?.open ?? ""} className="form-field" /></label>
+      <label><span className="form-label">Closing time</span><input name="closeTime" type="time" defaultValue={venue.hoursJson?.close ?? ""} className="form-field" /></label>
+      <p className="text-xs text-white/40 md:col-span-2">Set your daily opening hours so breakfast offers only run once you're actually open.</p>
       <label className="md:col-span-2"><span className="form-label">Venue image</span><div className="mt-1 flex flex-col gap-3 rounded-xl border border-white/10 bg-black/10 p-3 sm:flex-row sm:items-center">{photoUrl ? <SafeImage src={photoUrl} alt={`${venue.name} preview`} className="h-24 w-28 rounded-lg object-cover" /> : <span className="grid h-24 w-28 place-items-center rounded-lg bg-white/5 text-white/30"><ImagePlus size={25} /></span>}<div className="flex flex-wrap gap-2"><label className="cursor-pointer rounded-lg border border-white/15 px-3 py-2 text-sm font-bold hover:bg-white/10"><input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" onChange={(event) => void chooseImage(event.target.files?.[0])} />Choose image</label>{photoUrl && <button type="button" onClick={() => setPhotoUrl(null)} className="rounded-lg border border-red-400/20 px-3 py-2 text-sm font-bold text-red-300">Remove</button>}<p className="w-full text-xs text-white/35">JPG, PNG, or WebP up to 2 MB.</p></div></div></label>
       <button disabled={Boolean(busy)} className="panel-button justify-center md:col-span-2"><Save size={17} />{busy === busyKey ? "Saving venue..." : "Save venue profile"}</button>
     </div>

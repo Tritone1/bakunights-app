@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { z } from "zod";
+import { Prisma } from "@prisma/client";
 import { prisma } from "../db.js";
 import { asyncRoute, HttpError } from "../lib/http.js";
 import { requireAuth, requireMerchant } from "../middleware/auth.js";
@@ -113,23 +114,49 @@ function assertOfferTypeRules(input: OfferTypeRuleInput) {
 }
 
 // Keep in sync with DAYPART_HOURS in apps/web/src/pages/MerchantPage.tsx.
-const DAYPART_HOURS: Record<string, { startHour: number; endHour: number; label: string }> = {
-  breakfast: { startHour: 6, endHour: 11, label: "6:00 AM-11:00 AM" },
-  lunch: { startHour: 11, endHour: 16, label: "11:00 AM-4:00 PM" },
-  "happy hour": { startHour: 16, endHour: 19, label: "4:00 PM-7:00 PM" },
-  dinner: { startHour: 19, endHour: 23, label: "7:00 PM-11:00 PM" },
+// Breakfast has no fixed start hour since venues open at different times - it defaults to 8:00 AM
+// but adapts to each venue's declared opening time (Restaurant.hoursJson.open) when available.
+const DAYPART_HOURS: Record<string, { startMinutes: number; endMinutes: number; label: string }> = {
+  breakfast: { startMinutes: 8 * 60, endMinutes: 12 * 60, label: "8:00 AM-12:00 PM" },
+  lunch: { startMinutes: 12 * 60, endMinutes: 16 * 60, label: "12:00 PM-4:00 PM" },
+  "happy hour": { startMinutes: 16 * 60, endMinutes: 19 * 60, label: "4:00 PM-7:00 PM" },
+  dinner: { startMinutes: 19 * 60, endMinutes: 23 * 60, label: "7:00 PM-11:00 PM" },
 };
 
-function daypartValidationError(tag: string, startsAt: Date, endsAt: Date) {
-  const hours = DAYPART_HOURS[tag];
-  if (!hours) return null;
-  const windowStart = new Date(startsAt);
-  windowStart.setHours(hours.startHour, 0, 0, 0);
-  const windowEnd = new Date(startsAt);
-  windowEnd.setHours(hours.endHour, 0, 0, 0);
+function formatMinutesOfDay(totalMinutes: number) {
+  const hour24 = Math.floor(totalMinutes / 60) % 24;
+  const minute = totalMinutes % 60;
+  const period = hour24 < 12 ? "AM" : "PM";
+  const hour12 = hour24 % 12 === 0 ? 12 : hour24 % 12;
+  return `${hour12}:${String(minute).padStart(2, "0")} ${period}`;
+}
+
+function venueOpenTimeMinutes(hoursJson: unknown): number | null {
+  if (!hoursJson || typeof hoursJson !== "object") return null;
+  const open = (hoursJson as { open?: unknown }).open;
+  if (typeof open !== "string") return null;
+  const match = /^([01]?\d|2[0-3]):([0-5]\d)$/.exec(open);
+  if (!match) return null;
+  return Number(match[1]) * 60 + Number(match[2]);
+}
+
+function resolveDaypartWindow(tag: string, venueHoursJson?: unknown) {
+  const base = DAYPART_HOURS[tag];
+  if (!base) return null;
+  if (tag !== "breakfast") return base;
+  const openMinutes = venueOpenTimeMinutes(venueHoursJson);
+  if (openMinutes == null || openMinutes >= base.endMinutes) return base;
+  return { startMinutes: openMinutes, endMinutes: base.endMinutes, label: `${formatMinutesOfDay(openMinutes)}-${formatMinutesOfDay(base.endMinutes)}` };
+}
+
+function daypartValidationError(tag: string, startsAt: Date, endsAt: Date, venueHoursJson?: unknown) {
+  const window = resolveDaypartWindow(tag, venueHoursJson);
+  if (!window) return null;
+  const startMinutes = startsAt.getHours() * 60 + startsAt.getMinutes();
+  const endMinutes = endsAt.getHours() * 60 + endsAt.getMinutes();
   const sameDay = startsAt.toDateString() === endsAt.toDateString();
-  if (!sameDay || startsAt < windowStart || endsAt > windowEnd) {
-    return `${tag.charAt(0).toUpperCase() + tag.slice(1)} offers must run within that day's ${tag} hours (${hours.label}).`;
+  if (!sameDay || startMinutes < window.startMinutes || endMinutes > window.endMinutes) {
+    return `${tag.charAt(0).toUpperCase() + tag.slice(1)} offers must run within that day's ${tag} hours (${window.label}).`;
   }
   return null;
 }
@@ -150,8 +177,6 @@ const dealInput = dealInputFields
   .superRefine((value, context) => {
     const message = offerTypeValidationError(value);
     if (message) context.addIssue({ code: z.ZodIssueCode.custom, message, path: ["offerType"] });
-    const daypartMessage = daypartValidationError(value.tag, value.startsAt, value.endsAt);
-    if (daypartMessage) context.addIssue({ code: z.ZodIssueCode.custom, message: daypartMessage, path: ["startsAt"] });
   });
 
 function assertFlashDeal(input: { isFlash: boolean; offerType: string; discountPct?: number | null; startsAt: Date; endsAt: Date }) {
@@ -168,6 +193,11 @@ const menuItemInput = z.object({
   isActive: z.boolean().default(true),
 });
 
+const openingHoursInput = z.object({
+  open: z.string().regex(/^([01]?\d|2[0-3]):[0-5]\d$/, "Use HH:mm"),
+  close: z.string().regex(/^([01]?\d|2[0-3]):[0-5]\d$/, "Use HH:mm"),
+}).nullable().optional();
+
 const venueProfileInput = z.object({
   name: z.string().trim().min(2).max(120),
   cuisine: venueType,
@@ -176,6 +206,7 @@ const venueProfileInput = z.object({
   lat: z.coerce.number().min(-90).max(90),
   lng: z.coerce.number().min(-180).max(180),
   photoUrl: venueImageValue.nullable(),
+  hoursJson: openingHoursInput,
 });
 
 async function assertOwner(userId: string, restaurantId: string) {
@@ -298,11 +329,12 @@ merchantRouter.patch("/venues/:venueId/profile", asyncRoute(async (req, res) => 
   await assertOwner(req.user!.id, venueId);
   const input = venueProfileInput.parse(req.body);
   const photoUrl = await persistImage(input.photoUrl, "venues");
+  const { hoursJson, ...profileFields } = input;
   const [venue] = await prisma.$transaction([
     prisma.restaurant.update({
       where: { id: venueId },
-      data: { ...input, photoUrl },
-      select: { id: true, name: true, cuisine: true, address: true, phone: true, lat: true, lng: true, photoUrl: true },
+      data: { ...profileFields, photoUrl, hoursJson: hoursJson === undefined ? undefined : (hoursJson ?? Prisma.DbNull) },
+      select: { id: true, name: true, cuisine: true, address: true, phone: true, lat: true, lng: true, photoUrl: true, hoursJson: true },
     }),
     prisma.user.update({ where: { id: req.user!.id }, data: { merchantVenueType: input.cuisine } }),
   ]);
@@ -574,7 +606,9 @@ merchantRouter.get("/dashboard", asyncRoute(async (req, res) => {
 merchantRouter.post("/deals", asyncRoute(async (req, res) => {
   const input = dealInput.parse(req.body);
   assertOfferTypeRules(input);
-  await assertOwner(req.user!.id, input.restaurantId);
+  const restaurant = await assertOwner(req.user!.id, input.restaurantId);
+  const daypartMessage = daypartValidationError(input.tag, input.startsAt, input.endsAt, restaurant.hoursJson);
+  if (daypartMessage) throw new HttpError(400, daypartMessage, "INVALID_DAYPART_WINDOW");
   await assertOfferScope(input.restaurantId, input);
   const effectiveDiscountPct = await computeEffectiveDiscountPercent(input.restaurantId, input);
   assertFlashDeal({ ...input, discountPct: effectiveDiscountPct, isFlash: input.isFlash ?? false });
@@ -612,9 +646,9 @@ merchantRouter.patch("/deals/:id", asyncRoute(async (req, res) => {
   const nextEndsAt = input.endsAt ?? existing.endsAt;
   const nextTag = input.tag ?? existing.tag;
   if (nextEndsAt <= nextStartsAt) throw new HttpError(400, "End time must be after start time.", "INVALID_DEAL_WINDOW");
-  const daypartMessage = daypartValidationError(nextTag, nextStartsAt, nextEndsAt);
+  const targetRestaurant = input.restaurantId && input.restaurantId !== existing.restaurantId ? await assertOwner(req.user!.id, input.restaurantId) : await prisma.restaurant.findUniqueOrThrow({ where: { id: existing.restaurantId } });
+  const daypartMessage = daypartValidationError(nextTag, nextStartsAt, nextEndsAt, targetRestaurant.hoursJson);
   if (daypartMessage) throw new HttpError(400, daypartMessage, "INVALID_DAYPART_WINDOW");
-  if (input.restaurantId && input.restaurantId !== existing.restaurantId) await assertOwner(req.user!.id, input.restaurantId);
   const nextScope = input.scope ?? existing.scope;
   const nextCategoryId = input.scopeCategoryId === undefined ? existing.scopeCategoryId : input.scopeCategoryId;
   const existingOfferItems = await prisma.offerMenuItem.findMany({ where: { offerId: existing.id }, select: { menuItemId: true, overridePriceAzn: true } });
