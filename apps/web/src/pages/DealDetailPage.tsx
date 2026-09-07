@@ -174,17 +174,28 @@ function buildOfferTerms(deal: Deal) {
 
   if (["combo", "set_menu", "bundle"].includes(deal.offerType ?? "")) {
     items.forEach((item) => {
-      const { menuItem, overridePriceAzn } = item;
+      const { menuItem, overridePriceAzn, freeQuantity } = item;
       const qty = quantityOf(item);
+      const freeQty = Math.max(0, Math.min(qty, Math.round(freeQuantity ?? 0)));
+      const billableQty = qty - freeQty;
+      const unitPrice = overridePriceAzn == null ? Number(menuItem.priceAzn) : Number(overridePriceAzn);
       const regularPrice = Number(menuItem.priceAzn) * qty;
-      const itemOfferPrice = overridePriceAzn == null ? null : Number(overridePriceAzn) * qty;
-      rows.push({
-        label: qty > 1 ? `${qty}x ${menuItem.name}` : menuItem.name,
-        value: itemOfferPrice === 0 ? `Free · was ${regularPrice.toFixed(2)} AZN` : itemOfferPrice != null ? `${itemOfferPrice.toFixed(2)} AZN · was ${regularPrice.toFixed(2)} AZN` : `${regularPrice.toFixed(2)} AZN`,
-        emphasis: itemOfferPrice === 0 ? "green" : undefined,
-      });
+      const label = qty > 1 ? `${qty}x ${menuItem.name}` : menuItem.name;
+      const value = freeQty > 0 && freeQty === qty
+        ? `Free · was ${regularPrice.toFixed(2)} AZN`
+        : freeQty > 0
+          ? `${freeQty} free + ${billableQty} at ${unitPrice.toFixed(2)} AZN · was ${regularPrice.toFixed(2)} AZN`
+          : overridePriceAzn != null
+            ? `${(unitPrice * billableQty).toFixed(2)} AZN · was ${regularPrice.toFixed(2)} AZN`
+            : `${regularPrice.toFixed(2)} AZN`;
+      rows.push({ label, value, emphasis: freeQty > 0 ? "green" : undefined });
     });
-    const effectiveTotal = offerPrice > 0 ? offerPrice : items.reduce((sum, item) => sum + (item.overridePriceAzn == null ? Number(item.menuItem.priceAzn) : Number(item.overridePriceAzn)) * quantityOf(item), 0);
+    const effectiveTotal = offerPrice > 0 ? offerPrice : items.reduce((sum, item) => {
+      const qty = quantityOf(item);
+      const freeQty = Math.max(0, Math.min(qty, Math.round(item.freeQuantity ?? 0)));
+      const unitPrice = item.overridePriceAzn == null ? Number(item.menuItem.priceAzn) : Number(item.overridePriceAzn);
+      return sum + unitPrice * (qty - freeQty);
+    }, 0);
     if (regularTotal > 0) rows.push({ label: "Regular total", value: `${regularTotal.toFixed(2)} AZN` });
     rows.push({ label: "Offer total", value: `${effectiveTotal.toFixed(2)} AZN`, emphasis: "green" });
     if (regularTotal > effectiveTotal) rows.push({ label: "You save", value: `${(regularTotal - effectiveTotal).toFixed(2)} AZN (${Math.round((1 - effectiveTotal / regularTotal) * 100)}%)`, emphasis: "amber" });

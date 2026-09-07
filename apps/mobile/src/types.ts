@@ -17,6 +17,7 @@ export type OfferMenuItem = {
   menuItemId: string;
   overridePriceAzn?: string | number | null;
   quantity?: number | null;
+  freeQuantity?: number | null;
   menuItem: {
     id: string;
     name: string;

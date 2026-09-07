@@ -70,6 +70,7 @@ const dealInputFields = z.object({
   menuItemIds: z.array(z.string()).max(100).optional(),
   menuItemOverrides: z.record(z.string(), z.coerce.number().nonnegative().max(100000)).optional(),
   menuItemQuantities: z.record(z.string(), z.coerce.number().int().min(1).max(20)).optional(),
+  menuItemFreeQuantities: z.record(z.string(), z.coerce.number().int().min(0).max(20)).optional(),
   photoUrl: imageValue.nullable().optional(),
 });
 
@@ -84,6 +85,7 @@ type OfferTypeRuleInput = {
   menuItemIds: string[];
   menuItemOverrides?: Record<string, number>;
   menuItemQuantities?: Record<string, number>;
+  menuItemFreeQuantities?: Record<string, number>;
 };
 
 function offerTypeValidationError(input: OfferTypeRuleInput) {
@@ -111,6 +113,14 @@ function offerTypeValidationError(input: OfferTypeRuleInput) {
   if (input.offerType !== "bundle" && overrideIds.length > 0) return "Item-level offer prices and free-item markers are only available for fixed Bundle offers.";
   if (input.offerType === "bundle" && isSpendReward && overrideIds.length > 0) return "Spend-and-get-free bundles use the selected free item instead of fixed bundle item prices.";
   if (overrideIds.some((id) => !input.menuItemIds.includes(id))) return "Every item-level offer price must belong to a selected menu item.";
+  const freeQuantityIds = Object.keys(input.menuItemFreeQuantities ?? {}).filter((id) => (input.menuItemFreeQuantities?.[id] ?? 0) > 0);
+  if (input.offerType !== "bundle" && freeQuantityIds.length > 0) return "Free item quantities are only available for fixed Bundle offers.";
+  if (input.offerType === "bundle" && isSpendReward && freeQuantityIds.length > 0) return "Spend-and-get-free bundles use the selected free item instead of per-item free quantities.";
+  if (freeQuantityIds.some((id) => !input.menuItemIds.includes(id))) return "Every free-quantity entry must belong to a selected menu item.";
+  for (const id of freeQuantityIds) {
+    const includedQty = Math.max(1, Math.round(input.menuItemQuantities?.[id] ?? 1));
+    if ((input.menuItemFreeQuantities?.[id] ?? 0) > includedQty) return "The free quantity for an item cannot exceed how many of it are included.";
+  }
   if (!["combo", "set_menu", "bundle"].includes(input.offerType) && input.offerPriceAzn != null) return `${typeLabel} offers cannot use a fixed total offer price.`;
   if (!["perk", "bundle"].includes(input.offerType) && isSpendReward) return `${typeLabel} offers cannot use minimum-spend or free-item reward fields.`;
   return null;
@@ -194,6 +204,7 @@ const dealInput = dealInputFields
     menuItemIds: value.menuItemIds ?? [],
     menuItemOverrides: value.menuItemOverrides ?? {},
     menuItemQuantities: value.menuItemQuantities ?? {},
+    menuItemFreeQuantities: value.menuItemFreeQuantities ?? {},
     freeMenuItemQty: value.freeMenuItemQty ?? 1,
   }))
   .refine((value) => value.endsAt > value.startsAt, { message: "End time must be after start time", path: ["endsAt"] })
@@ -283,10 +294,11 @@ async function computeEffectiveDiscountPercent(restaurantId: string, input: Offe
     select: { id: true, priceAzn: true },
   });
   const quantityFor = (itemId: string) => Math.max(1, Math.round(input.menuItemQuantities?.[itemId] ?? 1));
+  const billableQuantityFor = (itemId: string) => Math.max(0, quantityFor(itemId) - Math.max(0, Math.min(quantityFor(itemId), Math.round(input.menuItemFreeQuantities?.[itemId] ?? 0))));
   const regularTotal = items.reduce((sum, item) => sum + Number(item.priceAzn) * quantityFor(item.id), 0);
   if (regularTotal <= 0) return null;
   const offerTotal = input.offerType === "bundle"
-    ? items.reduce((sum, item) => sum + (input.menuItemOverrides?.[item.id] ?? Number(item.priceAzn)) * quantityFor(item.id), 0)
+    ? items.reduce((sum, item) => sum + (input.menuItemOverrides?.[item.id] ?? Number(item.priceAzn)) * billableQuantityFor(item.id), 0)
     : input.offerPriceAzn ?? null;
   if (offerTotal == null || offerTotal >= regularTotal) return null;
   return Math.round(((regularTotal - offerTotal) / regularTotal) * 100);
@@ -305,6 +317,7 @@ async function resolveOfferPrice(restaurantId: string, input: OfferTypeRuleInput
     select: { id: true, priceAzn: true },
   });
   const quantityFor = (itemId: string) => Math.max(1, Math.round(input.menuItemQuantities?.[itemId] ?? 1));
+  const billableQuantityFor = (itemId: string) => Math.max(0, quantityFor(itemId) - Math.max(0, Math.min(quantityFor(itemId), Math.round(input.menuItemFreeQuantities?.[itemId] ?? 0))));
   const regularTotal = items.reduce((sum, item) => sum + Number(item.priceAzn) * quantityFor(item.id), 0);
   if (input.offerType === "combo" || input.offerType === "set_menu") {
     const offerPrice = input.offerPriceAzn!;
@@ -317,7 +330,7 @@ async function resolveOfferPrice(restaurantId: string, input: OfferTypeRuleInput
     const regularPrice = itemPrices.get(itemId);
     if (regularPrice != null && overridePrice > regularPrice) throw new HttpError(400, "A bundle item price cannot be higher than its regular menu price.", "INVALID_OFFER_PRICE");
   }
-  const offerTotal = items.reduce((sum, item) => sum + (input.menuItemOverrides?.[item.id] ?? Number(item.priceAzn)) * quantityFor(item.id), 0);
+  const offerTotal = items.reduce((sum, item) => sum + (input.menuItemOverrides?.[item.id] ?? Number(item.priceAzn)) * billableQuantityFor(item.id), 0);
   if (offerTotal >= regularTotal) throw new HttpError(400, "Reduce at least one bundle item price or mark an item as free.", "INVALID_OFFER_PRICE");
   return Math.round(offerTotal * 100) / 100;
 }
@@ -643,14 +656,14 @@ merchantRouter.post("/deals", asyncRoute(async (req, res) => {
   const storedPhotoUrl = await persistImage(input.photoUrl, "offers");
   const resolvedPhotoUrl = await assertOfferPhoto(input.restaurantId, { ...input, photoUrl: storedPhotoUrl });
   const now = new Date();
-  const { menuItemIds, menuItemOverrides, menuItemQuantities, ...dealData } = input;
+  const { menuItemIds, menuItemOverrides, menuItemQuantities, menuItemFreeQuantities, ...dealData } = input;
   const deal = await prisma.deal.create({
     data: {
       ...dealData,
       offerPriceAzn: resolvedOfferPrice,
       photoUrl: resolvedPhotoUrl,
       scopeCategoryId: input.scope === "CATEGORY" ? input.scopeCategoryId : null,
-      offerMenuItems: input.scope === "SPECIFIC_ITEMS" ? { create: [...new Set(menuItemIds)].map((menuItemId) => ({ menuItemId, overridePriceAzn: menuItemOverrides[menuItemId] ?? null, quantity: Math.max(1, Math.round(menuItemQuantities[menuItemId] ?? 1)) })) } : undefined,
+      offerMenuItems: input.scope === "SPECIFIC_ITEMS" ? { create: [...new Set(menuItemIds)].map((menuItemId) => { const quantity = Math.max(1, Math.round(menuItemQuantities[menuItemId] ?? 1)); return { menuItemId, overridePriceAzn: menuItemOverrides[menuItemId] ?? null, quantity, freeQuantity: Math.max(0, Math.min(quantity, Math.round(menuItemFreeQuantities[menuItemId] ?? 0))) }; }) } : undefined,
       status: "approved",
       isActive: true,
       submittedByUserId: req.user!.id,
@@ -678,7 +691,7 @@ merchantRouter.patch("/deals/:id", asyncRoute(async (req, res) => {
   if (daypartMessage) throw new HttpError(400, daypartMessage, "INVALID_DAYPART_WINDOW");
   const nextScope = input.scope ?? existing.scope;
   const nextCategoryId = input.scopeCategoryId === undefined ? existing.scopeCategoryId : input.scopeCategoryId;
-  const existingOfferItems = await prisma.offerMenuItem.findMany({ where: { offerId: existing.id }, select: { menuItemId: true, overridePriceAzn: true, quantity: true } });
+  const existingOfferItems = await prisma.offerMenuItem.findMany({ where: { offerId: existing.id }, select: { menuItemId: true, overridePriceAzn: true, quantity: true, freeQuantity: true } });
   const nextItemIds = input.menuItemIds ?? existingOfferItems.map((item) => item.menuItemId);
   const nextOfferType = input.offerType ?? existing.offerType;
   const nextDiscountPct = input.discountPct === undefined ? existing.discountPct : input.discountPct;
@@ -688,7 +701,8 @@ merchantRouter.patch("/deals/:id", asyncRoute(async (req, res) => {
   const nextFreeMenuItemQty = input.freeMenuItemQty === undefined ? existing.freeMenuItemQty : input.freeMenuItemQty;
   const nextMenuItemOverrides = input.menuItemOverrides ?? Object.fromEntries(existingOfferItems.flatMap((item) => item.overridePriceAzn == null ? [] : [[item.menuItemId, Number(item.overridePriceAzn)]]));
   const nextMenuItemQuantities = input.menuItemQuantities ?? Object.fromEntries(existingOfferItems.map((item) => [item.menuItemId, item.quantity]));
-  const nextTypeValues = { offerType: nextOfferType, scope: nextScope, discountPct: nextDiscountPct, offerPriceAzn: nextOfferPriceAzn, minimumSpendAzn: nextMinimumSpendAzn, freeMenuItemId: nextFreeMenuItemId, freeMenuItemQty: nextFreeMenuItemQty, menuItemIds: nextItemIds, menuItemOverrides: nextMenuItemOverrides, menuItemQuantities: nextMenuItemQuantities };
+  const nextMenuItemFreeQuantities = input.menuItemFreeQuantities ?? Object.fromEntries(existingOfferItems.map((item) => [item.menuItemId, item.freeQuantity]));
+  const nextTypeValues = { offerType: nextOfferType, scope: nextScope, discountPct: nextDiscountPct, offerPriceAzn: nextOfferPriceAzn, minimumSpendAzn: nextMinimumSpendAzn, freeMenuItemId: nextFreeMenuItemId, freeMenuItemQty: nextFreeMenuItemQty, menuItemIds: nextItemIds, menuItemOverrides: nextMenuItemOverrides, menuItemQuantities: nextMenuItemQuantities, menuItemFreeQuantities: nextMenuItemFreeQuantities };
   assertOfferTypeRules(nextTypeValues);
   if (nextOfferType === "discount" && nextDiscountPct == null) throw new HttpError(400, "Discount-type offers need a percentage.", "INVALID_DISCOUNT_OFFER");
   if (nextOfferType === "set_menu" && (nextScope !== "SPECIFIC_ITEMS" || nextItemIds.length < 2)) throw new HttpError(400, "Set menus must include at least two specific menu items.", "INVALID_OFFER_SCOPE");
@@ -701,9 +715,9 @@ merchantRouter.patch("/deals/:id", asyncRoute(async (req, res) => {
   const storedPhotoUrl = input.photoUrl === undefined ? existing.photoUrl : await persistImage(input.photoUrl, "offers");
   const resolvedPhotoUrl = await assertOfferPhoto(input.restaurantId ?? existing.restaurantId, { photoUrl: storedPhotoUrl, offerType: nextOfferType, scope: nextScope, scopeCategoryId: nextCategoryId, menuItemIds: nextItemIds });
   const now = new Date();
-  const { menuItemIds: _menuItemIds, menuItemOverrides, menuItemQuantities, ...dealChanges } = input;
+  const { menuItemIds: _menuItemIds, menuItemOverrides, menuItemQuantities, menuItemFreeQuantities, ...dealChanges } = input;
   const deal = await prisma.$transaction(async (tx) => {
-    if (input.scope || input.menuItemIds || input.menuItemOverrides || input.menuItemQuantities) await tx.offerMenuItem.deleteMany({ where: { offerId: existing.id } });
+    if (input.scope || input.menuItemIds || input.menuItemOverrides || input.menuItemQuantities || input.menuItemFreeQuantities) await tx.offerMenuItem.deleteMany({ where: { offerId: existing.id } });
     return tx.deal.update({
       where: { id: existing.id },
       data: {
@@ -711,7 +725,7 @@ merchantRouter.patch("/deals/:id", asyncRoute(async (req, res) => {
       offerPriceAzn: resolvedOfferPrice,
       photoUrl: resolvedPhotoUrl,
       scopeCategoryId: nextScope === "CATEGORY" ? nextCategoryId : null,
-      offerMenuItems: nextScope === "SPECIFIC_ITEMS" && (input.scope || input.menuItemIds || input.menuItemOverrides || input.menuItemQuantities) ? { create: [...new Set(nextItemIds)].map((menuItemId) => ({ menuItemId, overridePriceAzn: nextMenuItemOverrides[menuItemId] ?? null, quantity: Math.max(1, Math.round(nextMenuItemQuantities[menuItemId] ?? 1)) })) } : undefined,
+      offerMenuItems: nextScope === "SPECIFIC_ITEMS" && (input.scope || input.menuItemIds || input.menuItemOverrides || input.menuItemQuantities || input.menuItemFreeQuantities) ? { create: [...new Set(nextItemIds)].map((menuItemId) => { const quantity = Math.max(1, Math.round(nextMenuItemQuantities[menuItemId] ?? 1)); return { menuItemId, overridePriceAzn: nextMenuItemOverrides[menuItemId] ?? null, quantity, freeQuantity: Math.max(0, Math.min(quantity, Math.round(nextMenuItemFreeQuantities[menuItemId] ?? 0))) }; }) } : undefined,
       status: "approved",
       isActive: true,
       submittedByUserId: req.user!.id,

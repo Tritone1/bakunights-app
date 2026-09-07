@@ -32,7 +32,7 @@ export type Deal = {
   photoUrl?: string | null;
   scope?: "WHOLE_MENU" | "CATEGORY" | "SPECIFIC_ITEMS";
   scopeCategory?: { id: string; name: string } | null;
-  offerMenuItems?: { menuItemId: string; overridePriceAzn?: string | number | null; quantity?: number | null; menuItem: { id: string; name: string; photoUrl?: string | null; priceAzn: string | number; category?: { name: string } } }[];
+  offerMenuItems?: { menuItemId: string; overridePriceAzn?: string | number | null; quantity?: number | null; freeQuantity?: number | null; menuItem: { id: string; name: string; photoUrl?: string | null; priceAzn: string | number; category?: { name: string } } }[];
   offerType?: "discount" | "combo" | "set_menu" | "perk" | "event" | "bundle" | "other";
   discountPct?: number | null;
   offerPriceAzn?: string | number | null;
