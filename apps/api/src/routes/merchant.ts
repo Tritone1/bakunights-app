@@ -149,12 +149,27 @@ function resolveDaypartWindow(tag: string, venueHoursJson?: unknown) {
   return { startMinutes: openMinutes, endMinutes: base.endMinutes, label: `${formatMinutesOfDay(openMinutes)}-${formatMinutesOfDay(base.endMinutes)}` };
 }
 
+// Offer windows are defined in Baku wall-clock time. The server process may run in a different
+// timezone (e.g. UTC on Railway), so hours must be derived from a fixed offset, not Date.getHours()
+// (which reads the server's local timezone and would misread a merchant's intended local time).
+const BAKU_UTC_OFFSET_MINUTES = 4 * 60;
+
+function bakuMinutesOfDay(date: Date) {
+  const totalUtcMinutes = date.getUTCHours() * 60 + date.getUTCMinutes();
+  return ((totalUtcMinutes + BAKU_UTC_OFFSET_MINUTES) % 1440 + 1440) % 1440;
+}
+
+function bakuDateKey(date: Date) {
+  const shifted = new Date(date.getTime() + BAKU_UTC_OFFSET_MINUTES * 60_000);
+  return `${shifted.getUTCFullYear()}-${shifted.getUTCMonth()}-${shifted.getUTCDate()}`;
+}
+
 function daypartValidationError(tag: string, startsAt: Date, endsAt: Date, venueHoursJson?: unknown) {
   const window = resolveDaypartWindow(tag, venueHoursJson);
   if (!window) return null;
-  const startMinutes = startsAt.getHours() * 60 + startsAt.getMinutes();
-  const endMinutes = endsAt.getHours() * 60 + endsAt.getMinutes();
-  const sameDay = startsAt.toDateString() === endsAt.toDateString();
+  const startMinutes = bakuMinutesOfDay(startsAt);
+  const endMinutes = bakuMinutesOfDay(endsAt);
+  const sameDay = bakuDateKey(startsAt) === bakuDateKey(endsAt);
   if (!sameDay || startMinutes < window.startMinutes || endMinutes > window.endMinutes) {
     return `${tag.charAt(0).toUpperCase() + tag.slice(1)} offers must run within that day's ${tag} hours (${window.label}).`;
   }
