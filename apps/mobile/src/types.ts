@@ -16,6 +16,7 @@ export type Restaurant = {
 export type OfferMenuItem = {
   menuItemId: string;
   overridePriceAzn?: string | number | null;
+  quantity?: number | null;
   menuItem: {
     id: string;
     name: string;

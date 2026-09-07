@@ -144,7 +144,8 @@ function toOfferPresentation(deal: Deal): { venue: Venue; photos: OfferPhoto[] }
 function buildOfferTerms(deal: Deal) {
   const rows: { label: string; value: string; emphasis?: "amber" | "green" }[] = [];
   const items = deal.offerMenuItems ?? [];
-  const regularTotal = items.reduce((sum, item) => sum + Number(item.menuItem.priceAzn), 0);
+  const quantityOf = (item: { quantity?: number | null }) => Math.max(1, Math.round(item.quantity ?? 1));
+  const regularTotal = items.reduce((sum, item) => sum + Number(item.menuItem.priceAzn) * quantityOf(item), 0);
   const offerPrice = Number(deal.offerPriceAzn);
   const minimumSpend = Number(deal.minimumSpendAzn);
 
@@ -171,16 +172,18 @@ function buildOfferTerms(deal: Deal) {
   }
 
   if (["combo", "set_menu", "bundle"].includes(deal.offerType ?? "")) {
-    items.forEach(({ menuItem, overridePriceAzn }) => {
-      const regularPrice = Number(menuItem.priceAzn);
-      const itemOfferPrice = overridePriceAzn == null ? null : Number(overridePriceAzn);
+    items.forEach((item) => {
+      const { menuItem, overridePriceAzn } = item;
+      const qty = quantityOf(item);
+      const regularPrice = Number(menuItem.priceAzn) * qty;
+      const itemOfferPrice = overridePriceAzn == null ? null : Number(overridePriceAzn) * qty;
       rows.push({
-        label: menuItem.name,
+        label: qty > 1 ? `${qty}x ${menuItem.name}` : menuItem.name,
         value: itemOfferPrice === 0 ? `Free · was ${regularPrice.toFixed(2)} AZN` : itemOfferPrice != null ? `${itemOfferPrice.toFixed(2)} AZN · was ${regularPrice.toFixed(2)} AZN` : `${regularPrice.toFixed(2)} AZN`,
         emphasis: itemOfferPrice === 0 ? "green" : undefined,
       });
     });
-    const effectiveTotal = offerPrice > 0 ? offerPrice : items.reduce((sum, item) => sum + (item.overridePriceAzn == null ? Number(item.menuItem.priceAzn) : Number(item.overridePriceAzn)), 0);
+    const effectiveTotal = offerPrice > 0 ? offerPrice : items.reduce((sum, item) => sum + (item.overridePriceAzn == null ? Number(item.menuItem.priceAzn) : Number(item.overridePriceAzn)) * quantityOf(item), 0);
     if (regularTotal > 0) rows.push({ label: "Regular total", value: `${regularTotal.toFixed(2)} AZN` });
     rows.push({ label: "Offer total", value: `${effectiveTotal.toFixed(2)} AZN`, emphasis: "green" });
     if (regularTotal > effectiveTotal) rows.push({ label: "You save", value: `${(regularTotal - effectiveTotal).toFixed(2)} AZN (${Math.round((1 - effectiveTotal / regularTotal) * 100)}%)`, emphasis: "amber" });

@@ -256,6 +256,7 @@ model OfferMenuItem {
   offerId          String   @map("offer_id")
   menuItemId       String   @map("menu_item_id")
   overridePriceAzn Decimal? @map("override_price_azn") @db.Decimal(10, 2)
+  quantity         Int      @default(1)
   offer            Deal     @relation(fields: [offerId], references: [id], onDelete: Cascade)
   menuItem         MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
 
