@@ -149,7 +149,7 @@ usersRouter.get("/me/saved", asyncRoute(async (req, res) => {
   res.json({ deals: rows.map(({ deal, savedAt }) => {
     const { ratings, restaurant: restaurantWithMenuItems, ...rest } = deal;
     const { menuItems, ...restaurant } = restaurantWithMenuItems;
-    const offerMenuItems = deal.scope === "WHOLE_MENU"
+    const offerMenuItems = deal.scope === "WHOLE_MENU" && deal.offerType !== "event"
       ? menuItems.map((menuItem) => ({ menuItemId: menuItem.id, overridePriceAzn: null, menuItem }))
       : deal.offerMenuItems;
     return {

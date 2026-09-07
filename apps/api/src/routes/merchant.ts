@@ -67,6 +67,32 @@ const dealInputFields = z.object({
   photoUrl: imageValue.nullable().optional(),
 });
 
+type OfferTypeRuleInput = {
+  offerType: "discount" | "combo" | "set_menu" | "perk" | "event" | "bundle" | "other";
+  scope: "WHOLE_MENU" | "CATEGORY" | "SPECIFIC_ITEMS";
+  discountPct?: number | null;
+  menuItemIds: string[];
+  menuItemOverrides?: Record<string, number>;
+};
+
+function offerTypeValidationError(input: OfferTypeRuleInput) {
+  const groupedTypes = new Set<OfferTypeRuleInput["offerType"]>(["combo", "set_menu", "bundle"]);
+  const typeLabel = input.offerType === "set_menu" ? "Set menu" : input.offerType.charAt(0).toUpperCase() + input.offerType.slice(1);
+  if (input.offerType !== "discount" && input.discountPct != null) return `${typeLabel} offers cannot include a discount percentage. Choose Discount if this is a percentage reduction.`;
+  if (groupedTypes.has(input.offerType) && (input.scope !== "SPECIFIC_ITEMS" || input.menuItemIds.length < 2)) return `${typeLabel} offers must contain at least two specific menu items.`;
+  if (input.offerType === "event" && (input.scope !== "WHOLE_MENU" || input.menuItemIds.length > 0)) return "Event offers are venue-wide and cannot use menu category or menu item scope.";
+  if (input.scope === "SPECIFIC_ITEMS" && input.menuItemIds.length === 0) return `Choose at least one menu item for this ${typeLabel.toLowerCase()} offer.`;
+  const overrideIds = Object.keys(input.menuItemOverrides ?? {});
+  if (!groupedTypes.has(input.offerType) && overrideIds.length > 0) return `Item-level offer prices are only available for Combo, Set menu, and Bundle offers.`;
+  if (overrideIds.some((id) => !input.menuItemIds.includes(id))) return "Every item-level offer price must belong to a selected menu item.";
+  return null;
+}
+
+function assertOfferTypeRules(input: OfferTypeRuleInput) {
+  const message = offerTypeValidationError(input);
+  if (message) throw new HttpError(400, message, "INVALID_OFFER_TYPE_OPTIONS");
+}
+
 const dealInput = dealInputFields
   .transform((value) => ({
     ...value,
@@ -79,9 +105,11 @@ const dealInput = dealInputFields
   }))
   .refine((value) => value.endsAt > value.startsAt, { message: "End time must be after start time", path: ["endsAt"] })
   .refine((value) => value.offerType !== "discount" || value.discountPct != null, { message: "Discount-type offers need a percentage", path: ["discountPct"] })
-  .refine((value) => value.offerType !== "set_menu" || (value.scope === "SPECIFIC_ITEMS" && (value.menuItemIds?.length ?? 0) >= 2), { message: "Set menus must include at least two specific menu items", path: ["menuItemIds"] })
   .refine((value) => value.scope !== "CATEGORY" || Boolean(value.scopeCategoryId), { message: "Choose a menu category", path: ["scopeCategoryId"] })
-  .refine((value) => value.scope !== "SPECIFIC_ITEMS" || value.menuItemIds.length > 0, { message: "Choose at least one menu item", path: ["menuItemIds"] });
+  .superRefine((value, context) => {
+    const message = offerTypeValidationError(value);
+    if (message) context.addIssue({ code: z.ZodIssueCode.custom, message, path: ["offerType"] });
+  });
 
 function assertFlashDeal(input: { isFlash: boolean; offerType: string; discountPct?: number | null; startsAt: Date; endsAt: Date }) {
   const message = flashDealValidationError(input);
@@ -146,8 +174,9 @@ async function assertOfferScope(restaurantId: string, input: { scope: "WHOLE_MEN
   }
 }
 
-async function assertOfferPhoto(restaurantId: string, input: { photoUrl?: string | null; scope: "WHOLE_MENU" | "CATEGORY" | "SPECIFIC_ITEMS"; scopeCategoryId?: string | null; menuItemIds: string[] }) {
+async function assertOfferPhoto(restaurantId: string, input: { photoUrl?: string | null; offerType?: string; scope: "WHOLE_MENU" | "CATEGORY" | "SPECIFIC_ITEMS"; scopeCategoryId?: string | null; menuItemIds: string[] }) {
   if (input.photoUrl) return input.photoUrl;
+  if (input.offerType === "event") throw new HttpError(400, "Add an event photo. Event offers do not reuse unrelated menu-item photos.", "OFFER_PHOTO_REQUIRED");
   const itemWithPhoto = await prisma.menuItem.findFirst({
     where: {
       venueId: restaurantId,
@@ -454,6 +483,7 @@ merchantRouter.get("/dashboard", asyncRoute(async (req, res) => {
 
 merchantRouter.post("/deals", asyncRoute(async (req, res) => {
   const input = dealInput.parse(req.body);
+  assertOfferTypeRules(input);
   assertFlashDeal({ ...input, isFlash: input.isFlash ?? false });
   await assertOwner(req.user!.id, input.restaurantId);
   await assertOfferScope(input.restaurantId, input);
@@ -501,13 +531,15 @@ merchantRouter.patch("/deals/:id", asyncRoute(async (req, res) => {
   const nextItemIds = input.menuItemIds ?? (await prisma.offerMenuItem.findMany({ where: { offerId: existing.id }, select: { menuItemId: true } })).map((item) => item.menuItemId);
   const nextOfferType = input.offerType ?? existing.offerType;
   const nextDiscountPct = input.discountPct === undefined ? existing.discountPct : input.discountPct;
+  const nextMenuItemOverrides = input.menuItemOverrides ?? {};
+  assertOfferTypeRules({ offerType: nextOfferType, scope: nextScope, discountPct: nextDiscountPct, menuItemIds: nextItemIds, menuItemOverrides: nextMenuItemOverrides });
   if (nextOfferType === "discount" && nextDiscountPct == null) throw new HttpError(400, "Discount-type offers need a percentage.", "INVALID_DISCOUNT_OFFER");
   if (nextOfferType === "set_menu" && (nextScope !== "SPECIFIC_ITEMS" || nextItemIds.length < 2)) throw new HttpError(400, "Set menus must include at least two specific menu items.", "INVALID_OFFER_SCOPE");
   if (nextScope === "CATEGORY" && !nextCategoryId) throw new HttpError(400, "Choose a menu category.", "INVALID_OFFER_SCOPE");
   if (nextScope === "SPECIFIC_ITEMS" && nextItemIds.length === 0) throw new HttpError(400, "Choose at least one menu item.", "INVALID_OFFER_SCOPE");
   await assertOfferScope(input.restaurantId ?? existing.restaurantId, { scope: nextScope, scopeCategoryId: nextCategoryId, menuItemIds: nextItemIds });
   const storedPhotoUrl = input.photoUrl === undefined ? existing.photoUrl : await persistImage(input.photoUrl, "offers");
-  const resolvedPhotoUrl = await assertOfferPhoto(input.restaurantId ?? existing.restaurantId, { photoUrl: storedPhotoUrl, scope: nextScope, scopeCategoryId: nextCategoryId, menuItemIds: nextItemIds });
+  const resolvedPhotoUrl = await assertOfferPhoto(input.restaurantId ?? existing.restaurantId, { photoUrl: storedPhotoUrl, offerType: nextOfferType, scope: nextScope, scopeCategoryId: nextCategoryId, menuItemIds: nextItemIds });
   const now = new Date();
   const { menuItemIds: _menuItemIds, menuItemOverrides, ...dealChanges } = input;
   const deal = await prisma.$transaction(async (tx) => {

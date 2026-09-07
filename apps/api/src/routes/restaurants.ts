@@ -17,7 +17,7 @@ function assertGooglePlacesConfigured() {
 
 function serializeLiveDeal(deal: any, language: OfferLanguage, wholeMenuItems: any[] = []) {
   const { ratings, ...rest } = deal;
-  const offerMenuItems = deal.scope === "WHOLE_MENU"
+  const offerMenuItems = deal.scope === "WHOLE_MENU" && deal.offerType !== "event"
     ? wholeMenuItems.flatMap((menuItem) => menuItem.photoUrl ? [{ menuItemId: menuItem.id, overridePriceAzn: null, menuItem }] : [])
     : deal.offerMenuItems;
   return {
