@@ -91,6 +91,7 @@ function offerTypeValidationError(input: OfferTypeRuleInput) {
   if (fixedPriceTypes.has(input.offerType) && isSpendReward) return `${typeLabel} offers cannot use minimum-spend or free-item reward fields.`;
   if (input.offerType === "perk" && (input.minimumSpendAzn == null || !input.freeMenuItemId)) return "Perk offers need a minimum purchase amount and a free menu item.";
   if (input.offerType === "perk" && input.offerPriceAzn != null) return "Perk offers use a minimum purchase amount, not a fixed offer price.";
+  if (isSpendReward && input.scope === "SPECIFIC_ITEMS" && input.freeMenuItemId && !input.menuItemIds.includes(input.freeMenuItemId)) return "The free item must be one of the selected qualifying items.";
   if (input.offerType === "bundle" && input.scope !== "SPECIFIC_ITEMS") return "Bundle offers must identify the specific qualifying or included menu items.";
   if (input.offerType === "bundle" && isSpendReward && (input.minimumSpendAzn == null || !input.freeMenuItemId || input.menuItemIds.length < 1)) return "Spend-and-get-free bundles need a qualifying item, minimum purchase amount, and free item.";
   if (input.offerType === "bundle" && isSpendReward && input.offerPriceAzn != null) return "Spend-and-get-free bundles use a minimum purchase amount, not a fixed bundle price.";
@@ -111,6 +112,28 @@ function assertOfferTypeRules(input: OfferTypeRuleInput) {
   if (message) throw new HttpError(400, message, "INVALID_OFFER_TYPE_OPTIONS");
 }
 
+// Keep in sync with DAYPART_HOURS in apps/web/src/pages/MerchantPage.tsx.
+const DAYPART_HOURS: Record<string, { startHour: number; endHour: number; label: string }> = {
+  breakfast: { startHour: 6, endHour: 11, label: "6:00 AM-11:00 AM" },
+  lunch: { startHour: 11, endHour: 16, label: "11:00 AM-4:00 PM" },
+  "happy hour": { startHour: 16, endHour: 19, label: "4:00 PM-7:00 PM" },
+  dinner: { startHour: 19, endHour: 23, label: "7:00 PM-11:00 PM" },
+};
+
+function daypartValidationError(tag: string, startsAt: Date, endsAt: Date) {
+  const hours = DAYPART_HOURS[tag];
+  if (!hours) return null;
+  const windowStart = new Date(startsAt);
+  windowStart.setHours(hours.startHour, 0, 0, 0);
+  const windowEnd = new Date(startsAt);
+  windowEnd.setHours(hours.endHour, 0, 0, 0);
+  const sameDay = startsAt.toDateString() === endsAt.toDateString();
+  if (!sameDay || startsAt < windowStart || endsAt > windowEnd) {
+    return `${tag.charAt(0).toUpperCase() + tag.slice(1)} offers must run within that day's ${tag} hours (${hours.label}).`;
+  }
+  return null;
+}
+
 const dealInput = dealInputFields
   .transform((value) => ({
     ...value,
@@ -127,6 +150,8 @@ const dealInput = dealInputFields
   .superRefine((value, context) => {
     const message = offerTypeValidationError(value);
     if (message) context.addIssue({ code: z.ZodIssueCode.custom, message, path: ["offerType"] });
+    const daypartMessage = daypartValidationError(value.tag, value.startsAt, value.endsAt);
+    if (daypartMessage) context.addIssue({ code: z.ZodIssueCode.custom, message: daypartMessage, path: ["startsAt"] });
   });
 
 function assertFlashDeal(input: { isFlash: boolean; offerType: string; discountPct?: number | null; startsAt: Date; endsAt: Date }) {
@@ -190,6 +215,24 @@ async function assertOfferScope(restaurantId: string, input: { scope: "WHOLE_MEN
     const count = await prisma.menuItem.count({ where: { id: { in: uniqueIds }, venueId: restaurantId, isActive: true } });
     if (count !== uniqueIds.length) throw new HttpError(400, "One or more selected menu items are unavailable.", "INVALID_OFFER_SCOPE");
   }
+}
+
+async function computeEffectiveDiscountPercent(restaurantId: string, input: OfferTypeRuleInput): Promise<number | null> {
+  if (input.offerType === "discount") return input.discountPct ?? null;
+  if (!["combo", "set_menu", "bundle"].includes(input.offerType)) return null;
+  const isBundleSpendReward = input.offerType === "bundle" && (input.minimumSpendAzn != null || input.freeMenuItemId != null);
+  if (isBundleSpendReward) return null;
+  const items = await prisma.menuItem.findMany({
+    where: { id: { in: [...new Set(input.menuItemIds)] }, venueId: restaurantId, isActive: true },
+    select: { id: true, priceAzn: true },
+  });
+  const regularTotal = items.reduce((sum, item) => sum + Number(item.priceAzn), 0);
+  if (regularTotal <= 0) return null;
+  const offerTotal = input.offerType === "bundle"
+    ? items.reduce((sum, item) => sum + (input.menuItemOverrides?.[item.id] ?? Number(item.priceAzn)), 0)
+    : input.offerPriceAzn ?? null;
+  if (offerTotal == null || offerTotal >= regularTotal) return null;
+  return Math.round(((regularTotal - offerTotal) / regularTotal) * 100);
 }
 
 async function resolveOfferPrice(restaurantId: string, input: OfferTypeRuleInput) {
@@ -531,9 +574,10 @@ merchantRouter.get("/dashboard", asyncRoute(async (req, res) => {
 merchantRouter.post("/deals", asyncRoute(async (req, res) => {
   const input = dealInput.parse(req.body);
   assertOfferTypeRules(input);
-  assertFlashDeal({ ...input, isFlash: input.isFlash ?? false });
   await assertOwner(req.user!.id, input.restaurantId);
   await assertOfferScope(input.restaurantId, input);
+  const effectiveDiscountPct = await computeEffectiveDiscountPercent(input.restaurantId, input);
+  assertFlashDeal({ ...input, discountPct: effectiveDiscountPct, isFlash: input.isFlash ?? false });
   const resolvedOfferPrice = await resolveOfferPrice(input.restaurantId, input);
   const storedPhotoUrl = await persistImage(input.photoUrl, "offers");
   const resolvedPhotoUrl = await assertOfferPhoto(input.restaurantId, { ...input, photoUrl: storedPhotoUrl });
@@ -566,14 +610,10 @@ merchantRouter.patch("/deals/:id", asyncRoute(async (req, res) => {
   const input = dealInputFields.partial().parse(req.body);
   const nextStartsAt = input.startsAt ?? existing.startsAt;
   const nextEndsAt = input.endsAt ?? existing.endsAt;
+  const nextTag = input.tag ?? existing.tag;
   if (nextEndsAt <= nextStartsAt) throw new HttpError(400, "End time must be after start time.", "INVALID_DEAL_WINDOW");
-  assertFlashDeal({
-    isFlash: input.isFlash ?? existing.isFlash,
-    offerType: input.offerType ?? existing.offerType,
-    discountPct: input.discountPct === undefined ? existing.discountPct : input.discountPct,
-    startsAt: nextStartsAt,
-    endsAt: nextEndsAt,
-  });
+  const daypartMessage = daypartValidationError(nextTag, nextStartsAt, nextEndsAt);
+  if (daypartMessage) throw new HttpError(400, daypartMessage, "INVALID_DAYPART_WINDOW");
   if (input.restaurantId && input.restaurantId !== existing.restaurantId) await assertOwner(req.user!.id, input.restaurantId);
   const nextScope = input.scope ?? existing.scope;
   const nextCategoryId = input.scopeCategoryId === undefined ? existing.scopeCategoryId : input.scopeCategoryId;
@@ -592,6 +632,8 @@ merchantRouter.patch("/deals/:id", asyncRoute(async (req, res) => {
   if (nextScope === "CATEGORY" && !nextCategoryId) throw new HttpError(400, "Choose a menu category.", "INVALID_OFFER_SCOPE");
   if (nextScope === "SPECIFIC_ITEMS" && nextItemIds.length === 0) throw new HttpError(400, "Choose at least one menu item.", "INVALID_OFFER_SCOPE");
   await assertOfferScope(input.restaurantId ?? existing.restaurantId, { scope: nextScope, scopeCategoryId: nextCategoryId, menuItemIds: nextItemIds });
+  const nextEffectiveDiscountPct = await computeEffectiveDiscountPercent(input.restaurantId ?? existing.restaurantId, nextTypeValues);
+  assertFlashDeal({ isFlash: input.isFlash ?? existing.isFlash, offerType: nextOfferType, discountPct: nextEffectiveDiscountPct, startsAt: nextStartsAt, endsAt: nextEndsAt });
   const resolvedOfferPrice = await resolveOfferPrice(input.restaurantId ?? existing.restaurantId, nextTypeValues);
   const storedPhotoUrl = input.photoUrl === undefined ? existing.photoUrl : await persistImage(input.photoUrl, "offers");
   const resolvedPhotoUrl = await assertOfferPhoto(input.restaurantId ?? existing.restaurantId, { photoUrl: storedPhotoUrl, offerType: nextOfferType, scope: nextScope, scopeCategoryId: nextCategoryId, menuItemIds: nextItemIds });
