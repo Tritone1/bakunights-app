@@ -32,8 +32,13 @@ export type Deal = {
   description: string;
   menuItem?: string | null;
   photoUrl?: string | null;
+  scope?: "WHOLE_MENU" | "CATEGORY" | "SPECIFIC_ITEMS";
   offerType?: "discount" | "combo" | "set_menu" | "perk" | "event" | "bundle" | "other";
   discountPct?: number | null;
+  offerPriceAzn?: string | number | null;
+  minimumSpendAzn?: string | number | null;
+  freeMenuItemId?: string | null;
+  freeMenuItem?: OfferMenuItem["menuItem"] | null;
   isFlash?: boolean;
   tag?: string;
   dietaryTags?: string[];

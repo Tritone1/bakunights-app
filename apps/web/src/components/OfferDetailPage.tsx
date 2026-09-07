@@ -35,6 +35,7 @@ export interface Venue {
   lat: number;
   lng: number;
   priceRange: string;
+  offerTerms?: { label: string; value: string; emphasis?: "amber" | "green" }[];
   isMachineTranslated?: boolean;
 }
 
@@ -210,6 +211,11 @@ export function OfferDetailPage({
         <div className="flex flex-wrap gap-2" aria-label="Venue tags">
           {venue.tags.map((tag) => <span key={tag} className="rounded-full border border-white/[.07] bg-white/[.055] px-3 py-1.5 text-xs font-semibold text-[#aaaac0]">{tag}</span>)}
         </div>
+
+        {venue.offerTerms?.length ? <section className="overflow-hidden rounded-2xl border border-white/[.08] bg-card shadow-xl shadow-black/15">
+          <div className="border-b border-white/[.07] px-5 py-4"><p className="text-xs font-extrabold uppercase tracking-[.18em] text-amber-400">Offer breakdown</p><h2 className="mt-1 font-display text-2xl font-semibold">Exactly what you get</h2></div>
+          <dl className="divide-y divide-white/[.07] px-5">{venue.offerTerms.map((term, index) => <div key={`${term.label}-${index}`} className="flex items-start justify-between gap-5 py-3.5"><dt className="text-sm text-muted">{term.label}</dt><dd className={`max-w-[65%] text-right text-sm font-bold ${term.emphasis === "green" ? "text-emerald-300" : term.emphasis === "amber" ? "text-amber-300" : "text-white"}`}>{term.value}</dd></div>)}</dl>
+        </section> : null}
 
         <div className="grid grid-cols-3 gap-3">
           <ActionButton active={saved} onClick={() => void toggleSave()} icon={<Bookmark size={18} fill={saved ? "currentColor" : "none"} />} label={saved ? "Saved" : "Save"} />

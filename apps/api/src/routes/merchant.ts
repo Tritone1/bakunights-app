@@ -53,6 +53,9 @@ const dealInputFields = z.object({
   menuItem: z.string().trim().min(2).max(120).nullable().optional(),
   offerType: z.enum(["discount", "combo", "set_menu", "perk", "event", "bundle", "other"]).optional(),
   discountPct: z.number().int().min(1).max(100).nullable().optional(),
+  offerPriceAzn: z.number().positive().max(100000).nullable().optional(),
+  minimumSpendAzn: z.number().positive().max(100000).nullable().optional(),
+  freeMenuItemId: z.string().min(1).nullable().optional(),
   tag: z.enum(["breakfast", "lunch", "dinner", "happy hour", "all day"]),
   dietaryTags: z.array(z.string().max(30)).max(10).optional(),
   startsAt: z.coerce.date(),
@@ -63,7 +66,7 @@ const dealInputFields = z.object({
   scope: z.enum(["WHOLE_MENU", "CATEGORY", "SPECIFIC_ITEMS"]).optional(),
   scopeCategoryId: z.string().nullable().optional(),
   menuItemIds: z.array(z.string()).max(100).optional(),
-  menuItemOverrides: z.record(z.string(), z.coerce.number().positive().max(100000)).optional(),
+  menuItemOverrides: z.record(z.string(), z.coerce.number().nonnegative().max(100000)).optional(),
   photoUrl: imageValue.nullable().optional(),
 });
 
@@ -71,20 +74,35 @@ type OfferTypeRuleInput = {
   offerType: "discount" | "combo" | "set_menu" | "perk" | "event" | "bundle" | "other";
   scope: "WHOLE_MENU" | "CATEGORY" | "SPECIFIC_ITEMS";
   discountPct?: number | null;
+  offerPriceAzn?: number | null;
+  minimumSpendAzn?: number | null;
+  freeMenuItemId?: string | null;
   menuItemIds: string[];
   menuItemOverrides?: Record<string, number>;
 };
 
 function offerTypeValidationError(input: OfferTypeRuleInput) {
-  const groupedTypes = new Set<OfferTypeRuleInput["offerType"]>(["combo", "set_menu", "bundle"]);
+  const fixedPriceTypes = new Set<OfferTypeRuleInput["offerType"]>(["combo", "set_menu"]);
   const typeLabel = input.offerType === "set_menu" ? "Set menu" : input.offerType.charAt(0).toUpperCase() + input.offerType.slice(1);
+  const isSpendReward = input.minimumSpendAzn != null || input.freeMenuItemId != null;
   if (input.offerType !== "discount" && input.discountPct != null) return `${typeLabel} offers cannot include a discount percentage. Choose Discount if this is a percentage reduction.`;
-  if (groupedTypes.has(input.offerType) && (input.scope !== "SPECIFIC_ITEMS" || input.menuItemIds.length < 2)) return `${typeLabel} offers must contain at least two specific menu items.`;
+  if (fixedPriceTypes.has(input.offerType) && (input.scope !== "SPECIFIC_ITEMS" || input.menuItemIds.length < 2)) return `${typeLabel} offers must contain at least two specific menu items.`;
+  if (fixedPriceTypes.has(input.offerType) && input.offerPriceAzn == null) return `${typeLabel} offers need one total offer price.`;
+  if (fixedPriceTypes.has(input.offerType) && isSpendReward) return `${typeLabel} offers cannot use minimum-spend or free-item reward fields.`;
+  if (input.offerType === "perk" && (input.minimumSpendAzn == null || !input.freeMenuItemId)) return "Perk offers need a minimum purchase amount and a free menu item.";
+  if (input.offerType === "perk" && input.offerPriceAzn != null) return "Perk offers use a minimum purchase amount, not a fixed offer price.";
+  if (input.offerType === "bundle" && input.scope !== "SPECIFIC_ITEMS") return "Bundle offers must identify the specific qualifying or included menu items.";
+  if (input.offerType === "bundle" && isSpendReward && (input.minimumSpendAzn == null || !input.freeMenuItemId || input.menuItemIds.length < 1)) return "Spend-and-get-free bundles need a qualifying item, minimum purchase amount, and free item.";
+  if (input.offerType === "bundle" && isSpendReward && input.offerPriceAzn != null) return "Spend-and-get-free bundles use a minimum purchase amount, not a fixed bundle price.";
+  if (input.offerType === "bundle" && !isSpendReward && input.menuItemIds.length < 2) return "Fixed bundles must contain at least two specific menu items.";
   if (input.offerType === "event" && (input.scope !== "WHOLE_MENU" || input.menuItemIds.length > 0)) return "Event offers are venue-wide and cannot use menu category or menu item scope.";
   if (input.scope === "SPECIFIC_ITEMS" && input.menuItemIds.length === 0) return `Choose at least one menu item for this ${typeLabel.toLowerCase()} offer.`;
   const overrideIds = Object.keys(input.menuItemOverrides ?? {});
-  if (!groupedTypes.has(input.offerType) && overrideIds.length > 0) return `Item-level offer prices are only available for Combo, Set menu, and Bundle offers.`;
+  if (input.offerType !== "bundle" && overrideIds.length > 0) return "Item-level offer prices and free-item markers are only available for fixed Bundle offers.";
+  if (input.offerType === "bundle" && isSpendReward && overrideIds.length > 0) return "Spend-and-get-free bundles use the selected free item instead of fixed bundle item prices.";
   if (overrideIds.some((id) => !input.menuItemIds.includes(id))) return "Every item-level offer price must belong to a selected menu item.";
+  if (!["combo", "set_menu", "bundle"].includes(input.offerType) && input.offerPriceAzn != null) return `${typeLabel} offers cannot use a fixed total offer price.`;
+  if (!["perk", "bundle"].includes(input.offerType) && isSpendReward) return `${typeLabel} offers cannot use minimum-spend or free-item reward fields.`;
   return null;
 }
 
@@ -172,6 +190,35 @@ async function assertOfferScope(restaurantId: string, input: { scope: "WHOLE_MEN
     const count = await prisma.menuItem.count({ where: { id: { in: uniqueIds }, venueId: restaurantId, isActive: true } });
     if (count !== uniqueIds.length) throw new HttpError(400, "One or more selected menu items are unavailable.", "INVALID_OFFER_SCOPE");
   }
+}
+
+async function resolveOfferPrice(restaurantId: string, input: OfferTypeRuleInput) {
+  if (input.freeMenuItemId) {
+    const freeItem = await prisma.menuItem.findFirst({ where: { id: input.freeMenuItemId, venueId: restaurantId, isActive: true }, select: { id: true } });
+    if (!freeItem) throw new HttpError(400, "Choose an active free item from this venue's menu.", "INVALID_FREE_MENU_ITEM");
+  }
+  if (!["combo", "set_menu", "bundle"].includes(input.offerType)) return null;
+  if (input.offerType === "bundle" && input.minimumSpendAzn != null) return null;
+
+  const items = await prisma.menuItem.findMany({
+    where: { id: { in: [...new Set(input.menuItemIds)] }, venueId: restaurantId, isActive: true },
+    select: { id: true, priceAzn: true },
+  });
+  const regularTotal = items.reduce((sum, item) => sum + Number(item.priceAzn), 0);
+  if (input.offerType === "combo" || input.offerType === "set_menu") {
+    const offerPrice = input.offerPriceAzn!;
+    if (offerPrice >= regularTotal) throw new HttpError(400, `The total ${input.offerType === "combo" ? "combo" : "set-menu"} price must be lower than the ${regularTotal.toFixed(2)} AZN regular total.`, "INVALID_OFFER_PRICE");
+    return offerPrice;
+  }
+
+  const itemPrices = new Map(items.map((item) => [item.id, Number(item.priceAzn)]));
+  for (const [itemId, overridePrice] of Object.entries(input.menuItemOverrides ?? {})) {
+    const regularPrice = itemPrices.get(itemId);
+    if (regularPrice != null && overridePrice > regularPrice) throw new HttpError(400, "A bundle item price cannot be higher than its regular menu price.", "INVALID_OFFER_PRICE");
+  }
+  const offerTotal = items.reduce((sum, item) => sum + (input.menuItemOverrides?.[item.id] ?? Number(item.priceAzn)), 0);
+  if (offerTotal >= regularTotal) throw new HttpError(400, "Reduce at least one bundle item price or mark an item as free.", "INVALID_OFFER_PRICE");
+  return Math.round(offerTotal * 100) / 100;
 }
 
 async function assertOfferPhoto(restaurantId: string, input: { photoUrl?: string | null; offerType?: string; scope: "WHOLE_MENU" | "CATEGORY" | "SPECIFIC_ITEMS"; scopeCategoryId?: string | null; menuItemIds: string[] }) {
@@ -487,6 +534,7 @@ merchantRouter.post("/deals", asyncRoute(async (req, res) => {
   assertFlashDeal({ ...input, isFlash: input.isFlash ?? false });
   await assertOwner(req.user!.id, input.restaurantId);
   await assertOfferScope(input.restaurantId, input);
+  const resolvedOfferPrice = await resolveOfferPrice(input.restaurantId, input);
   const storedPhotoUrl = await persistImage(input.photoUrl, "offers");
   const resolvedPhotoUrl = await assertOfferPhoto(input.restaurantId, { ...input, photoUrl: storedPhotoUrl });
   const now = new Date();
@@ -494,6 +542,7 @@ merchantRouter.post("/deals", asyncRoute(async (req, res) => {
   const deal = await prisma.deal.create({
     data: {
       ...dealData,
+      offerPriceAzn: resolvedOfferPrice,
       photoUrl: resolvedPhotoUrl,
       scopeCategoryId: input.scope === "CATEGORY" ? input.scopeCategoryId : null,
       offerMenuItems: input.scope === "SPECIFIC_ITEMS" ? { create: [...new Set(menuItemIds)].map((menuItemId) => ({ menuItemId, overridePriceAzn: menuItemOverrides[menuItemId] ?? null })) } : undefined,
@@ -528,16 +577,22 @@ merchantRouter.patch("/deals/:id", asyncRoute(async (req, res) => {
   if (input.restaurantId && input.restaurantId !== existing.restaurantId) await assertOwner(req.user!.id, input.restaurantId);
   const nextScope = input.scope ?? existing.scope;
   const nextCategoryId = input.scopeCategoryId === undefined ? existing.scopeCategoryId : input.scopeCategoryId;
-  const nextItemIds = input.menuItemIds ?? (await prisma.offerMenuItem.findMany({ where: { offerId: existing.id }, select: { menuItemId: true } })).map((item) => item.menuItemId);
+  const existingOfferItems = await prisma.offerMenuItem.findMany({ where: { offerId: existing.id }, select: { menuItemId: true, overridePriceAzn: true } });
+  const nextItemIds = input.menuItemIds ?? existingOfferItems.map((item) => item.menuItemId);
   const nextOfferType = input.offerType ?? existing.offerType;
   const nextDiscountPct = input.discountPct === undefined ? existing.discountPct : input.discountPct;
-  const nextMenuItemOverrides = input.menuItemOverrides ?? {};
-  assertOfferTypeRules({ offerType: nextOfferType, scope: nextScope, discountPct: nextDiscountPct, menuItemIds: nextItemIds, menuItemOverrides: nextMenuItemOverrides });
+  const nextOfferPriceAzn = input.offerPriceAzn === undefined ? Number(existing.offerPriceAzn) || null : input.offerPriceAzn;
+  const nextMinimumSpendAzn = input.minimumSpendAzn === undefined ? Number(existing.minimumSpendAzn) || null : input.minimumSpendAzn;
+  const nextFreeMenuItemId = input.freeMenuItemId === undefined ? existing.freeMenuItemId : input.freeMenuItemId;
+  const nextMenuItemOverrides = input.menuItemOverrides ?? Object.fromEntries(existingOfferItems.flatMap((item) => item.overridePriceAzn == null ? [] : [[item.menuItemId, Number(item.overridePriceAzn)]]));
+  const nextTypeValues = { offerType: nextOfferType, scope: nextScope, discountPct: nextDiscountPct, offerPriceAzn: nextOfferPriceAzn, minimumSpendAzn: nextMinimumSpendAzn, freeMenuItemId: nextFreeMenuItemId, menuItemIds: nextItemIds, menuItemOverrides: nextMenuItemOverrides };
+  assertOfferTypeRules(nextTypeValues);
   if (nextOfferType === "discount" && nextDiscountPct == null) throw new HttpError(400, "Discount-type offers need a percentage.", "INVALID_DISCOUNT_OFFER");
   if (nextOfferType === "set_menu" && (nextScope !== "SPECIFIC_ITEMS" || nextItemIds.length < 2)) throw new HttpError(400, "Set menus must include at least two specific menu items.", "INVALID_OFFER_SCOPE");
   if (nextScope === "CATEGORY" && !nextCategoryId) throw new HttpError(400, "Choose a menu category.", "INVALID_OFFER_SCOPE");
   if (nextScope === "SPECIFIC_ITEMS" && nextItemIds.length === 0) throw new HttpError(400, "Choose at least one menu item.", "INVALID_OFFER_SCOPE");
   await assertOfferScope(input.restaurantId ?? existing.restaurantId, { scope: nextScope, scopeCategoryId: nextCategoryId, menuItemIds: nextItemIds });
+  const resolvedOfferPrice = await resolveOfferPrice(input.restaurantId ?? existing.restaurantId, nextTypeValues);
   const storedPhotoUrl = input.photoUrl === undefined ? existing.photoUrl : await persistImage(input.photoUrl, "offers");
   const resolvedPhotoUrl = await assertOfferPhoto(input.restaurantId ?? existing.restaurantId, { photoUrl: storedPhotoUrl, offerType: nextOfferType, scope: nextScope, scopeCategoryId: nextCategoryId, menuItemIds: nextItemIds });
   const now = new Date();
@@ -548,9 +603,10 @@ merchantRouter.patch("/deals/:id", asyncRoute(async (req, res) => {
       where: { id: existing.id },
       data: {
       ...dealChanges,
+      offerPriceAzn: resolvedOfferPrice,
       photoUrl: resolvedPhotoUrl,
       scopeCategoryId: nextScope === "CATEGORY" ? nextCategoryId : null,
-      offerMenuItems: nextScope === "SPECIFIC_ITEMS" && (input.scope || input.menuItemIds || input.menuItemOverrides) ? { create: [...new Set(nextItemIds)].map((menuItemId) => ({ menuItemId, overridePriceAzn: menuItemOverrides?.[menuItemId] ?? null })) } : undefined,
+      offerMenuItems: nextScope === "SPECIFIC_ITEMS" && (input.scope || input.menuItemIds || input.menuItemOverrides) ? { create: [...new Set(nextItemIds)].map((menuItemId) => ({ menuItemId, overridePriceAzn: nextMenuItemOverrides[menuItemId] ?? null })) } : undefined,
       status: "approved",
       isActive: true,
       submittedByUserId: req.user!.id,

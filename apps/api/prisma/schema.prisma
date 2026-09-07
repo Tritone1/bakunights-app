@@ -155,6 +155,10 @@ model Deal {
   scopeCategory     MenuCategory?     @relation("ScopedDealCategory", fields: [scopeCategoryId], references: [id], onDelete: SetNull)
   offerType         DealOfferType     @default(discount) @map("offer_type")
   discountPct       Int?              @map("discount_pct")
+  offerPriceAzn     Decimal?          @map("offer_price_azn") @db.Decimal(10, 2)
+  minimumSpendAzn   Decimal?          @map("minimum_spend_azn") @db.Decimal(10, 2)
+  freeMenuItemId    String?           @map("free_menu_item_id")
+  freeMenuItem      MenuItem?         @relation("DealFreeMenuItem", fields: [freeMenuItemId], references: [id], onDelete: SetNull)
   tag               String
   dietaryTags       String[]          @default([]) @map("dietary_tags")
   startsAt          DateTime          @map("starts_at")
@@ -181,6 +185,7 @@ model Deal {
   offerMenuItems    OfferMenuItem[]
 
   @@index([isActive, startsAt, endsAt])
+  @@index([freeMenuItemId])
   @@map("deals")
 }
 
@@ -241,6 +246,7 @@ model MenuItem {
   venue       Restaurant      @relation(fields: [venueId], references: [id], onDelete: Cascade)
   category    MenuCategory    @relation(fields: [categoryId], references: [id], onDelete: Restrict)
   offerLinks  OfferMenuItem[]
+  freeInDeals Deal[]          @relation("DealFreeMenuItem")
 
   @@index([venueId, categoryId, isActive])
   @@map("menu_items")

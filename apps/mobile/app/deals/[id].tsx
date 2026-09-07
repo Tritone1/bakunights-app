@@ -52,6 +52,7 @@ export default function OfferDetailScreen() {
     const candidates = [
       ...(deal.photoUrl ? [{ src: deal.photoUrl, label: deal.title }] : []),
       ...(deal.offerMenuItems || []).flatMap(({ menuItem }) => menuItem.photoUrl ? [{ src: menuItem.photoUrl, label: menuItem.name }] : []),
+      ...(deal.freeMenuItem?.photoUrl ? [{ src: deal.freeMenuItem.photoUrl, label: `${deal.freeMenuItem.name} · free item` }] : []),
       ...(deal.restaurant.photoUrl ? [{ src: deal.restaurant.photoUrl, label: deal.restaurant.name }] : []),
     ];
     return [...new Map(candidates.map((photo) => [photo.src, photo])).values()];
@@ -121,9 +122,12 @@ export default function OfferDetailScreen() {
   const { deal } = data;
   const venue = deal.restaurant;
   const priceValues = (deal.offerMenuItems || []).map(({ menuItem }) => Number(menuItem.priceAzn)).filter(Number.isFinite);
-  const price = priceValues.length ? `${Math.min(...priceValues).toFixed(0)}${priceValues.length > 1 ? `–${Math.max(...priceValues).toFixed(0)}` : ""} AZN` : "Price varies";
+  const offerPrice = Number(deal.offerPriceAzn);
+  const minimumSpend = Number(deal.minimumSpendAzn);
+  const price = offerPrice > 0 ? `${offerPrice.toFixed(2)} AZN total` : minimumSpend > 0 ? `${minimumSpend.toFixed(2)} AZN minimum` : priceValues.length ? `${Math.min(...priceValues).toFixed(0)}${priceValues.length > 1 ? `–${Math.max(...priceValues).toFixed(0)}` : ""} AZN` : "Price varies";
   const tags = [...new Set([...(deal.dietaryTags || []), ...(deal.scopeCategory?.name ? [deal.scopeCategory.name] : []), ...((deal.offerMenuItems || []).map(({ menuItem }) => menuItem.category?.name).filter(Boolean) as string[])])];
   const offerTag = deal.offerType === "discount" && deal.discountPct ? `${deal.discountPct}% OFF` : (deal.offerType || "OFFER").replaceAll("_", " ").toUpperCase();
+  const offerTerms = buildOfferTerms(deal);
 
   return <SafeAreaView style={styles.safe} edges={["top"]}><ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
     <View style={styles.topBar}><Pressable onPress={() => router.back()} style={styles.back}><Ionicons name="chevron-back" size={19} color={palette.white} /><Text style={styles.backText}>Back</Text></Pressable><View style={styles.tag}><Text style={styles.tagText}>{offerTag}</Text></View></View>
@@ -134,6 +138,8 @@ export default function OfferDetailScreen() {
     </View>
 
     <View style={styles.intro}><View style={styles.pills}><Text style={styles.category}>{venue.cuisine}</Text>{deal.tag && <Text style={styles.period}>{deal.tag}</Text>}</View><Text style={styles.title}>{deal.title}</Text><Text style={styles.venueName}>{venue.name}</Text><Text style={styles.description}>{deal.description}</Text>{deal.isMachineTranslated && <Text style={styles.translated}>AUTOMATICALLY TRANSLATED</Text>}</View>
+
+    {offerTerms.length > 0 && <View style={styles.termsCard}><Text style={styles.eyebrow}>OFFER BREAKDOWN</Text><Text style={styles.termsTitle}>Exactly what you get</Text>{offerTerms.map((term, index) => <View key={`${term.label}-${index}`} style={styles.termRow}><Text style={styles.termLabel}>{term.label}</Text><Text style={[styles.termValue, term.tone === "green" && styles.termGreen, term.tone === "amber" && styles.termAmber]}>{term.value}</Text></View>)}</View>}
 
     <View style={styles.metaGrid}><Meta icon="time" label="OFFER EXPIRES" value={remaining} color={palette.red} /><Meta icon="star" label="RATING" value={`${(deal.dealRating ?? venue.rating ?? 0).toFixed(1)}/5.0`} color={palette.gold} /><Meta icon="wallet" label="PRICE RANGE" value={price} color={palette.gold} /><Meta icon="navigate" label="DISTANCE" value={deal.distanceMiles == null ? "Nearby" : `${(deal.distanceMiles * 1.60934).toFixed(1)} km`} color={palette.white} /></View>
     {tags.length > 0 && <View style={styles.tags}>{tags.map((tag) => <Text key={tag} style={styles.chip}>{tag}</Text>)}</View>}
@@ -155,6 +161,39 @@ export default function OfferDetailScreen() {
   </ScrollView></SafeAreaView>;
 }
 
+function buildOfferTerms(deal: Deal) {
+  const rows: { label: string; value: string; tone?: "amber" | "green" }[] = [];
+  const items = deal.offerMenuItems || [];
+  const regularTotal = items.reduce((sum, item) => sum + Number(item.menuItem.priceAzn), 0);
+  const offerPrice = Number(deal.offerPriceAzn);
+  const minimumSpend = Number(deal.minimumSpendAzn);
+  if (minimumSpend > 0 && deal.freeMenuItem) {
+    const qualifying = deal.scopeCategory?.name || items.map((item) => item.menuItem.name).join(", ") || "Any eligible venue purchase";
+    return [
+      { label: "Qualifying purchase", value: qualifying },
+      { label: "Minimum spend", value: `${minimumSpend.toFixed(2)} AZN`, tone: "amber" as const },
+      { label: "Free item", value: `${deal.freeMenuItem.name} (${Number(deal.freeMenuItem.priceAzn).toFixed(2)} AZN value)`, tone: "green" as const },
+    ];
+  }
+  if (deal.offerType === "discount") {
+    rows.push({ label: "Discount", value: `${deal.discountPct || 0}% off`, tone: "amber" });
+    rows.push({ label: "Applies to", value: deal.scopeCategory?.name ? `${deal.scopeCategory.name} · all category items` : items.length ? items.map((item) => item.menuItem.name).join(", ") : "Whole menu" });
+    return rows;
+  }
+  if (["combo", "set_menu", "bundle"].includes(deal.offerType || "")) {
+    items.forEach(({ menuItem, overridePriceAzn }) => {
+      const regular = Number(menuItem.priceAzn);
+      const offered = overridePriceAzn == null ? null : Number(overridePriceAzn);
+      rows.push({ label: menuItem.name, value: offered === 0 ? `Free · was ${regular.toFixed(2)} AZN` : offered != null ? `${offered.toFixed(2)} AZN · was ${regular.toFixed(2)} AZN` : `${regular.toFixed(2)} AZN`, tone: offered === 0 ? "green" : undefined });
+    });
+    const effectiveTotal = offerPrice > 0 ? offerPrice : items.reduce((sum, item) => sum + (item.overridePriceAzn == null ? Number(item.menuItem.priceAzn) : Number(item.overridePriceAzn)), 0);
+    rows.push({ label: "Regular total", value: `${regularTotal.toFixed(2)} AZN` });
+    rows.push({ label: "Offer total", value: `${effectiveTotal.toFixed(2)} AZN`, tone: "green" });
+    if (regularTotal > effectiveTotal) rows.push({ label: "You save", value: `${(regularTotal - effectiveTotal).toFixed(2)} AZN (${Math.round((1 - effectiveTotal / regularTotal) * 100)}%)`, tone: "amber" });
+  }
+  return rows;
+}
+
 function Meta({ icon, label, value, color }: { icon: keyof typeof Ionicons.glyphMap; label: string; value: string; color: string }) { return <View style={styles.meta}><View style={[styles.metaIcon, { backgroundColor: `${color}18` }]}><Ionicons name={icon} size={18} color={color} /></View><View style={styles.metaCopy}><Text style={styles.metaLabel}>{label}</Text><Text style={styles.metaValue}>{value}</Text></View></View>; }
 function Action({ icon, label, active = false, onPress }: { icon: keyof typeof Ionicons.glyphMap; label: string; active?: boolean; onPress: () => void }) { return <Pressable onPress={onPress} style={[styles.action, active && styles.actionActive]}><Ionicons name={icon} size={18} color={active ? palette.night : palette.white} /><Text style={[styles.actionText, active && styles.actionTextActive]}>{label}</Text></Pressable>; }
 
@@ -162,6 +201,7 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: palette.night }, content: { paddingBottom: 45 }, center: { flex: 1, backgroundColor: palette.night, alignItems: "center", justifyContent: "center", padding: 24 }, loadingText: { color: palette.muted, marginTop: 12 }, errorTitle: { color: palette.white, fontFamily: displayFont, fontSize: 26, marginTop: 12 }, errorBody: { color: palette.muted, textAlign: "center", marginTop: 7 }, topBar: { height: 62, flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16 }, back: { flexDirection: "row", gap: 3, alignItems: "center", borderRadius: 20, borderWidth: 1, borderColor: palette.line, backgroundColor: palette.card, paddingHorizontal: 12, paddingVertical: 9 }, backText: { color: palette.white, fontWeight: "800", fontSize: 12 }, tag: { borderRadius: 16, backgroundColor: palette.red, paddingHorizontal: 11, paddingVertical: 7 }, tagText: { color: palette.white, fontSize: 9, fontWeight: "900", letterSpacing: 1.1 },
   gallery: { height: 285, marginHorizontal: 16, overflow: "hidden", borderRadius: 22, borderWidth: 1, borderColor: palette.line, backgroundColor: "#0d0d14" }, photo: { width: "100%", height: 283, backgroundColor: "#0d0d14" }, fallback: { alignItems: "center", justifyContent: "center" }, photoLabel: { position: "absolute", left: 12, bottom: 14, maxWidth: 220, borderRadius: 12, backgroundColor: "rgba(9,9,14,.85)", paddingHorizontal: 10, paddingVertical: 7 }, photoLabelText: { color: palette.white, fontSize: 10, fontWeight: "800" }, dots: { position: "absolute", right: 13, bottom: 17, flexDirection: "row", gap: 6 }, dot: { width: 7, height: 7, borderRadius: 4, backgroundColor: "rgba(255,255,255,.35)" }, dotActive: { width: 24, backgroundColor: palette.gold },
   intro: { paddingHorizontal: 18, paddingTop: 21 }, pills: { flexDirection: "row", gap: 7 }, category: { color: palette.white, backgroundColor: "rgba(255,255,255,.07)", borderRadius: 15, paddingHorizontal: 10, paddingVertical: 6, fontSize: 9, fontWeight: "800" }, period: { color: palette.goldSoft, backgroundColor: "rgba(245,158,11,.1)", borderRadius: 15, paddingHorizontal: 10, paddingVertical: 6, fontSize: 9, fontWeight: "800" }, title: { color: palette.white, fontFamily: displayFont, fontSize: 34, lineHeight: 39, fontWeight: "700", marginTop: 13 }, venueName: { color: palette.gold, fontSize: 11, fontWeight: "900", letterSpacing: 1.2, marginTop: 6 }, description: { color: "#b3b3c8", fontSize: 14, lineHeight: 21, marginTop: 9 }, translated: { color: palette.goldSoft, fontSize: 8, letterSpacing: 1.3, fontWeight: "900", marginTop: 9 },
+  termsCard: { marginHorizontal: 16, marginTop: 20, borderRadius: 20, borderWidth: 1, borderColor: palette.line, backgroundColor: palette.card, paddingHorizontal: 16, paddingTop: 16, overflow: "hidden" }, termsTitle: { color: palette.white, fontFamily: displayFont, fontSize: 24, fontWeight: "700", marginTop: 4, marginBottom: 8 }, termRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", gap: 16, borderTopWidth: 1, borderTopColor: palette.line, paddingVertical: 12 }, termLabel: { color: palette.muted, fontSize: 11, flex: 1 }, termValue: { color: palette.white, fontSize: 11, fontWeight: "800", textAlign: "right", flex: 1.6 }, termGreen: { color: palette.green }, termAmber: { color: palette.gold },
   metaGrid: { marginHorizontal: 16, marginTop: 22, borderRadius: 20, borderWidth: 1, borderColor: palette.line, backgroundColor: palette.card, overflow: "hidden", flexDirection: "row", flexWrap: "wrap" }, meta: { width: "50%", minHeight: 94, padding: 13, flexDirection: "row", alignItems: "center", gap: 9, borderWidth: 0.5, borderColor: palette.line }, metaIcon: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center" }, metaCopy: { flex: 1 }, metaLabel: { color: palette.muted, fontSize: 7, fontWeight: "900", letterSpacing: 1.1 }, metaValue: { color: palette.white, fontSize: 12, fontWeight: "900", marginTop: 5 }, tags: { flexDirection: "row", flexWrap: "wrap", gap: 7, paddingHorizontal: 18, marginTop: 16 }, chip: { color: "#aaaac0", borderRadius: 16, borderWidth: 1, borderColor: palette.line, backgroundColor: "rgba(255,255,255,.045)", paddingHorizontal: 10, paddingVertical: 7, fontSize: 9, fontWeight: "700" }, actions: { flexDirection: "row", gap: 8, marginHorizontal: 16, marginTop: 17 }, action: { flex: 1, height: 48, borderRadius: 14, borderWidth: 1, borderColor: palette.line, backgroundColor: palette.cardRaised, alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 6 }, actionActive: { backgroundColor: palette.gold, borderColor: palette.gold }, actionText: { color: palette.white, fontSize: 10, fontWeight: "800" }, actionTextActive: { color: palette.night },
   sectionHeading: { marginHorizontal: 18, marginTop: 30 }, eyebrow: { color: palette.gold, fontSize: 8, fontWeight: "900", letterSpacing: 1.7 }, sectionTitle: { color: palette.white, fontFamily: displayFont, fontWeight: "700", fontSize: 26, marginTop: 5 }, mapCard: { marginHorizontal: 16, marginTop: 14, borderRadius: 20, borderWidth: 1, borderColor: palette.line, overflow: "hidden", backgroundColor: palette.card }, map: { height: 220, width: "100%" }, mapAddress: { color: palette.muted, paddingHorizontal: 14, paddingTop: 12, fontSize: 11, lineHeight: 16 }, mapButtons: { flexDirection: "row", gap: 8, padding: 12 }, mapPrimary: { flex: 1, height: 44, borderRadius: 13, backgroundColor: palette.gold, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7 }, mapPrimaryText: { color: palette.night, fontSize: 10, fontWeight: "900" }, mapSecondary: { width: 82, height: 44, borderRadius: 13, borderWidth: 1, borderColor: palette.line, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5 }, mapSecondaryText: { color: palette.white, fontSize: 10, fontWeight: "800" },
   proof: { marginHorizontal: 16, marginTop: 24, borderRadius: 22, borderWidth: 1, borderColor: "rgba(245,158,11,.35)", backgroundColor: "rgba(245,158,11,.07)", padding: 20, alignItems: "center" }, proofIcon: { width: 52, height: 52, borderRadius: 26, backgroundColor: "rgba(245,158,11,.12)", alignItems: "center", justifyContent: "center" }, proofIconConfirmed: { backgroundColor: "rgba(16,185,129,.12)" }, proofLabel: { color: palette.muted, fontSize: 8, letterSpacing: 1.8, fontWeight: "900", marginTop: 14 }, proofTitle: { color: palette.white, fontFamily: displayFont, fontSize: 28, fontWeight: "700", marginTop: 5 }, qr: { width: 210, height: 210, borderRadius: 14, marginTop: 16 }, code: { color: palette.goldSoft, backgroundColor: "rgba(0,0,0,.25)", borderRadius: 11, padding: 11, fontWeight: "900", letterSpacing: 2, marginTop: 10 }, proofHelp: { color: palette.muted, textAlign: "center", fontSize: 10, lineHeight: 15, marginTop: 13 }, primary: { minWidth: 180, height: 45, borderRadius: 14, backgroundColor: palette.gold, alignItems: "center", justifyContent: "center", marginTop: 15, paddingHorizontal: 18 }, primaryText: { color: palette.night, fontSize: 11, fontWeight: "900" },

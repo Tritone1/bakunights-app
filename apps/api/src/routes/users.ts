@@ -144,13 +144,19 @@ usersRouter.get("/me/saved", asyncRoute(async (req, res) => {
       ratings: { select: { value: true } },
       offerMenuItems: { include: { menuItem: { include: { category: true } } } },
       scopeCategory: true,
+      freeMenuItem: { include: { category: true } },
     } } },
   });
   res.json({ deals: rows.map(({ deal, savedAt }) => {
     const { ratings, restaurant: restaurantWithMenuItems, ...rest } = deal;
     const { menuItems, ...restaurant } = restaurantWithMenuItems;
-    const offerMenuItems = deal.scope === "WHOLE_MENU" && deal.offerType !== "event"
-      ? menuItems.map((menuItem) => ({ menuItemId: menuItem.id, overridePriceAzn: null, menuItem }))
+    const galleryItems = deal.scope === "WHOLE_MENU" && deal.offerType !== "event"
+      ? menuItems
+      : deal.scope === "CATEGORY"
+        ? menuItems.filter((menuItem) => menuItem.categoryId === deal.scopeCategoryId)
+        : null;
+    const offerMenuItems = galleryItems
+      ? galleryItems.map((menuItem) => ({ menuItemId: menuItem.id, overridePriceAzn: null, menuItem }))
       : deal.offerMenuItems;
     return {
       ...localizeDeal({ ...rest, restaurant, offerMenuItems }, getOfferLanguage(req)),

@@ -83,13 +83,20 @@ export function DealDetailPage() {
 function toOfferPresentation(deal: Deal): { venue: Venue; photos: OfferPhoto[] } {
   const restaurant = deal.restaurant;
   const itemPhotos = (deal.offerMenuItems ?? []).flatMap(({ menuItem }) => menuItem.photoUrl ? [{ src: menuItem.photoUrl, label: menuItem.name }] : []);
+  const freeItemPhotos = deal.freeMenuItem?.photoUrl ? [{ src: deal.freeMenuItem.photoUrl, label: `${deal.freeMenuItem.name} · free item` }] : [];
   const photoCandidates = (deal.offerType ?? "").toLowerCase() === "set_menu" && itemPhotos.length
     ? itemPhotos
-    : [...(deal.photoUrl ? [{ src: deal.photoUrl, label: deal.title }] : []), ...itemPhotos];
+    : [...(deal.photoUrl ? [{ src: deal.photoUrl, label: deal.title }] : []), ...itemPhotos, ...freeItemPhotos];
   if (!photoCandidates.length && restaurant.photoUrl) photoCandidates.push({ src: restaurant.photoUrl, label: restaurant.name });
   const photos = [...new Map(photoCandidates.map((photo) => [photo.src, photo])).values()];
   const prices = (deal.offerMenuItems ?? []).map(({ menuItem }) => Number(menuItem.priceAzn)).filter(Number.isFinite);
-  const priceRange = prices.length === 0
+  const structuredPrice = Number(deal.offerPriceAzn);
+  const minimumSpend = Number(deal.minimumSpendAzn);
+  const priceRange = structuredPrice > 0
+    ? `${structuredPrice.toFixed(2)} AZN total`
+    : minimumSpend > 0
+      ? `${minimumSpend.toFixed(2)} AZN minimum`
+      : prices.length === 0
     ? "Price varies"
     : prices.length === 1
       ? `${prices[0]!.toFixed(2)} AZN`
@@ -127,10 +134,58 @@ function toOfferPresentation(deal: Deal): { venue: Venue; photos: OfferPhoto[] }
       lat: restaurant.lat,
       lng: restaurant.lng,
       priceRange,
+      offerTerms: buildOfferTerms(deal),
       isMachineTranslated: deal.isMachineTranslated,
     },
     photos,
   };
+}
+
+function buildOfferTerms(deal: Deal) {
+  const rows: { label: string; value: string; emphasis?: "amber" | "green" }[] = [];
+  const items = deal.offerMenuItems ?? [];
+  const regularTotal = items.reduce((sum, item) => sum + Number(item.menuItem.priceAzn), 0);
+  const offerPrice = Number(deal.offerPriceAzn);
+  const minimumSpend = Number(deal.minimumSpendAzn);
+
+  if (minimumSpend > 0 && deal.freeMenuItem) {
+    const qualifying = deal.scope === "WHOLE_MENU"
+      ? "Any eligible venue purchase"
+      : deal.scope === "CATEGORY"
+        ? deal.scopeCategory?.name ?? "Selected menu category"
+        : items.map((item) => item.menuItem.name).join(", ");
+    rows.push(
+      { label: "Qualifying purchase", value: qualifying || "Selected items" },
+      { label: "Minimum spend", value: `${minimumSpend.toFixed(2)} AZN`, emphasis: "amber" },
+      { label: "Free item", value: `${deal.freeMenuItem.name} (${Number(deal.freeMenuItem.priceAzn).toFixed(2)} AZN value)`, emphasis: "green" },
+    );
+    return rows;
+  }
+
+  if (deal.offerType === "discount") {
+    rows.push({ label: "Discount", value: `${deal.discountPct ?? 0}% off`, emphasis: "amber" });
+    if (deal.scope === "CATEGORY") rows.push({ label: "Applies to", value: `${deal.scopeCategory?.name ?? "Selected category"} · all category items` });
+    else if (deal.scope === "WHOLE_MENU") rows.push({ label: "Applies to", value: "Whole menu" });
+    else rows.push({ label: "Applies to", value: items.map((item) => item.menuItem.name).join(", ") });
+    return rows;
+  }
+
+  if (["combo", "set_menu", "bundle"].includes(deal.offerType ?? "")) {
+    items.forEach(({ menuItem, overridePriceAzn }) => {
+      const regularPrice = Number(menuItem.priceAzn);
+      const itemOfferPrice = overridePriceAzn == null ? null : Number(overridePriceAzn);
+      rows.push({
+        label: menuItem.name,
+        value: itemOfferPrice === 0 ? `Free · was ${regularPrice.toFixed(2)} AZN` : itemOfferPrice != null ? `${itemOfferPrice.toFixed(2)} AZN · was ${regularPrice.toFixed(2)} AZN` : `${regularPrice.toFixed(2)} AZN`,
+        emphasis: itemOfferPrice === 0 ? "green" : undefined,
+      });
+    });
+    const effectiveTotal = offerPrice > 0 ? offerPrice : items.reduce((sum, item) => sum + (item.overridePriceAzn == null ? Number(item.menuItem.priceAzn) : Number(item.overridePriceAzn)), 0);
+    if (regularTotal > 0) rows.push({ label: "Regular total", value: `${regularTotal.toFixed(2)} AZN` });
+    rows.push({ label: "Offer total", value: `${effectiveTotal.toFixed(2)} AZN`, emphasis: "green" });
+    if (regularTotal > effectiveTotal) rows.push({ label: "You save", value: `${(regularTotal - effectiveTotal).toFixed(2)} AZN (${Math.round((1 - effectiveTotal / regularTotal) * 100)}%)`, emphasis: "amber" });
+  }
+  return rows;
 }
 
 function numericId(value: string) {

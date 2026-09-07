@@ -17,8 +17,13 @@ function assertGooglePlacesConfigured() {
 
 function serializeLiveDeal(deal: any, language: OfferLanguage, wholeMenuItems: any[] = []) {
   const { ratings, ...rest } = deal;
-  const offerMenuItems = deal.scope === "WHOLE_MENU" && deal.offerType !== "event"
-    ? wholeMenuItems.flatMap((menuItem) => menuItem.photoUrl ? [{ menuItemId: menuItem.id, overridePriceAzn: null, menuItem }] : [])
+  const galleryItems = deal.scope === "WHOLE_MENU" && deal.offerType !== "event"
+    ? wholeMenuItems
+    : deal.scope === "CATEGORY"
+      ? wholeMenuItems.filter((menuItem) => menuItem.categoryId === deal.scopeCategoryId)
+      : null;
+  const offerMenuItems = galleryItems
+    ? galleryItems.flatMap((menuItem) => menuItem.photoUrl ? [{ menuItemId: menuItem.id, overridePriceAzn: null, menuItem }] : [])
     : deal.offerMenuItems;
   return {
     ...localizeDeal({ ...rest, offerMenuItems }, language),
@@ -169,6 +174,7 @@ restaurantsRouter.get("/:id", asyncRoute(async (req, res) => {
           ratings: { select: { value: true } },
           _count: { select: { savedBy: true, redemptions: true } },
           scopeCategory: true,
+          freeMenuItem: { include: { category: true } },
           offerMenuItems: { include: { menuItem: { include: { category: true } } } },
         },
       },
