@@ -57,6 +57,7 @@ const dealInputFields = z.object({
   offerPriceAzn: z.number().positive().max(100000).nullable().optional(),
   minimumSpendAzn: z.number().positive().max(100000).nullable().optional(),
   freeMenuItemId: z.string().min(1).nullable().optional(),
+  freeMenuItemQty: z.coerce.number().int().min(1).max(20).optional(),
   tag: z.enum(["breakfast", "lunch", "dinner", "happy hour", "all day"]),
   dietaryTags: z.array(z.string().max(30)).max(10).optional(),
   startsAt: z.coerce.date(),
@@ -79,6 +80,7 @@ type OfferTypeRuleInput = {
   offerPriceAzn?: number | null;
   minimumSpendAzn?: number | null;
   freeMenuItemId?: string | null;
+  freeMenuItemQty?: number;
   menuItemIds: string[];
   menuItemOverrides?: Record<string, number>;
   menuItemQuantities?: Record<string, number>;
@@ -95,6 +97,10 @@ function offerTypeValidationError(input: OfferTypeRuleInput) {
   if (input.offerType === "perk" && (input.minimumSpendAzn == null || !input.freeMenuItemId)) return "Perk offers need a minimum purchase amount and a free menu item.";
   if (input.offerType === "perk" && input.offerPriceAzn != null) return "Perk offers use a minimum purchase amount, not a fixed offer price.";
   if (isSpendReward && input.scope === "SPECIFIC_ITEMS" && input.freeMenuItemId && !input.menuItemIds.includes(input.freeMenuItemId)) return "The free item must be one of the selected qualifying items.";
+  if (isSpendReward && input.scope === "SPECIFIC_ITEMS" && input.freeMenuItemId && input.freeMenuItemQty != null) {
+    const includedQty = Math.max(1, Math.round(input.menuItemQuantities?.[input.freeMenuItemId] ?? 1));
+    if (input.freeMenuItemQty > includedQty) return "The free quantity cannot exceed how many of that item are included.";
+  }
   if (input.offerType === "bundle" && input.scope !== "SPECIFIC_ITEMS") return "Bundle offers must identify the specific qualifying or included menu items.";
   if (input.offerType === "bundle" && isSpendReward && (input.minimumSpendAzn == null || !input.freeMenuItemId || input.menuItemIds.length < 1)) return "Spend-and-get-free bundles need a qualifying item, minimum purchase amount, and free item.";
   if (input.offerType === "bundle" && isSpendReward && input.offerPriceAzn != null) return "Spend-and-get-free bundles use a minimum purchase amount, not a fixed bundle price.";
@@ -188,6 +194,7 @@ const dealInput = dealInputFields
     menuItemIds: value.menuItemIds ?? [],
     menuItemOverrides: value.menuItemOverrides ?? {},
     menuItemQuantities: value.menuItemQuantities ?? {},
+    freeMenuItemQty: value.freeMenuItemQty ?? 1,
   }))
   .refine((value) => value.endsAt > value.startsAt, { message: "End time must be after start time", path: ["endsAt"] })
   .refine((value) => value.offerType !== "discount" || value.discountPct != null, { message: "Discount-type offers need a percentage", path: ["discountPct"] })
@@ -678,9 +685,10 @@ merchantRouter.patch("/deals/:id", asyncRoute(async (req, res) => {
   const nextOfferPriceAzn = input.offerPriceAzn === undefined ? Number(existing.offerPriceAzn) || null : input.offerPriceAzn;
   const nextMinimumSpendAzn = input.minimumSpendAzn === undefined ? Number(existing.minimumSpendAzn) || null : input.minimumSpendAzn;
   const nextFreeMenuItemId = input.freeMenuItemId === undefined ? existing.freeMenuItemId : input.freeMenuItemId;
+  const nextFreeMenuItemQty = input.freeMenuItemQty === undefined ? existing.freeMenuItemQty : input.freeMenuItemQty;
   const nextMenuItemOverrides = input.menuItemOverrides ?? Object.fromEntries(existingOfferItems.flatMap((item) => item.overridePriceAzn == null ? [] : [[item.menuItemId, Number(item.overridePriceAzn)]]));
   const nextMenuItemQuantities = input.menuItemQuantities ?? Object.fromEntries(existingOfferItems.map((item) => [item.menuItemId, item.quantity]));
-  const nextTypeValues = { offerType: nextOfferType, scope: nextScope, discountPct: nextDiscountPct, offerPriceAzn: nextOfferPriceAzn, minimumSpendAzn: nextMinimumSpendAzn, freeMenuItemId: nextFreeMenuItemId, menuItemIds: nextItemIds, menuItemOverrides: nextMenuItemOverrides, menuItemQuantities: nextMenuItemQuantities };
+  const nextTypeValues = { offerType: nextOfferType, scope: nextScope, discountPct: nextDiscountPct, offerPriceAzn: nextOfferPriceAzn, minimumSpendAzn: nextMinimumSpendAzn, freeMenuItemId: nextFreeMenuItemId, freeMenuItemQty: nextFreeMenuItemQty, menuItemIds: nextItemIds, menuItemOverrides: nextMenuItemOverrides, menuItemQuantities: nextMenuItemQuantities };
   assertOfferTypeRules(nextTypeValues);
   if (nextOfferType === "discount" && nextDiscountPct == null) throw new HttpError(400, "Discount-type offers need a percentage.", "INVALID_DISCOUNT_OFFER");
   if (nextOfferType === "set_menu" && (nextScope !== "SPECIFIC_ITEMS" || nextItemIds.length < 2)) throw new HttpError(400, "Set menus must include at least two specific menu items.", "INVALID_OFFER_SCOPE");

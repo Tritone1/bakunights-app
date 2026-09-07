@@ -150,6 +150,7 @@ function buildOfferTerms(deal: Deal) {
   const minimumSpend = Number(deal.minimumSpendAzn);
 
   if (minimumSpend > 0 && deal.freeMenuItem) {
+    const freeQty = Math.max(1, Math.round(deal.freeMenuItemQty ?? 1));
     const qualifying = deal.scope === "WHOLE_MENU"
       ? "Any eligible venue purchase"
       : deal.scope === "CATEGORY"
@@ -158,7 +159,7 @@ function buildOfferTerms(deal: Deal) {
     rows.push(
       { label: "Qualifying purchase", value: qualifying || "Selected items" },
       { label: "Minimum spend", value: `${minimumSpend.toFixed(2)} AZN`, emphasis: "amber" },
-      { label: "Free item", value: `${deal.freeMenuItem.name} (${Number(deal.freeMenuItem.priceAzn).toFixed(2)} AZN value)`, emphasis: "green" },
+      { label: "Free item", value: `${freeQty > 1 ? `${freeQty}x ` : ""}${deal.freeMenuItem.name} (${(Number(deal.freeMenuItem.priceAzn) * freeQty).toFixed(2)} AZN value)`, emphasis: "green" },
     );
     return rows;
   }

@@ -39,6 +39,7 @@ export type Deal = {
   offerPriceAzn?: string | number | null;
   minimumSpendAzn?: string | number | null;
   freeMenuItemId?: string | null;
+  freeMenuItemQty?: number | null;
   freeMenuItem?: OfferMenuItem["menuItem"] | null;
   isFlash?: boolean;
   tag?: string;

@@ -169,11 +169,12 @@ function buildOfferTerms(deal: Deal) {
   const offerPrice = Number(deal.offerPriceAzn);
   const minimumSpend = Number(deal.minimumSpendAzn);
   if (minimumSpend > 0 && deal.freeMenuItem) {
+    const freeQty = Math.max(1, Math.round(deal.freeMenuItemQty ?? 1));
     const qualifying = deal.scopeCategory?.name || items.map((item) => item.menuItem.name).join(", ") || "Any eligible venue purchase";
     return [
       { label: "Qualifying purchase", value: qualifying },
       { label: "Minimum spend", value: `${minimumSpend.toFixed(2)} AZN`, tone: "amber" as const },
-      { label: "Free item", value: `${deal.freeMenuItem.name} (${Number(deal.freeMenuItem.priceAzn).toFixed(2)} AZN value)`, tone: "green" as const },
+      { label: "Free item", value: `${freeQty > 1 ? `${freeQty}x ` : ""}${deal.freeMenuItem.name} (${(Number(deal.freeMenuItem.priceAzn) * freeQty).toFixed(2)} AZN value)`, tone: "green" as const },
     ];
   }
   if (deal.offerType === "discount") {

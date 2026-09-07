@@ -159,6 +159,7 @@ model Deal {
   minimumSpendAzn   Decimal?          @map("minimum_spend_azn") @db.Decimal(10, 2)
   freeMenuItemId    String?           @map("free_menu_item_id")
   freeMenuItem      MenuItem?         @relation("DealFreeMenuItem", fields: [freeMenuItemId], references: [id], onDelete: SetNull)
+  freeMenuItemQty   Int               @default(1) @map("free_menu_item_qty")
   tag               String
   dietaryTags       String[]          @default([]) @map("dietary_tags")
   startsAt          DateTime          @map("starts_at")
