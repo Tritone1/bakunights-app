@@ -139,12 +139,21 @@ usersRouter.get("/me/saved", asyncRoute(async (req, res) => {
   const rows = await prisma.savedDeal.findMany({
     where: { userId: req.user!.id },
     orderBy: { savedAt: "desc" },
-    include: { deal: { include: { restaurant: true, ratings: { select: { value: true } } } } },
+    include: { deal: { include: {
+      restaurant: { include: { menuItems: { where: { isActive: true, photoUrl: { not: null } }, orderBy: { name: "asc" }, include: { category: true } } } },
+      ratings: { select: { value: true } },
+      offerMenuItems: { include: { menuItem: { include: { category: true } } } },
+      scopeCategory: true,
+    } } },
   });
   res.json({ deals: rows.map(({ deal, savedAt }) => {
-    const { ratings, ...rest } = deal;
+    const { ratings, restaurant: restaurantWithMenuItems, ...rest } = deal;
+    const { menuItems, ...restaurant } = restaurantWithMenuItems;
+    const offerMenuItems = deal.scope === "WHOLE_MENU"
+      ? menuItems.map((menuItem) => ({ menuItemId: menuItem.id, overridePriceAzn: null, menuItem }))
+      : deal.offerMenuItems;
     return {
-      ...localizeDeal(rest, getOfferLanguage(req)),
+      ...localizeDeal({ ...rest, restaurant, offerMenuItems }, getOfferLanguage(req)),
       savedAt,
       dealRating: ratings.length
         ? ratings.reduce((sum, rating) => sum + rating.value, 0) / ratings.length : null,

@@ -25,7 +25,15 @@ const feedQuery = z.object({
 });
 
 const include = {
-  restaurant: true,
+  restaurant: {
+    include: {
+      menuItems: {
+        where: { isActive: true, photoUrl: { not: null } },
+        orderBy: { name: "asc" },
+        include: { category: true },
+      },
+    },
+  },
   ratings: { select: { value: true } },
   _count: { select: { savedBy: true, redemptions: true } },
   scopeCategory: true,
@@ -35,12 +43,16 @@ const include = {
 type IncludedDeal = Prisma.DealGetPayload<{ include: typeof include }>;
 
 function serializeDeal(deal: IncludedDeal, language: ReturnType<typeof getOfferLanguage>, lat?: number, lng?: number) {
-  const { ratings: ratingValues, ...rest } = deal;
+  const { ratings: ratingValues, restaurant: restaurantWithMenuItems, ...rest } = deal;
+  const { menuItems, ...restaurant } = restaurantWithMenuItems;
+  const offerMenuItems = deal.scope === "WHOLE_MENU"
+    ? menuItems.map((menuItem) => ({ menuItemId: menuItem.id, overridePriceAzn: null, menuItem }))
+    : deal.offerMenuItems;
   const dealRating = ratingValues.length
     ? ratingValues.reduce((sum, item) => sum + item.value, 0) / ratingValues.length
     : null;
   return {
-    ...localizeDeal(rest, language),
+    ...localizeDeal({ ...rest, restaurant, offerMenuItems }, language),
     dealRating,
     ratingCount: ratingValues.length,
     distanceMiles: lat !== undefined && lng !== undefined

@@ -15,10 +15,13 @@ function assertGooglePlacesConfigured() {
   if (!env.GOOGLE_MAPS_SERVER_API_KEY) throw new HttpError(503, "Google reviews are not configured yet.");
 }
 
-function serializeLiveDeal(deal: any, language: OfferLanguage) {
+function serializeLiveDeal(deal: any, language: OfferLanguage, wholeMenuItems: any[] = []) {
   const { ratings, ...rest } = deal;
+  const offerMenuItems = deal.scope === "WHOLE_MENU"
+    ? wholeMenuItems.flatMap((menuItem) => menuItem.photoUrl ? [{ menuItemId: menuItem.id, overridePriceAzn: null, menuItem }] : [])
+    : deal.offerMenuItems;
   return {
-    ...localizeDeal(rest, language),
+    ...localizeDeal({ ...rest, offerMenuItems }, language),
     dealRating: ratings.length ? ratings.reduce((sum: number, rating: { value: number }) => sum + rating.value, 0) / ratings.length : null,
     ratingCount: ratings.length,
   };
@@ -182,7 +185,7 @@ restaurantsRouter.get("/:id", asyncRoute(async (req, res) => {
     prisma.savedDeal.findMany({ where: { userId: req.user.id, dealId: { in: dealIds } }, select: { dealId: true } }),
   ]) : [null, []];
   res.json({
-    restaurant: { ...publicRestaurant, menuCategories: categories, deals: deals.map((deal) => serializeLiveDeal(deal, getOfferLanguage(req))) },
+    restaurant: { ...publicRestaurant, menuCategories: categories, deals: deals.map((deal) => serializeLiveDeal(deal, getOfferLanguage(req), menuItems)) },
     followed: Boolean(followed),
     savedDealIds: savedRows.map((row) => row.dealId),
   });

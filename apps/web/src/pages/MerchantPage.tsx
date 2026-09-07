@@ -522,7 +522,11 @@ function DealForm({ venues, categoryOptions, menuItems, editing, onOpenMenu, onC
   const selectedCategories = (categoryOptions[venueId]?.selected ?? []).map((row) => ({ ...row.category, sortOrder: row.sortOrder }));
   const activeItems = menuItems.filter((item) => item.venueId === venueId && item.isActive);
   const selectedMenuItems = activeItems.filter((item) => selectedItems.includes(item.id));
-  const selectedItemPhotos = scope === "SPECIFIC_ITEMS" ? selectedMenuItems.filter((item) => item.photoUrl) : [];
+  const selectedItemPhotos = scope === "SPECIFIC_ITEMS"
+    ? selectedMenuItems.filter((item) => item.photoUrl)
+    : scope === "WHOLE_MENU"
+      ? activeItems.filter((item) => item.photoUrl)
+      : [];
   const overriddenItems = selectedMenuItems.filter((item) => Number(itemOverrides[item.id]) > 0);
   const regularTotal = overriddenItems.reduce((sum, item) => sum + item.priceAzn, 0);
   const offerTotal = overriddenItems.reduce((sum, item) => sum + Number(itemOverrides[item.id]), 0);
