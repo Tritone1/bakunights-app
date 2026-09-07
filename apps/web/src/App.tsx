@@ -715,7 +715,8 @@ function RouteNavigation() {
 function ConsumerApp() {
   const [query, setQuery] = useState("");
   const [restaurants, setRestaurants] = useState<HomepageRestaurant[]>([]);
-  const [deals, setDeals] = useState<Deal[]>([]);
+  const [liveDeals, setLiveDeals] = useState<Deal[]>([]);
+  const [flashDeals, setFlashDeals] = useState<Deal[]>([]);
   const [stats, setStats] = useState<HomepageStats>({ activeVenues: 0, liveDeals: 0, areas: 0 });
   const [dataLoading, setDataLoading] = useState(true);
   const [dataError, setDataError] = useState("");
@@ -740,10 +741,11 @@ function ConsumerApp() {
     Promise.all([
       api<{ restaurants: HomepageRestaurant[] }>(`/restaurants?lang=${language}`),
       api<{ stats: HomepageStats }>("/restaurants/stats/home"),
-      api<{ deals: Deal[] }>(`/deals?lat=${lat}&lng=${lng}&radius=100&all=true&sort=ending&lang=${language}`),
-    ]).then(([venueData, statsData, dealData]) => {
+      api<{ deals: Deal[] }>(`/deals?lat=${lat}&lng=${lng}&radius=100&all=true&flash=false&sort=distance&lang=${language}`),
+      api<{ deals: Deal[] }>(`/deals?lat=${lat}&lng=${lng}&radius=100&all=true&flash=true&sort=ending&lang=${language}`),
+    ]).then(([venueData, statsData, liveDealData, flashDealData]) => {
       if (cancelled) return;
-      setRestaurants(venueData.restaurants); setStats(statsData.stats); setDeals(dealData.deals); setDataError("");
+      setRestaurants(venueData.restaurants); setStats(statsData.stats); setLiveDeals(liveDealData.deals); setFlashDeals(flashDealData.deals); setDataError("");
     }).catch((reason) => { if (!cancelled) setDataError(reason instanceof Error ? reason.message : "Could not load homepage data"); })
       .finally(() => { if (!cancelled) setDataLoading(false); });
     return () => { cancelled = true; };
@@ -768,9 +770,9 @@ function ConsumerApp() {
     <main>
       <Hero stats={stats} />
       {dataError && <div className="mx-auto mt-6 max-w-[1340px] rounded-2xl border border-red-400/30 bg-red-500/10 p-4 text-sm text-red-100">{dataError}</div>}
-      <Reveal><LiveOffers deals={deals} loading={dataLoading} error={dataError} /></Reveal>
+      <Reveal><LiveOffers deals={liveDeals} loading={dataLoading} error={dataError} /></Reveal>
       <Reveal><DailyPointsWheel /></Reveal>
-      <Reveal><FlashDeals deals={deals} loading={dataLoading} /></Reveal>
+      <Reveal><FlashDeals deals={flashDeals} loading={dataLoading} /></Reveal>
       <Reveal><VenueDirectory venues={venues} query={query} setQuery={setQuery} onNavigate={navigateInApp} origin={feedPosition} /></Reveal>
       <Reveal>{selectedVenue ? <MapSection venues={venues} selected={selectedVenue} onSelect={setSelectedVenue} onNavigationOptions={setNavigationVenue} userPosition={feedPosition} locationStatus={locationStatus} locationMessage={locationMessage} onRequestLocation={requestLocation} routeRequest={routeRequest} routeMode={routeMode} onStartRoute={startRoute} /> : <section id="map" className="border-y border-white/[0.07] bg-[#0c0c14] py-20"><div className="mx-auto max-w-[1400px] px-5 text-center text-muted">No active venues are available to show on the map.</div></section>}</Reveal>
     </main>

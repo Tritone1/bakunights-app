@@ -159,6 +159,7 @@ model Deal {
   dietaryTags       String[]          @default([]) @map("dietary_tags")
   startsAt          DateTime          @map("starts_at")
   endsAt            DateTime          @map("ends_at")
+  isFlash           Boolean           @default(false) @map("is_flash")
   liveCycle         Int               @default(1) @map("live_cycle")
   isActive          Boolean           @default(true) @map("is_active")
   isRecurring       Boolean           @default(false) @map("is_recurring")

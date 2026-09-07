@@ -35,6 +35,7 @@ export type Deal = {
   offerMenuItems?: { menuItemId: string; menuItem: { id: string; name: string; photoUrl?: string | null; priceAzn: string | number; category?: { name: string } } }[];
   offerType?: "discount" | "combo" | "set_menu" | "perk" | "event" | "bundle" | "other";
   discountPct?: number | null;
+  isFlash?: boolean;
   tag?: string;
   dietaryTags?: string[];
   startsAt?: string;

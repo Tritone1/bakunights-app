@@ -20,6 +20,7 @@ const feedQuery = z.object({
   dietary: z.string().optional(),
   endingSoon: z.enum(["true", "false"]).optional(),
   all: z.enum(["true", "false"]).optional(),
+  flash: z.enum(["true", "false", "all"]).default("false"),
   sort: z.enum(["distance", "discount", "ending", "rating"]).default("distance"),
 });
 
@@ -57,6 +58,7 @@ dealsRouter.get("/", asyncRoute(async (req, res) => {
       isActive: true,
       status: "approved",
       startsAt: { lte: now },
+      isFlash: query.flash === "all" ? undefined : query.flash === "true",
       discountPct: query.minDiscount > 0 ? { gte: query.minDiscount } : undefined,
       restaurant: {
         isActive: true,

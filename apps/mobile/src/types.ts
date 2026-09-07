@@ -34,6 +34,7 @@ export type Deal = {
   photoUrl?: string | null;
   offerType?: "discount" | "combo" | "set_menu" | "perk" | "event" | "bundle" | "other";
   discountPct?: number | null;
+  isFlash?: boolean;
   tag?: string;
   dietaryTags?: string[];
   startsAt?: string;

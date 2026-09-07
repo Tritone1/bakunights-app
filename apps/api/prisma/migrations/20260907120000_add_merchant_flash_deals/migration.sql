@@ -1,0 +1,2 @@
+ALTER TABLE "deals"
+ADD COLUMN "is_flash" BOOLEAN NOT NULL DEFAULT false;

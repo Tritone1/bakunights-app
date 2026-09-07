@@ -3,6 +3,10 @@ export type AppLanguage = "en" | "az" | "ru";
 type Translation = readonly [az: string, ru: string];
 
 const messages: Record<string, Translation> = {
+  "Flash Deal": ["Sürətli təklif", "Срочное предложение"],
+  "Flash deals get featured in the Flash Deals carousel with a countdown, but must be a steep, time-limited discount.": ["Sürətli təkliflər geri sayım ilə xüsusi karuseldə göstərilir, lakin böyük endirimli və qısa müddətli olmalıdır.", "Срочные предложения показываются в специальной карусели с обратным отсчётом, но скидка должна быть значительной, а срок — коротким."],
+  "Eligible for Flash: 25%+ discount and a window no longer than 6 hours.": ["Sürətli təklif üçün uyğundur: ən azı 25% endirim və 6 saatdan çox olmayan müddət.", "Подходит для срочного предложения: скидка от 25% и срок не более 6 часов."],
+  "Flash deals need 25%+ discount and a 6-hour or shorter window.": ["Sürətli təklif üçün ən azı 25% endirim və 6 saat və ya daha qısa müddət lazımdır.", "Для срочного предложения нужна скидка от 25% и срок не более 6 часов."],
   // Shared navigation and actions
   "Home": ["Ana səhifə", "Главная"],
   "Back": ["Geri", "Назад"],

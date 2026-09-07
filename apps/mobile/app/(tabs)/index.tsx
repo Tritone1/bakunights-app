@@ -41,6 +41,7 @@ export default function HomeScreen() {
   const [category, setCategory] = useState<(typeof CATEGORIES)[number]>("All");
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
   const [deals, setDeals] = useState<Deal[]>([]);
+  const [flashDeals, setFlashDeals] = useState<Deal[]>([]);
   const [stats, setStats] = useState<HomepageStats>({ activeVenues: 0, liveDeals: 0, areas: 0 });
   const [saved, setSaved] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
@@ -52,13 +53,15 @@ export default function HomeScreen() {
   const load = useCallback(async (refresh = false) => {
     if (refresh) setRefreshing(true); else setLoading(true);
     try {
-      const [venueResult, dealResult, statsResult] = await Promise.all([
+      const [venueResult, dealResult, flashDealResult, statsResult] = await Promise.all([
         api<{ restaurants: Restaurant[] }>(`/restaurants?lang=${language}`),
-        api<{ deals: Deal[] }>(`/deals?lat=${latitude}&lng=${longitude}&radius=100&all=true&sort=ending&lang=${language}`),
+        api<{ deals: Deal[] }>(`/deals?lat=${latitude}&lng=${longitude}&radius=100&all=true&flash=false&sort=distance&lang=${language}`),
+        api<{ deals: Deal[] }>(`/deals?lat=${latitude}&lng=${longitude}&radius=100&all=true&flash=true&sort=ending&lang=${language}`),
         api<{ stats: HomepageStats }>("/restaurants/stats/home"),
       ]);
       setRestaurants(venueResult.restaurants);
       setDeals(dealResult.deals);
+      setFlashDeals(flashDealResult.deals);
       setStats(statsResult.stats);
       setError("");
       if (user?.role === "CONSUMER") {
@@ -77,7 +80,6 @@ export default function HomeScreen() {
       .filter((venue) => (category === "All" || venue.cuisine.toLowerCase() === category.toLowerCase()) && (!normalized || `${venue.name} ${venue.cuisine} ${venue.address} ${venue.liveDeal?.title || ""}`.toLowerCase().includes(normalized)))
       .sort((a, b) => distanceKm(latitude, longitude, a) - distanceKm(latitude, longitude, b));
   }, [category, latitude, longitude, query, restaurants]);
-  const flashDeals = useMemo(() => [...deals].sort((a, b) => (b.discountPct ?? 0) - (a.discountPct ?? 0)).slice(0, 6), [deals]);
 
   async function toggleSaved(deal: Deal) {
     if (!user) { router.push("/login/customer" as never); return; }

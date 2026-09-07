@@ -7,6 +7,7 @@ import multer from "multer";
 import { env } from "../env.js";
 import { persistImage } from "../lib/image-storage.js";
 import { syncDealTranslationsBestEffort } from "../lib/deal-translation.js";
+import { FLASH_DEAL_MAX_DURATION_MS, flashDealValidationError } from "../lib/flash-deal.js";
 
 export const merchantRouter = Router();
 const venueType = z.enum(["Restaurant", "Pub", "Bar", "Lounge", "Cafe"]);
@@ -45,30 +46,47 @@ merchantRouter.post("/enroll", requireAuth, asyncRoute(async (req, res) => {
 
 merchantRouter.use(requireMerchant);
 
-const dealInput = z.object({
+const dealInputFields = z.object({
   restaurantId: z.string().min(1),
   title: z.string().trim().min(3).max(100),
   description: z.string().trim().min(10).max(1000),
   menuItem: z.string().trim().min(2).max(120).nullable().optional(),
-  offerType: z.enum(["discount", "combo", "set_menu", "perk", "event", "bundle", "other"]).default("discount"),
+  offerType: z.enum(["discount", "combo", "set_menu", "perk", "event", "bundle", "other"]).optional(),
   discountPct: z.number().int().min(1).max(100).nullable().optional(),
   tag: z.enum(["breakfast", "lunch", "dinner", "happy hour", "all day"]),
-  dietaryTags: z.array(z.string().max(30)).max(10).default([]),
+  dietaryTags: z.array(z.string().max(30)).max(10).optional(),
   startsAt: z.coerce.date(),
   endsAt: z.coerce.date(),
-  isRecurring: z.boolean().default(false),
+  isFlash: z.boolean().optional(),
+  isRecurring: z.boolean().optional(),
   recurrenceRule: z.string().max(200).nullable().optional(),
-  scope: z.enum(["WHOLE_MENU", "CATEGORY", "SPECIFIC_ITEMS"]).default("WHOLE_MENU"),
+  scope: z.enum(["WHOLE_MENU", "CATEGORY", "SPECIFIC_ITEMS"]).optional(),
   scopeCategoryId: z.string().nullable().optional(),
-  menuItemIds: z.array(z.string()).max(100).default([]),
-  menuItemOverrides: z.record(z.string(), z.coerce.number().positive().max(100000)).default({}),
+  menuItemIds: z.array(z.string()).max(100).optional(),
+  menuItemOverrides: z.record(z.string(), z.coerce.number().positive().max(100000)).optional(),
   photoUrl: imageValue.nullable().optional(),
-})
+});
+
+const dealInput = dealInputFields
+  .transform((value) => ({
+    ...value,
+    offerType: value.offerType ?? ("discount" as const),
+    dietaryTags: value.dietaryTags ?? [],
+    isRecurring: value.isRecurring ?? false,
+    scope: value.scope ?? ("WHOLE_MENU" as const),
+    menuItemIds: value.menuItemIds ?? [],
+    menuItemOverrides: value.menuItemOverrides ?? {},
+  }))
   .refine((value) => value.endsAt > value.startsAt, { message: "End time must be after start time", path: ["endsAt"] })
   .refine((value) => value.offerType !== "discount" || value.discountPct != null, { message: "Discount-type offers need a percentage", path: ["discountPct"] })
   .refine((value) => value.offerType !== "set_menu" || (value.scope === "SPECIFIC_ITEMS" && (value.menuItemIds?.length ?? 0) >= 2), { message: "Set menus must include at least two specific menu items", path: ["menuItemIds"] })
   .refine((value) => value.scope !== "CATEGORY" || Boolean(value.scopeCategoryId), { message: "Choose a menu category", path: ["scopeCategoryId"] })
   .refine((value) => value.scope !== "SPECIFIC_ITEMS" || value.menuItemIds.length > 0, { message: "Choose at least one menu item", path: ["menuItemIds"] });
+
+function assertFlashDeal(input: { isFlash: boolean; offerType: string; discountPct?: number | null; startsAt: Date; endsAt: Date }) {
+  const message = flashDealValidationError(input);
+  if (message) throw new HttpError(400, message, "INVALID_FLASH_DEAL");
+}
 
 const menuItemInput = z.object({
   categoryId: z.string().min(1),
@@ -436,6 +454,7 @@ merchantRouter.get("/dashboard", asyncRoute(async (req, res) => {
 
 merchantRouter.post("/deals", asyncRoute(async (req, res) => {
   const input = dealInput.parse(req.body);
+  assertFlashDeal({ ...input, isFlash: input.isFlash ?? false });
   await assertOwner(req.user!.id, input.restaurantId);
   await assertOfferScope(input.restaurantId, input);
   const storedPhotoUrl = await persistImage(input.photoUrl, "offers");
@@ -465,11 +484,27 @@ merchantRouter.patch("/deals/:id", asyncRoute(async (req, res) => {
   const existing = await prisma.deal.findUnique({ where: { id: dealId } });
   if (!existing) throw new HttpError(404, "Offer not found.");
   await assertOwner(req.user!.id, existing.restaurantId);
-  const input = dealInput.partial().parse(req.body);
+  const input = dealInputFields.partial().parse(req.body);
+  const nextStartsAt = input.startsAt ?? existing.startsAt;
+  const nextEndsAt = input.endsAt ?? existing.endsAt;
+  if (nextEndsAt <= nextStartsAt) throw new HttpError(400, "End time must be after start time.", "INVALID_DEAL_WINDOW");
+  assertFlashDeal({
+    isFlash: input.isFlash ?? existing.isFlash,
+    offerType: input.offerType ?? existing.offerType,
+    discountPct: input.discountPct === undefined ? existing.discountPct : input.discountPct,
+    startsAt: nextStartsAt,
+    endsAt: nextEndsAt,
+  });
   if (input.restaurantId && input.restaurantId !== existing.restaurantId) await assertOwner(req.user!.id, input.restaurantId);
   const nextScope = input.scope ?? existing.scope;
   const nextCategoryId = input.scopeCategoryId === undefined ? existing.scopeCategoryId : input.scopeCategoryId;
   const nextItemIds = input.menuItemIds ?? (await prisma.offerMenuItem.findMany({ where: { offerId: existing.id }, select: { menuItemId: true } })).map((item) => item.menuItemId);
+  const nextOfferType = input.offerType ?? existing.offerType;
+  const nextDiscountPct = input.discountPct === undefined ? existing.discountPct : input.discountPct;
+  if (nextOfferType === "discount" && nextDiscountPct == null) throw new HttpError(400, "Discount-type offers need a percentage.", "INVALID_DISCOUNT_OFFER");
+  if (nextOfferType === "set_menu" && (nextScope !== "SPECIFIC_ITEMS" || nextItemIds.length < 2)) throw new HttpError(400, "Set menus must include at least two specific menu items.", "INVALID_OFFER_SCOPE");
+  if (nextScope === "CATEGORY" && !nextCategoryId) throw new HttpError(400, "Choose a menu category.", "INVALID_OFFER_SCOPE");
+  if (nextScope === "SPECIFIC_ITEMS" && nextItemIds.length === 0) throw new HttpError(400, "Choose at least one menu item.", "INVALID_OFFER_SCOPE");
   await assertOfferScope(input.restaurantId ?? existing.restaurantId, { scope: nextScope, scopeCategoryId: nextCategoryId, menuItemIds: nextItemIds });
   const storedPhotoUrl = input.photoUrl === undefined ? existing.photoUrl : await persistImage(input.photoUrl, "offers");
   const resolvedPhotoUrl = await assertOfferPhoto(input.restaurantId ?? existing.restaurantId, { photoUrl: storedPhotoUrl, scope: nextScope, scopeCategoryId: nextCategoryId, menuItemIds: nextItemIds });
@@ -516,13 +551,17 @@ merchantRouter.post("/deals/:id/go-live", asyncRoute(async (req, res) => {
   if (!existing) throw new HttpError(404, "Offer not found.");
   await assertOwner(req.user!.id, existing.restaurantId);
   const now = new Date();
+  const previousDurationMs = existing.endsAt.getTime() - existing.startsAt.getTime();
+  const restartedDurationMs = existing.isFlash
+    ? Math.min(FLASH_DEAL_MAX_DURATION_MS, Math.max(60_000, previousDurationMs))
+    : 24 * 60 * 60 * 1000;
   const deal = await prisma.deal.update({
     where: { id: existing.id },
     data: {
       status: "approved",
       isActive: true,
       startsAt: now,
-      endsAt: existing.endsAt > now ? existing.endsAt : new Date(now.getTime() + 24 * 60 * 60 * 1000),
+      endsAt: existing.endsAt > now ? existing.endsAt : new Date(now.getTime() + restartedDurationMs),
       liveCycle: { increment: 1 },
     },
   });

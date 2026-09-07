@@ -9,7 +9,7 @@ import { MerchantProfilePage } from "./MerchantProfilePage";
 import { LanguageSwitcher } from "../components/LanguageSwitcher";
 
 type MerchantDeal = {
-  id: string; restaurantId: string; title: string; description: string; menuItem?: string | null; photoUrl?: string | null; offerType: OfferType; discountPct: number | null; tag: string; dietaryTags: string[]; startsAt: string; endsAt: string; isActive: boolean; status: "draft" | "pending_review" | "approved" | "rejected" | "expired"; reviewNotes?: string | null;
+  id: string; restaurantId: string; title: string; description: string; menuItem?: string | null; photoUrl?: string | null; offerType: OfferType; discountPct: number | null; isFlash: boolean; tag: string; dietaryTags: string[]; startsAt: string; endsAt: string; isActive: boolean; status: "draft" | "pending_review" | "approved" | "rejected" | "expired"; reviewNotes?: string | null;
   scope: OfferScope; scopeCategoryId?: string | null; offerMenuItems: { menuItemId: string; overridePriceAzn?: string | number | null; menuItem: MenuItem }[];
   _count: { views: number; savedBy: number; redemptions: number };
 };
@@ -30,6 +30,19 @@ const OFFER_TYPES: { value: OfferType; label: string }[] = [
   { value: "bundle", label: "Bundle" },
   { value: "other", label: "Other" },
 ];
+const FLASH_MIN_DISCOUNT = 25;
+const FLASH_MAX_DURATION_MS = 6 * 60 * 60 * 1000;
+
+function localDateTimeValue(date?: string, offset = 0) {
+  const value = date ? new Date(date) : new Date(Date.now() + offset);
+  value.setMinutes(value.getMinutes() - value.getTimezoneOffset());
+  return value.toISOString().slice(0, 16);
+}
+
+function isFlashEligible(offerType: OfferType, discountPct: number | null, startsAt: string, endsAt: string) {
+  const durationMs = new Date(endsAt).getTime() - new Date(startsAt).getTime();
+  return offerType === "discount" && discountPct != null && discountPct >= FLASH_MIN_DISCOUNT && durationMs > 0 && durationMs <= FLASH_MAX_DURATION_MS;
+}
 
 export function MerchantPage() {
   const { user, loading: authLoading, logout } = useAuth();
@@ -503,6 +516,9 @@ function DealForm({ venues, categoryOptions, menuItems, editing, onOpenMenu, onC
   const [formError, setFormError] = useState("");
   const [offerType, setOfferType] = useState<OfferType>(editing?.offerType ?? "combo");
   const [manualDiscount, setManualDiscount] = useState(editing?.discountPct == null ? "" : String(editing.discountPct));
+  const [startsAt, setStartsAt] = useState(localDateTimeValue(editing?.startsAt, -60_000));
+  const [endsAt, setEndsAt] = useState(localDateTimeValue(editing?.endsAt, 24 * 60 * 60 * 1000));
+  const [isFlash, setIsFlash] = useState(editing?.isFlash ?? false);
   const selectedCategories = (categoryOptions[venueId]?.selected ?? []).map((row) => ({ ...row.category, sortOrder: row.sortOrder }));
   const activeItems = menuItems.filter((item) => item.venueId === venueId && item.isActive);
   const selectedMenuItems = activeItems.filter((item) => selectedItems.includes(item.id));
@@ -511,16 +527,18 @@ function DealForm({ venues, categoryOptions, menuItems, editing, onOpenMenu, onC
   const regularTotal = overriddenItems.reduce((sum, item) => sum + item.priceAzn, 0);
   const offerTotal = overriddenItems.reduce((sum, item) => sum + Number(itemOverrides[item.id]), 0);
   const calculatedDiscount = regularTotal > 0 && offerTotal < regularTotal ? Math.round((1 - offerTotal / regularTotal) * 100) : null;
+  const enteredDiscount = calculatedDiscount ?? (manualDiscount.trim() ? Number(manualDiscount) : null);
+  const flashEligible = isFlashEligible(offerType, enteredDiscount, startsAt, endsAt);
   const activeCategoryIds = new Set(activeItems.map((item) => item.categoryId));
   const offerCategories = selectedCategories.filter((category) => activeCategoryIds.has(category.id));
-  const localValue = (date?: string, offset = 0) => { const value = date ? new Date(date) : new Date(Date.now() + offset); value.setMinutes(value.getMinutes() - value.getTimezoneOffset()); return value.toISOString().slice(0, 16); };
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     const discountValue = String(form.get("discountPct") || "").trim();
     const menuItem = String(form.get("menuItem") || "").trim();
     if (offerType === "set_menu" && (scope !== "SPECIFIC_ITEMS" || selectedItems.length < 2)) { setFormError("Choose at least two menu items for a set menu."); return; }
-    const body = { restaurantId: String(form.get("restaurantId")), scope, scopeCategoryId: scope === "CATEGORY" ? scopeCategoryId : null, menuItemIds: scope === "SPECIFIC_ITEMS" ? selectedItems : [], menuItemOverrides: Object.fromEntries(Object.entries(itemOverrides).filter(([id, value]) => selectedItems.includes(id) && value).map(([id, value]) => [id, Number(value)])), photoUrl: selectedItemPhotos.length ? null : photoUrl || null, title: String(form.get("title")), description: String(form.get("description")), menuItem: menuItem || null, offerType: String(form.get("offerType")), discountPct: discountValue ? Number(discountValue) : null, tag: String(form.get("tag")), dietaryTags: String(form.get("dietaryTags") || "").split(",").map((item) => item.trim()).filter(Boolean), startsAt: new Date(String(form.get("startsAt"))).toISOString(), endsAt: new Date(String(form.get("endsAt"))).toISOString(), isRecurring: false };
+    if (isFlash && !flashEligible) { setFormError("Flash deals need a percentage discount of 25% or more and a window of 6 hours or less."); return; }
+    const body = { restaurantId: String(form.get("restaurantId")), scope, scopeCategoryId: scope === "CATEGORY" ? scopeCategoryId : null, menuItemIds: scope === "SPECIFIC_ITEMS" ? selectedItems : [], menuItemOverrides: Object.fromEntries(Object.entries(itemOverrides).filter(([id, value]) => selectedItems.includes(id) && value).map(([id, value]) => [id, Number(value)])), photoUrl: selectedItemPhotos.length ? null : photoUrl || null, title: String(form.get("title")), description: String(form.get("description")), menuItem: menuItem || null, offerType: String(form.get("offerType")), discountPct: discountValue ? Number(discountValue) : null, isFlash, tag: String(form.get("tag")), dietaryTags: String(form.get("dietaryTags") || "").split(",").map((item) => item.trim()).filter(Boolean), startsAt: new Date(startsAt).toISOString(), endsAt: new Date(endsAt).toISOString(), isRecurring: false };
     try { await api(editing ? `/merchant/deals/${editing.id}` : "/merchant/deals", { method: editing ? "PATCH" : "POST", body: JSON.stringify(body) }); onSaved(); }
     catch (reason) { setFormError(reason instanceof Error ? reason.message : "Could not submit offer."); }
   }
@@ -532,7 +550,7 @@ function DealForm({ venues, categoryOptions, menuItems, editing, onOpenMenu, onC
       <label><span className="form-label">Offer scope</span><select value={scope} disabled={offerType === "set_menu"} onChange={(event) => setScope(event.target.value as OfferScope)} className="form-field disabled:cursor-not-allowed disabled:opacity-65"><option value="WHOLE_MENU">Whole menu</option><option value="CATEGORY">Specific category</option><option value="SPECIFIC_ITEMS">Specific items</option></select>{offerType === "set_menu" && <span className="mt-1 block text-xs text-cyan-200">Set menus use specific items so customers can see every included item and photo.</span>}</label>
       {scope === "CATEGORY" && <label className="md:col-span-2"><span className="form-label">Covered category</span><select name="scopeCategoryId" value={scopeCategoryId} onChange={(event) => setScopeCategoryId(event.target.value)} className="form-field" required><option value="">Choose an enabled section with active items</option>{offerCategories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select>{!offerCategories.length && <span className="mt-2 block text-xs text-amber-200">No selected section has active menu items. Add or activate items from the Menu tab first.</span>}</label>}
       {scope === "SPECIFIC_ITEMS" && <div className="md:col-span-2 rounded-xl border border-white/10 p-3"><p className="form-label">Covered items</p>{activeItems.length ? <><input value={itemSearch} onChange={(event) => setItemSearch(event.target.value)} className="form-field mb-2" placeholder="Search menu items..." /><div className="max-h-60 space-y-1 overflow-y-auto">{activeItems.filter((item) => item.name.toLowerCase().includes(itemSearch.toLowerCase())).map((item) => <div key={item.id} className="flex items-center gap-2 rounded-lg p-2 hover:bg-white/5"><label className="flex min-w-0 flex-1 items-center gap-2"><input type="checkbox" checked={selectedItems.includes(item.id)} onChange={() => setSelectedItems((ids) => ids.includes(item.id) ? ids.filter((id) => id !== item.id) : [...ids, item.id])} /><span className="flex-1 truncate">{item.name}</span>{item.photoUrl && <span className="text-xs text-cyan-300">photo</span>}<span className="text-gold">{item.priceAzn.toFixed(2)} AZN</span></label>{selectedItems.includes(item.id) && <input aria-label={`Offer price for ${item.name}`} value={itemOverrides[item.id] ?? ""} onChange={(event) => setItemOverrides((values) => ({ ...values, [item.id]: event.target.value }))} type="number" min="0.01" step="0.01" className="w-24 rounded-lg border border-white/10 bg-black/20 px-2 py-1 text-sm" placeholder="Offer AZN" />}</div>)}</div></> : <p className="text-sm text-white/55">No active items yet. <button type="button" onClick={onOpenMenu} className="font-bold text-cyan-300 underline">Add menu items</button>, or use Whole menu with free text.</p>}</div>}
-      <label><span className="form-label">Offer type</span><select name="offerType" className="form-field" value={offerType} onChange={(event) => { const nextType = event.target.value as OfferType; setOfferType(nextType); if (nextType === "set_menu") { setScope("SPECIFIC_ITEMS"); setScopeCategoryId(""); } }}>{OFFER_TYPES.map((type) => <option key={type.value} value={type.value}>{type.label}</option>)}</select></label>
+      <label><span className="form-label">Offer type</span><select name="offerType" className="form-field" value={offerType} onChange={(event) => { const nextType = event.target.value as OfferType; setOfferType(nextType); if (nextType !== "discount") setIsFlash(false); if (nextType === "set_menu") { setScope("SPECIFIC_ITEMS"); setScopeCategoryId(""); } }}>{OFFER_TYPES.map((type) => <option key={type.value} value={type.value}>{type.label}</option>)}</select></label>
       <label><span className="form-label">Discount % {calculatedDiscount != null ? "(calculated automatically)" : "(only for discount offers)"}</span><input name="discountPct" className="form-field" type="number" min={1} max={100} value={calculatedDiscount ?? manualDiscount} readOnly={calculatedDiscount != null} required={offerType === "discount"} onChange={(event) => setManualDiscount(event.target.value)} />{calculatedDiscount != null && <span className="mt-1 block text-xs text-emerald-300">{regularTotal.toFixed(2)} AZN → {offerTotal.toFixed(2)} AZN = {calculatedDiscount}% saving</span>}{overriddenItems.length > 0 && calculatedDiscount == null && <span className="mt-1 block text-xs text-amber-300">The offer price must be lower than the normal menu price to calculate a saving.</span>}</label>
       <Input name="title" label="Offer title" defaultValue={editing?.title} wide />
       <Input name="menuItem" label="Free-text coverage fallback (optional)" defaultValue={editing?.menuItem ?? ""} placeholder="Lule Kebab, lunch combo, dessert plate..." wide required={false} />
@@ -540,8 +558,16 @@ function DealForm({ venues, categoryOptions, menuItems, editing, onOpenMenu, onC
       <label className="md:col-span-2"><span className="form-label">Description</span><textarea name="description" className="form-field min-h-24" required defaultValue={editing?.description} placeholder="Combo details, items, price, conditions, and what the customer receives." /></label>
       <label><span className="form-label">Daypart</span><select name="tag" className="form-field" defaultValue={editing?.tag ?? "all day"}>{["breakfast", "lunch", "dinner", "happy hour", "all day"].map((tag) => <option key={tag}>{tag}</option>)}</select></label>
       <Input name="dietaryTags" label="Tags" defaultValue={editing?.dietaryTags.join(", ") ?? ""} required={false} />
-      <Input name="startsAt" label="Starts (date and time)" type="datetime-local" defaultValue={localValue(editing?.startsAt, -60_000)} />
-      <Input name="endsAt" label="Ends (date and time)" type="datetime-local" defaultValue={localValue(editing?.endsAt, 24 * 60 * 60 * 1000)} />
+      <Input name="startsAt" label="Starts (date and time)" type="datetime-local" value={startsAt} onChange={(event) => setStartsAt(event.target.value)} />
+      <Input name="endsAt" label="Ends (date and time)" type="datetime-local" value={endsAt} onChange={(event) => setEndsAt(event.target.value)} />
+      <label className={`md:col-span-2 flex gap-3 rounded-xl border p-4 transition ${isFlash ? "border-gold/45 bg-gold/[0.08]" : "border-white/10 bg-white/[0.025]"}`}>
+        <input type="checkbox" checked={isFlash} disabled={!flashEligible && !isFlash} onChange={(event) => setIsFlash(event.target.checked)} className="mt-1 h-4 w-4 accent-amber-500 disabled:cursor-not-allowed" />
+        <span>
+          <strong className="block text-sm text-white">Flash Deal</strong>
+          <span className="mt-1 block text-xs leading-5 text-white/55">Flash deals get featured in the Flash Deals carousel with a countdown, but must be a steep, time-limited discount.</span>
+          <span className={`mt-2 block text-xs font-semibold ${flashEligible ? "text-emerald-300" : "text-amber-300"}`}>{flashEligible ? "Eligible for Flash: 25%+ discount and a window no longer than 6 hours." : "Flash deals need 25%+ discount and a 6-hour or shorter window."}</span>
+        </span>
+      </label>
     </div>
     {formError && <p className="mt-4 rounded-lg border border-red-400/30 bg-red-500/10 p-3 text-sm text-red-200">{formError}</p>}
     <p className="mt-4 text-sm text-white/50">Your offer will be published automatically. Admins can monitor offer activity but no approval is required.</p><div className="mt-5 flex justify-end gap-2"><button type="button" onClick={onClose} className="rounded-lg border border-white/10 px-4 py-2 font-semibold text-white/70">Cancel</button><button className="panel-button">Publish offer</button></div>
