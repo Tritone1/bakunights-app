@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Image, Linking, Pressable, ScrollView, Share, StyleSheet, View, type LayoutChangeEvent, type NativeScrollEvent, type NativeSyntheticEvent } from "react-native";
+import { ActivityIndicator, AppState, Image, Linking, Pressable, ScrollView, Share, StyleSheet, View, type LayoutChangeEvent, type NativeScrollEvent, type NativeSyntheticEvent } from "react-native";
 import MapView, { Marker } from "react-native-maps";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -45,6 +45,42 @@ export default function OfferDetailScreen() {
     finally { setLoading(false); }
   }, [id, language]);
   useEffect(() => { const timer = setTimeout(() => void load(), 0); return () => clearTimeout(timer); }, [load]);
+  const redemptionId = data?.redemption?.id;
+  const redeemedAt = data?.redemption?.redeemedAt;
+  useEffect(() => {
+    if (!id || !redemptionId || redeemedAt) return;
+    let cancelled = false;
+    let checking = false;
+    let completed = false;
+
+    const checkStatus = async () => {
+      if (cancelled || completed || checking || AppState.currentState !== "active") return;
+      checking = true;
+      try {
+        const result = await api<{ redemption: Pick<Redemption, "id" | "redemptionCode" | "redeemedAt"> | null }>(`/deals/${id}/redemption/status`);
+        if (!cancelled && result.redemption?.id === redemptionId && result.redemption.redeemedAt) {
+          completed = true;
+          setData((current) => current?.redemption?.id === redemptionId
+            ? { ...current, redemption: { ...current.redemption, redeemedAt: result.redemption!.redeemedAt } }
+            : current);
+          setNotice("Visit confirmed by the merchant. Your reward spin is now unlocked.");
+        }
+      } catch {
+        // Keep the QR visible and retry after temporary connection failures.
+      } finally {
+        checking = false;
+      }
+    };
+
+    const timer = setInterval(() => void checkStatus(), 2_000);
+    const subscription = AppState.addEventListener("change", (state) => { if (state === "active") void checkStatus(); });
+    void checkStatus();
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+      subscription.remove();
+    };
+  }, [id, redeemedAt, redemptionId]);
 
   const photos = useMemo(() => {
     if (!data) return [];

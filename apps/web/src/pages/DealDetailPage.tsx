@@ -26,6 +26,40 @@ export function DealDetailPage() {
   }, [id, language]);
 
   useEffect(() => { void load(); }, [load]);
+  const redemptionId = data?.redemption?.id;
+  const redeemedAt = data?.redemption?.redeemedAt;
+  useEffect(() => {
+    if (!id || !redemptionId || redeemedAt) return;
+    let cancelled = false;
+    let checking = false;
+
+    const checkStatus = async () => {
+      if (cancelled || checking || document.visibilityState === "hidden") return;
+      checking = true;
+      try {
+        const result = await api<{ redemption: Pick<Redemption, "id" | "redemptionCode" | "redeemedAt"> | null }>(`/deals/${id}/redemption/status`);
+        if (!cancelled && result.redemption?.id === redemptionId && result.redemption.redeemedAt) {
+          setData((current) => current?.redemption?.id === redemptionId
+            ? { ...current, redemption: { ...current.redemption, redeemedAt: result.redemption!.redeemedAt } }
+            : current);
+        }
+      } catch {
+        // A temporary network failure should not dismiss the customer's QR proof.
+      } finally {
+        checking = false;
+      }
+    };
+
+    const timer = window.setInterval(() => void checkStatus(), 2_000);
+    const onVisibilityChange = () => { if (document.visibilityState === "visible") void checkStatus(); };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    void checkStatus();
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, [id, redeemedAt, redemptionId]);
   const presentation = useMemo(() => data ? toOfferPresentation(data.deal) : null, [data]);
 
   if (error) return <ErrorState message={error} retry={() => void load()} />;

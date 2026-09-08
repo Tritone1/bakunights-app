@@ -125,6 +125,18 @@ dealsRouter.get("/:id", asyncRoute(async (req, res) => {
   res.json({ deal: serializeDeal(deal, getOfferLanguage(req)), saved, followed, redemption: redemptionWithQr });
 }));
 
+dealsRouter.get("/:id/redemption/status", requireAuth, asyncRoute(async (req, res) => {
+  const dealId = z.string().parse(req.params.id);
+  const deal = await prisma.deal.findUnique({ where: { id: dealId }, select: { liveCycle: true } });
+  if (!deal) throw new HttpError(404, "Offer not found.");
+  const redemption = await prisma.redemption.findUnique({
+    where: { userId_dealId_dealCycle: { userId: req.user!.id, dealId, dealCycle: deal.liveCycle } },
+    select: { id: true, redemptionCode: true, redeemedAt: true },
+  });
+  res.set("Cache-Control", "no-store");
+  res.json({ redemption });
+}));
+
 dealsRouter.put("/:id/save", requireAuth, asyncRoute(async (req, res) => {
   const dealId = z.string().parse(req.params.id);
   await prisma.savedDeal.upsert({

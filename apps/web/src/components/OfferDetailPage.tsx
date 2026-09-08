@@ -84,6 +84,7 @@ export function OfferDetailPage({
   const [claimed, setClaimed] = useState(Boolean(confirmationCode));
   const [busy, setBusy] = useState("");
   const [notice, setNotice] = useState("");
+  const previouslyConfirmed = useRef(initiallyConfirmed);
   const countdown = useCountdown(expiresAt);
   const gallery = useMemo(() => {
     const supplied = photos?.filter((photo) => photo.src) ?? [];
@@ -106,7 +107,11 @@ export function OfferDetailPage({
 
   useEffect(() => setSaved(initiallySaved), [initiallySaved]);
   useEffect(() => setFollowed(initiallyFollowed), [initiallyFollowed]);
-  useEffect(() => setConfirmed(initiallyConfirmed), [initiallyConfirmed]);
+  useEffect(() => {
+    setConfirmed(initiallyConfirmed);
+    if (initiallyConfirmed && !previouslyConfirmed.current) setNotice("Visit confirmed by the merchant. Your reward spin is now unlocked.");
+    previouslyConfirmed.current = initiallyConfirmed;
+  }, [initiallyConfirmed]);
   useEffect(() => setClaimed(Boolean(confirmationCode)), [confirmationCode]);
 
   const percent = venue.dealTag.match(/(\d+)%/)?.[1];
