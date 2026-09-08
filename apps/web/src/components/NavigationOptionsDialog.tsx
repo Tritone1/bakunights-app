@@ -1,4 +1,4 @@
-import { Bus, Car, Footprints, MapPin, Navigation, X } from "lucide-react";
+import { Bus, Car, CarTaxiFront, Footprints, MapPin, Navigation, X } from "lucide-react";
 import { useEffect } from "react";
 
 type NavigationDestination = {
@@ -18,6 +18,7 @@ export function NavigationOptionsDialog({ destination, onClose }: NavigationOpti
   const googleMapsUrl = (mode: "driving" | "walking" | "transit") =>
     `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(coordinates)}&travelmode=${mode}`;
   const wazeUrl = `https://waze.com/ul?ll=${encodeURIComponent(coordinates)}&navigate=yes&zoom=17&utm_source=wheretogo`;
+  const rideUrl = buildUberRideUrl(destination);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => { if (event.key === "Escape") onClose(); };
@@ -60,10 +61,27 @@ export function NavigationOptionsDialog({ destination, onClose }: NavigationOpti
           <div className="flex items-center gap-3"><span className="grid h-11 w-11 place-items-center rounded-xl bg-[#33ccff] text-[#07151a]"><Navigation size={21} /></span><div><p className="font-semibold text-white">Waze</p><p className="text-xs text-white/50">Start navigation to this destination</p></div></div>
           <a href={wazeUrl} target="_blank" rel="noreferrer" className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#33ccff] px-4 py-3 text-sm font-extrabold text-[#07151a] transition hover:bg-[#66dcff]">Open in Waze<Navigation size={17} /></a>
         </div>
-        <p className="mt-4 text-center text-[10px] leading-4 text-white/35">WhereToGo opens the selected navigation service with this venue&apos;s exact coordinates.</p>
+
+        <div className="mt-3 rounded-2xl border border-white/15 bg-white/[.045] p-4">
+          <div className="flex items-center gap-3"><span className="grid h-11 w-11 place-items-center rounded-xl bg-white text-[#09090e]"><CarTaxiFront size={22} /></span><div><p className="font-semibold text-white">Ride service</p><p className="text-xs text-white/50">Request a ride to this venue</p></div></div>
+          <a href={rideUrl} target="_blank" rel="noreferrer" className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-white px-4 py-3 text-sm font-extrabold text-[#09090e] transition hover:bg-white/85">Request with Uber<CarTaxiFront size={18} /></a>
+        </div>
+        <p className="mt-4 text-center text-[10px] leading-4 text-white/35">WhereToGo sends this venue&apos;s exact coordinates to the selected map or ride service.</p>
       </div>
     </section>
   </div>;
+}
+
+function buildUberRideUrl(destination: NavigationDestination) {
+  const params = new URLSearchParams({
+    action: "setPickup",
+    pickup: "my_location",
+    "dropoff[latitude]": String(destination.lat),
+    "dropoff[longitude]": String(destination.lng),
+    "dropoff[nickname]": destination.name,
+    "dropoff[formatted_address]": destination.address,
+  });
+  return `https://m.uber.com/ul/?${params.toString()}`;
 }
 
 function NavigationLink({ href, icon, label }: { href: string; icon: React.ReactNode; label: string }) {

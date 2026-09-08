@@ -24,6 +24,18 @@ export function TaxiSheet({ venue, onClose }: Props) {
     await Linking.openURL(`https://waze.com/ul?ll=${encodeURIComponent(destination)}&navigate=yes&zoom=17&utm_source=wheretogo`);
   }
 
+  async function openRideService() {
+    const params = [
+      "action=setPickup",
+      "pickup=my_location",
+      `dropoff%5Blatitude%5D=${encodeURIComponent(String(venue?.lat))}`,
+      `dropoff%5Blongitude%5D=${encodeURIComponent(String(venue?.lng))}`,
+      `dropoff%5Bnickname%5D=${encodeURIComponent(venue?.name ?? "")}`,
+      `dropoff%5Bformatted_address%5D=${encodeURIComponent(venue?.address ?? "")}`,
+    ].join("&");
+    await Linking.openURL(`https://m.uber.com/ul/?${params}`);
+  }
+
   return (
     <Modal transparent animationType="slide" visible onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose} accessibilityRole="button" accessibilityLabel={translate("Close navigation options")}>
@@ -66,7 +78,17 @@ export function TaxiSheet({ venue, onClose }: Props) {
               <Ionicons name="arrow-forward" color="#07151a" size={16} />
             </Pressable>
           </View>
-          <Text style={styles.disclaimer}>Your route stays in WhereToGo unless you choose one of these external navigation services.</Text>
+          <View style={styles.rideProvider}>
+            <View style={styles.providerRow}>
+              <View style={styles.rideLogo}><Ionicons name="car-sport" color="#09090e" size={23} /></View>
+              <View><Text style={styles.providerName}>Ride service</Text><Text style={styles.providerCaption}>Request a ride to this venue</Text></View>
+            </View>
+            <Pressable onPress={openRideService} style={styles.rideButton} accessibilityRole="button">
+              <Text style={styles.rideButtonText}>Request with Uber</Text>
+              <Ionicons name="arrow-forward" color="#09090e" size={16} />
+            </Pressable>
+          </View>
+          <Text style={styles.disclaimer}>WhereToGo sends this venue&apos;s exact coordinates to the selected map or ride service.</Text>
         </Pressable>
       </Pressable>
     </Modal>
@@ -87,9 +109,11 @@ const styles = StyleSheet.create({
   address: { color: "#8f8f9d", fontSize: 13, marginTop: 4 },
   mapsProvider: { marginTop: 14, padding: 16, borderRadius: 18, backgroundColor: "rgba(66,133,244,0.08)", borderWidth: 1, borderColor: "rgba(66,133,244,0.3)" },
   wazeProvider: { marginTop: 10, padding: 16, borderRadius: 18, backgroundColor: "rgba(51,204,255,0.08)", borderWidth: 1, borderColor: "rgba(51,204,255,0.3)" },
+  rideProvider: { marginTop: 10, padding: 16, borderRadius: 18, backgroundColor: "rgba(255,255,255,0.045)", borderWidth: 1, borderColor: "rgba(255,255,255,0.15)" },
   providerRow: { flexDirection: "row", alignItems: "center", gap: 12 },
   mapsLogo: { width: 46, height: 46, borderRadius: 13, backgroundColor: "#4285f4", alignItems: "center", justifyContent: "center" },
   wazeLogo: { width: 46, height: 46, borderRadius: 13, backgroundColor: "#33ccff", alignItems: "center", justifyContent: "center" },
+  rideLogo: { width: 46, height: 46, borderRadius: 13, backgroundColor: "#ffffff", alignItems: "center", justifyContent: "center" },
   providerName: { color: "#ffffff", fontSize: 16, fontWeight: "700" },
   providerCaption: { color: "#8f8f9d", fontSize: 12, marginTop: 2 },
   help: { color: "#9a9aa7", fontSize: 12, lineHeight: 18, marginTop: 14 },
@@ -97,5 +121,7 @@ const styles = StyleSheet.create({
   mapsButtonText: { color: "#ffffff", fontWeight: "800", fontSize: 12 },
   wazeButton: { minHeight: 48, borderRadius: 14, backgroundColor: "#33ccff", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7, marginTop: 14 },
   wazeButtonText: { color: "#07151a", fontWeight: "800", fontSize: 12 },
+  rideButton: { minHeight: 48, borderRadius: 14, backgroundColor: "#ffffff", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7, marginTop: 14 },
+  rideButtonText: { color: "#09090e", fontWeight: "800", fontSize: 12 },
   disclaimer: { color: "#5f5f6c", fontSize: 10, lineHeight: 15, textAlign: "center", marginTop: 14 },
 });

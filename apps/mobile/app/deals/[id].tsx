@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, AppState, Image, Linking, Pressable, ScrollView, Share, StyleSheet, View, type LayoutChangeEvent, type NativeScrollEvent, type NativeSyntheticEvent } from "react-native";
+import { ActivityIndicator, AppState, Image, Pressable, ScrollView, Share, StyleSheet, View, type LayoutChangeEvent, type NativeScrollEvent, type NativeSyntheticEvent } from "react-native";
 import MapView, { Marker } from "react-native-maps";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -9,6 +9,7 @@ import { api } from "@/src/api";
 import { useAuth } from "@/src/AuthContext";
 import { useLanguage } from "@/src/LanguageContext";
 import { LocalizedText as Text } from "@/src/LocalizedText";
+import { TaxiSheet } from "@/src/TaxiSheet";
 import { displayFont, palette } from "@/src/theme";
 import type { Deal, Redemption } from "@/src/types";
 
@@ -35,6 +36,7 @@ export default function OfferDetailScreen() {
   const [remaining, setRemaining] = useState("00:00:00");
   const [galleryWidth, setGalleryWidth] = useState(1);
   const [activePhoto, setActivePhoto] = useState(0);
+  const [navigationOptionsOpen, setNavigationOptionsOpen] = useState(false);
   const galleryRef = useRef<ScrollView>(null);
 
   const load = useCallback(async () => {
@@ -182,7 +184,7 @@ export default function OfferDetailScreen() {
     <View style={styles.actions}><Action icon={data.saved ? "bookmark" : "bookmark-outline"} label={data.saved ? "Saved" : "Save"} active={data.saved} onPress={() => void toggleSave()} /><Action icon={data.followed ? "heart" : "heart-outline"} label={data.followed ? "Following" : "Follow"} active={data.followed} onPress={() => void toggleFollow()} /><Action icon="share-outline" label="Share" onPress={() => void Share.share({ title: deal.title, message: `${deal.title} at ${venue.name}` })} /></View>
 
     <View style={styles.sectionHeading}><View><Text style={styles.eyebrow}>WHERETOGO NAVIGATION</Text><Text style={styles.sectionTitle}>Find your way</Text></View></View>
-    <View style={styles.mapCard}><MapView style={styles.map} initialRegion={{ latitude: venue.lat, longitude: venue.lng, latitudeDelta: 0.018, longitudeDelta: 0.018 }} mapType="mutedStandard" scrollEnabled={false} zoomEnabled={false}><Marker coordinate={{ latitude: venue.lat, longitude: venue.lng }} title={venue.name} pinColor={palette.gold} /></MapView><Text style={styles.mapAddress} numberOfLines={2}><Ionicons name="location" size={13} color={palette.gold} /> {venue.address}</Text><View style={styles.mapButtons}><Pressable onPress={() => router.push({ pathname: "/(tabs)/explore", params: { venue: venue.id, navigate: "1" } } as never)} style={styles.mapPrimary}><Ionicons name="navigate" size={16} color={palette.night} /><Text style={styles.mapPrimaryText}>Navigate in app</Text></Pressable><Pressable onPress={() => void Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${venue.lat},${venue.lng}`)} style={styles.mapSecondary}><Ionicons name="open-outline" size={16} color={palette.white} /><Text style={styles.mapSecondaryText}>Maps</Text></Pressable></View></View>
+    <View style={styles.mapCard}><MapView style={styles.map} initialRegion={{ latitude: venue.lat, longitude: venue.lng, latitudeDelta: 0.018, longitudeDelta: 0.018 }} mapType="mutedStandard" scrollEnabled={false} zoomEnabled={false}><Marker coordinate={{ latitude: venue.lat, longitude: venue.lng }} title={venue.name} pinColor={palette.gold} /></MapView><Text style={styles.mapAddress} numberOfLines={2}><Ionicons name="location" size={13} color={palette.gold} /> {venue.address}</Text><View style={styles.mapButtons}><Pressable onPress={() => router.push({ pathname: "/(tabs)/explore", params: { venue: venue.id, navigate: "1" } } as never)} style={styles.mapPrimary}><Ionicons name="navigate" size={16} color={palette.night} /><Text style={styles.mapPrimaryText}>Navigate in app</Text></Pressable><Pressable onPress={() => setNavigationOptionsOpen(true)} style={styles.mapSecondary}><Ionicons name="apps-outline" size={16} color={palette.white} /><Text style={styles.mapSecondaryText}>Options</Text></Pressable></View></View>
 
     <View style={styles.proof}><View style={[styles.proofIcon, data.redemption?.redeemedAt && styles.proofIconConfirmed]}><Ionicons name={data.redemption?.redeemedAt ? "checkmark" : "qr-code"} size={25} color={data.redemption?.redeemedAt ? palette.green : palette.gold} /></View><Text style={styles.proofLabel}>YOUR PROOF</Text><Text style={styles.proofTitle}>{data.redemption?.redeemedAt ? "Visit Confirmed" : data.redemption ? "Show this QR" : "Claim Offer"}</Text>
       {data.redemption?.qrDataUrl && <Image source={{ uri: data.redemption.qrDataUrl }} style={styles.qr} />}
@@ -194,7 +196,7 @@ export default function OfferDetailScreen() {
     <View style={styles.rate}><Text style={styles.eyebrow}>RATE THIS OFFER</Text><Text style={styles.sectionTitle}>Was this offer worth it?</Text><View style={styles.ratingRow}>{[1, 2, 3, 4, 5].map((value) => <Pressable key={value} onPress={() => setRating(value)} hitSlop={6}><Ionicons name={value <= rating ? "star" : "star-outline"} size={34} color={palette.gold} /></Pressable>)}{rating > 0 && <Pressable onPress={() => void submitRating()} disabled={busy === "rating"} style={styles.submit}><Text style={styles.submitText}>{busy === "rating" ? "Saving…" : "Submit"}</Text></Pressable>}</View></View>
     <Text style={styles.disclaimer}>Always confirm offer details with the venue before ordering.</Text>
     {notice ? <View style={styles.toast}><Text style={styles.toastText}>{notice}</Text></View> : null}
-  </ScrollView></SafeAreaView>;
+  </ScrollView><TaxiSheet venue={navigationOptionsOpen ? venue : null} onClose={() => setNavigationOptionsOpen(false)} /></SafeAreaView>;
 }
 
 function buildOfferTerms(deal: Deal) {
