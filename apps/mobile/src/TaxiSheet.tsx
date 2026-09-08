@@ -25,15 +25,8 @@ export function TaxiSheet({ venue, onClose }: Props) {
   }
 
   async function openRideService() {
-    const params = [
-      "action=setPickup",
-      "pickup=my_location",
-      `dropoff%5Blatitude%5D=${encodeURIComponent(String(venue?.lat))}`,
-      `dropoff%5Blongitude%5D=${encodeURIComponent(String(venue?.lng))}`,
-      `dropoff%5Bnickname%5D=${encodeURIComponent(venue?.name ?? "")}`,
-      `dropoff%5Bformatted_address%5D=${encodeURIComponent(venue?.address ?? "")}`,
-    ].join("&");
-    await Linking.openURL(`https://m.uber.com/ul/?${params}`);
+    const destination = `${venue?.lat},${venue?.lng}`;
+    await Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(destination)}`);
   }
 
   return (
@@ -63,10 +56,17 @@ export function TaxiSheet({ venue, onClose }: Props) {
               <View><Text style={styles.providerName}>Google Maps</Text><Text style={styles.providerCaption}>Driving directions</Text></View>
             </View>
             <Text style={styles.help}>Open driving directions to this venue using its exact map coordinates.</Text>
-            <Pressable onPress={openGoogleMaps} style={styles.mapsButton} accessibilityRole="button">
-              <Text style={styles.mapsButtonText}>Open Google Maps</Text>
-              <Ionicons name="arrow-forward" color="#ffffff" size={16} />
-            </Pressable>
+            <View style={styles.mapsActions}>
+              <Pressable onPress={openGoogleMaps} style={styles.mapsButton} accessibilityRole="button">
+                <Ionicons name="car" color="#ffffff" size={16} />
+                <Text style={styles.mapsButtonText}>Driving</Text>
+              </Pressable>
+              <Pressable onPress={openRideService} style={styles.mapsButton} accessibilityRole="button">
+                <Ionicons name="car-sport" color="#ffffff" size={16} />
+                <Text style={styles.mapsButtonText}>Ride service</Text>
+              </Pressable>
+            </View>
+            <Text style={styles.rideHelp}>In Google Maps, choose Rides and select Bolt. Google will pass the pickup and destination to Bolt.</Text>
           </View>
           <View style={styles.wazeProvider}>
             <View style={styles.providerRow}>
@@ -76,16 +76,6 @@ export function TaxiSheet({ venue, onClose }: Props) {
             <Pressable onPress={openWaze} style={styles.wazeButton} accessibilityRole="button">
               <Text style={styles.wazeButtonText}>Open destination in Waze</Text>
               <Ionicons name="arrow-forward" color="#07151a" size={16} />
-            </Pressable>
-          </View>
-          <View style={styles.rideProvider}>
-            <View style={styles.providerRow}>
-              <View style={styles.rideLogo}><Ionicons name="car-sport" color="#09090e" size={23} /></View>
-              <View><Text style={styles.providerName}>Ride service</Text><Text style={styles.providerCaption}>Request a ride to this venue</Text></View>
-            </View>
-            <Pressable onPress={openRideService} style={styles.rideButton} accessibilityRole="button">
-              <Text style={styles.rideButtonText}>Request with Uber</Text>
-              <Ionicons name="arrow-forward" color="#09090e" size={16} />
             </Pressable>
           </View>
           <Text style={styles.disclaimer}>WhereToGo sends this venue&apos;s exact coordinates to the selected map or ride service.</Text>
@@ -109,19 +99,17 @@ const styles = StyleSheet.create({
   address: { color: "#8f8f9d", fontSize: 13, marginTop: 4 },
   mapsProvider: { marginTop: 14, padding: 16, borderRadius: 18, backgroundColor: "rgba(66,133,244,0.08)", borderWidth: 1, borderColor: "rgba(66,133,244,0.3)" },
   wazeProvider: { marginTop: 10, padding: 16, borderRadius: 18, backgroundColor: "rgba(51,204,255,0.08)", borderWidth: 1, borderColor: "rgba(51,204,255,0.3)" },
-  rideProvider: { marginTop: 10, padding: 16, borderRadius: 18, backgroundColor: "rgba(255,255,255,0.045)", borderWidth: 1, borderColor: "rgba(255,255,255,0.15)" },
   providerRow: { flexDirection: "row", alignItems: "center", gap: 12 },
   mapsLogo: { width: 46, height: 46, borderRadius: 13, backgroundColor: "#4285f4", alignItems: "center", justifyContent: "center" },
   wazeLogo: { width: 46, height: 46, borderRadius: 13, backgroundColor: "#33ccff", alignItems: "center", justifyContent: "center" },
-  rideLogo: { width: 46, height: 46, borderRadius: 13, backgroundColor: "#ffffff", alignItems: "center", justifyContent: "center" },
   providerName: { color: "#ffffff", fontSize: 16, fontWeight: "700" },
   providerCaption: { color: "#8f8f9d", fontSize: 12, marginTop: 2 },
   help: { color: "#9a9aa7", fontSize: 12, lineHeight: 18, marginTop: 14 },
-  mapsButton: { minHeight: 48, borderRadius: 14, backgroundColor: "#4285f4", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7, marginTop: 14 },
+  mapsActions: { flexDirection: "row", gap: 8, marginTop: 14 },
+  mapsButton: { flex: 1, minHeight: 48, borderRadius: 14, backgroundColor: "#4285f4", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7 },
   mapsButtonText: { color: "#ffffff", fontWeight: "800", fontSize: 12 },
+  rideHelp: { color: "#7f8fab", fontSize: 10, lineHeight: 15, marginTop: 10 },
   wazeButton: { minHeight: 48, borderRadius: 14, backgroundColor: "#33ccff", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7, marginTop: 14 },
   wazeButtonText: { color: "#07151a", fontWeight: "800", fontSize: 12 },
-  rideButton: { minHeight: 48, borderRadius: 14, backgroundColor: "#ffffff", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7, marginTop: 14 },
-  rideButtonText: { color: "#09090e", fontWeight: "800", fontSize: 12 },
   disclaimer: { color: "#5f5f6c", fontSize: 10, lineHeight: 15, textAlign: "center", marginTop: 14 },
 });
