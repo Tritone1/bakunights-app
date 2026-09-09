@@ -419,6 +419,7 @@ const messages: Record<string, Translation> = {
   "Starts (date and time)": ["Başlayır (tarix və vaxt)", "Начало (дата и время)"],
   "Ends (date and time)": ["Bitir (tarix və vaxt)", "Окончание (дата и время)"],
   "Go live now": ["İndi yayımla", "Опубликовать сейчас"],
+  "Offer again": ["Təklifi yenidən et", "Повторить предложение"],
   "Your offer will be published automatically. Admins can monitor offer activity but no approval is required.": ["Təklifin avtomatik yayımlanacaq. Adminlər fəaliyyəti izləyə bilər, lakin təsdiq tələb olunmur.", "Предложение будет опубликовано автоматически. Администраторы могут отслеживать активность, но одобрение не требуется."],
   "Offer published. It appears on the main feed as soon as its start time arrives.": ["Təklif yayımlandı. Başlama vaxtı çatdıqda əsas lentdə görünəcək.", "Предложение опубликовано и появится в основной ленте в момент начала."],
   "Venue profile unavailable": ["Məkan profili əlçatan deyil", "Профиль заведения недоступен"],

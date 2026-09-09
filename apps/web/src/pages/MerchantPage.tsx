@@ -191,8 +191,11 @@ export function MerchantPage() {
   }
 
   async function goLive(deal: MerchantDeal) {
-    await api(`/merchant/deals/${deal.id}/go-live`, { method: "POST" });
-    setPublishNotice(`“${deal.title}” is live now and available on the main offer feed.`);
+    const result = await api<{ deal: MerchantDeal; visibility: "live" | "scheduled" }>(`/merchant/deals/${deal.id}/go-live`, { method: "POST" });
+    const window = `${format(new Date(result.deal.startsAt), "MMM d, HH:mm")}–${format(new Date(result.deal.endsAt), "MMM d, HH:mm")}`;
+    setPublishNotice(result.visibility === "live"
+      ? `“${deal.title}” is live again until ${format(new Date(result.deal.endsAt), "MMM d, HH:mm")}. Its original offer hours were kept.`
+      : `“${deal.title}” is scheduled again for ${window}. Its original offer hours were kept.`);
     await load();
   }
 
@@ -219,7 +222,7 @@ export function MerchantPage() {
       <div className="mt-3 overflow-x-auto rounded-xl border border-white/10 bg-white/[0.035]">
         <table className="w-full min-w-[760px] text-left text-sm">
           <thead className="bg-white/[0.055] text-xs uppercase tracking-[.14em] text-white/45"><tr><th className="p-3">Offer</th><th className="p-3">Status</th><th className="p-3">Ends</th><th className="p-3">Views</th><th className="p-3">Saves</th><th className="p-3">QR proofs</th><th className="p-3 text-right">Actions</th></tr></thead>
-          <tbody>{allDeals.map((deal) => { const visibility = offerVisibility(deal); return <tr key={deal.id} className="border-t border-white/10"><td className="p-3"><strong>{deal.title}</strong><p className="text-xs text-white/45">{offerSummary(deal)} · {deal.tag}</p>{deal.status === "rejected" && deal.reviewNotes && <p className="mt-1 text-xs text-red-300">{deal.reviewNotes}</p>}</td><td className="p-3"><StatusPill label={visibility.label} tone={visibility.tone} /><p className="mt-1 max-w-36 text-[10px] leading-4 text-white/40">{visibility.detail}</p></td><td className="p-3">{format(new Date(deal.endsAt), "MMM d, HH:mm")}</td><td className="p-3">{deal._count.views}</td><td className="p-3">{deal._count.savedBy}</td><td className="p-3">{deal._count.redemptions}</td><td className="p-3 text-right"><button onClick={() => { setEditing(deal); setShowForm(true); }} className="mr-3 font-semibold text-cyan-300">Edit</button>{visibility.kind !== "live" && <button onClick={() => void goLive(deal)} className="mr-3 inline-flex items-center gap-1 font-semibold text-emerald-300"><Play size={13} />Go live now</button>}{deal.status === "approved" && deal.isActive && <button onClick={() => void expire(deal)} className="font-semibold text-red-300">Expire</button>}</td></tr>; })}</tbody>
+          <tbody>{allDeals.map((deal) => { const visibility = offerVisibility(deal); return <tr key={deal.id} className="border-t border-white/10"><td className="p-3"><strong>{deal.title}</strong><p className="text-xs text-white/45">{offerSummary(deal)} · {deal.tag}</p>{deal.status === "rejected" && deal.reviewNotes && <p className="mt-1 text-xs text-red-300">{deal.reviewNotes}</p>}</td><td className="p-3"><StatusPill label={visibility.label} tone={visibility.tone} /><p className="mt-1 max-w-36 text-[10px] leading-4 text-white/40">{visibility.detail}</p></td><td className="p-3">{format(new Date(deal.endsAt), "MMM d, HH:mm")}</td><td className="p-3">{deal._count.views}</td><td className="p-3">{deal._count.savedBy}</td><td className="p-3">{deal._count.redemptions}</td><td className="p-3 text-right"><button onClick={() => { setEditing(deal); setShowForm(true); }} className="mr-3 font-semibold text-cyan-300">Edit</button>{visibility.kind !== "live" && <button onClick={() => void goLive(deal)} className="mr-3 inline-flex items-center gap-1 font-semibold text-emerald-300"><Play size={13} />Offer again</button>}{deal.status === "approved" && deal.isActive && <button onClick={() => void expire(deal)} className="font-semibold text-red-300">Expire</button>}</td></tr>; })}</tbody>
         </table>
       </div>
     </section>

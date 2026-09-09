@@ -9,6 +9,7 @@ import { env } from "../env.js";
 import { persistImage } from "../lib/image-storage.js";
 import { syncDealTranslationsBestEffort } from "../lib/deal-translation.js";
 import { FLASH_DEAL_MAX_DURATION_MS, flashDealValidationError } from "../lib/flash-deal.js";
+import { rescheduleDealWindow } from "../lib/deal-schedule.js";
 
 export const merchantRouter = Router();
 const venueType = z.enum(["Restaurant", "Pub", "Bar", "Lounge", "Cafe"]);
@@ -758,21 +759,18 @@ merchantRouter.post("/deals/:id/go-live", asyncRoute(async (req, res) => {
   if (!existing) throw new HttpError(404, "Offer not found.");
   await assertOwner(req.user!.id, existing.restaurantId);
   const now = new Date();
-  const previousDurationMs = existing.endsAt.getTime() - existing.startsAt.getTime();
-  const restartedDurationMs = existing.isFlash
-    ? Math.min(FLASH_DEAL_MAX_DURATION_MS, Math.max(60_000, previousDurationMs))
-    : 24 * 60 * 60 * 1000;
+  const nextWindow = rescheduleDealWindow(existing.startsAt, existing.endsAt, now);
   const deal = await prisma.deal.update({
     where: { id: existing.id },
     data: {
       status: "approved",
       isActive: true,
-      startsAt: now,
-      endsAt: existing.endsAt > now ? existing.endsAt : new Date(now.getTime() + restartedDurationMs),
+      startsAt: nextWindow.startsAt,
+      endsAt: nextWindow.endsAt,
       liveCycle: { increment: 1 },
     },
   });
-  res.json({ deal, visibility: "live" });
+  res.json({ deal, visibility: deal.startsAt <= now ? "live" : "scheduled" });
 }));
 
 merchantRouter.post("/redemptions/redeem", asyncRoute(async (req, res) => {
