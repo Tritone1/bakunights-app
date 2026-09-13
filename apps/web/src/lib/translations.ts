@@ -90,7 +90,7 @@ const messages: Record<string, Translation> = {
   // Roulette and rewards
   "Verified visit rewards": ["Təsdiqlənmiş ziyarət mükafatları", "Награды за подтверждённые визиты"],
   "Spin. Earn. Save.": ["Fırlat. Qazan. Qənaət et.", "Крути. Зарабатывай. Экономь."],
-  "Visit a participating venue and show your in-app QR code. After the merchant verifies your visit, one spin unlocks. Spin to collect points and build your balance toward a reward.": ["İştirakçı məkana get və tətbiqdəki QR kodunu göstər. Tərəfdaş ziyarətini təsdiqlədikdən sonra bir fırlatma açılır. Xal toplamaq və mükafata yaxınlaşmaq üçün çarxı fırlat.", "Посетите заведение-участник и покажите QR-код в приложении. После подтверждения визита партнёром откроется одно вращение. Крутите колесо, копите баллы и приближайтесь к награде."],
+  "Visit a participating venue and show your in-app QR code. After the merchant verifies your visit, one spin unlocks. You can use a maximum of one spin per day to collect points toward a reward.": ["İştirakçı məkana get və tətbiqdəki QR kodunu göstər. Tərəfdaş ziyarətini təsdiqlədikdən sonra bir fırlatma açılır. Mükafata doğru xal toplamaq üçün gündə maksimum bir dəfə fırlada bilərsən.", "Посетите заведение-участник и покажите QR-код в приложении. После подтверждения визита партнёром откроется одно вращение. Чтобы копить баллы для награды, можно использовать не более одного вращения в день."],
   "1 · Visit venue": ["1 · Məkana get", "1 · Посетите заведение"],
   "2 · Show your QR": ["2 · QR kodunu göstər", "2 · Покажите QR-код"],
   "3 · Merchant verifies": ["3 · Tərəfdaş təsdiqləyir", "3 · Партнёр подтверждает"],
@@ -102,6 +102,10 @@ const messages: Record<string, Translation> = {
   "500-point reward unlocked": ["500 xallıq mükafat açıldı", "Награда за 500 баллов открыта"],
   "Ready to use": ["İstifadəyə hazırdır", "Готово к использованию"],
   "Spin": ["Fırlat", "Крутить"],
+  "Spin today": ["Bu gün fırlat", "Крутить сегодня"],
+  "Today's spin used — come back tomorrow": ["Bugünkü fırlatma istifadə edildi — sabah yenidən gəl", "Сегодняшнее вращение использовано — возвращайтесь завтра"],
+  "Done for": ["Bitdi", "Завершено"],
+  "today": ["bu gün", "сегодня"],
   "Visit to unlock": ["Açmaq üçün ziyarət et", "Посетите, чтобы открыть"],
   "Log in to play": ["Oynamaq üçün daxil ol", "Войдите, чтобы играть"],
   "Loading points...": ["Xallar yüklənir...", "Загрузка баллов..."],
@@ -110,6 +114,7 @@ const messages: Record<string, Translation> = {
   "Show this code at a participating venue for 50% off a bill up to 200 AZN. Maximum discount: 100 AZN.": ["200 AZN-dək hesabda 50% endirim üçün bu kodu iştirakçı məkanda göstər. Maksimum endirim: 100 AZN.", "Покажите этот код в заведении-участнике, чтобы получить скидку 50% на счёт до 200 AZN. Максимальная скидка: 100 AZN."],
   "Could not load your points.": ["Xallarını yükləmək mümkün olmadı.", "Не удалось загрузить ваши баллы."],
   "The visit spin could not be completed.": ["Ziyarət fırlatmasını tamamlamaq mümkün olmadı.", "Не удалось завершить вращение за визит."],
+  "You have already used today's spin. You can spin again tomorrow if you have a merchant-verified visit.": ["Bugünkü fırlatmanı artıq istifadə etmisən. Tərəfdaş tərəfindən təsdiqlənmiş ziyarətin varsa, sabah yenidən fırlada bilərsən.", "Вы уже использовали сегодняшнее вращение. Завтра вы сможете вращать снова, если у вас есть визит, подтверждённый партнёром."],
   "Could not copy the code. Select it manually instead.": ["Kodu kopyalamaq mümkün olmadı. Onu əl ilə seç.", "Не удалось скопировать код. Выделите его вручную."],
 
   // Maps and location

@@ -82,6 +82,7 @@ export type PointsStatus = {
   pointsToReward: number;
   rewardThreshold: number;
   canSpin: boolean;
+  hasSpunToday: boolean;
   pendingSpins: number;
   lastSpin: { points: number; createdAt: string } | null;
   activeRewards: PointReward[];

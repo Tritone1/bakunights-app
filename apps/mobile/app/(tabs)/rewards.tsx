@@ -85,22 +85,26 @@ export default function RewardsScreen() {
       Animated.timing(rotation, { toValue: next, duration: 2600, easing: Easing.bezier(0.12, 0.72, 0.12, 1), useNativeDriver: true }).start(() => {
         setEarned(result.pointsEarned); setUnlocked(result.rewardUnlocked); setSpinning(false);
       });
-    } catch (reason) { setError(reason instanceof Error ? reason.message : "The spin could not be completed."); setSpinning(false); }
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "The spin could not be completed.");
+      setSpinning(false);
+      api<{ status: PointsStatus }>("/users/me/points").then(({ status: value }) => setStatus(value)).catch(() => undefined);
+    }
   }
 
   const rotate = rotation.interpolate({ inputRange: [0, 10000], outputRange: ["0deg", "10000deg"] });
   const progress = status ? Math.min(100, status.pointsBalance / status.rewardThreshold * 100) : 0;
 
   return <SafeAreaView style={styles.safe} edges={["top"]}><ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-    <View style={styles.heading}><Text style={styles.eyebrow}>VERIFIED VISIT REWARDS</Text><Text style={styles.title}>Spin. Earn. Save.</Text><Text style={styles.body}>Visit a participating venue and show your offer QR. After the merchant verifies it, one spin unlocks.</Text></View>
+    <View style={styles.heading}><Text style={styles.eyebrow}>VERIFIED VISIT REWARDS</Text><Text style={styles.title}>Spin. Earn. Save.</Text><Text style={styles.body}>Visit a participating venue and show your offer QR. After the merchant verifies it, one spin unlocks. You can use a maximum of one spin per day.</Text></View>
     <View style={styles.steps}><Step number="1" text="Visit venue" color={palette.cyan} /><Step number="2" text="Show QR" color="#fb923c" /><Step number="3" text="Get verified" color={palette.gold} /><Step number="4" text="Spin" color={palette.green} /></View>
 
     <View style={styles.wheelStage}><View style={styles.pointer} /><Animated.View style={[styles.wheel, { transform: [{ rotate }] }]}><WheelFace /></Animated.View>
-      <Pressable onPress={() => void spin()} disabled={!status?.canSpin || spinning || loading} style={[styles.spinButton, (!status?.canSpin || loading) && styles.disabled]}><Ionicons name={status?.canSpin ? "sparkles" : "lock-closed"} size={21} color="#5b4310" /><Text style={styles.spinText}>{spinning ? "SPINNING" : status?.canSpin ? "SPIN" : "LOCKED"}</Text></Pressable>
+      <Pressable onPress={() => void spin()} disabled={!status?.canSpin || spinning || loading} style={[styles.spinButton, (!status?.canSpin || loading) && styles.disabled]}><Ionicons name={status?.canSpin ? "sparkles" : "lock-closed"} size={21} color="#5b4310" /><Text style={styles.spinText}>{spinning ? "SPINNING" : status?.canSpin ? "SPIN" : status?.hasSpunToday ? "DONE TODAY" : "LOCKED"}</Text></Pressable>
     </View>
 
     {!user ? <View style={styles.loginCard}><Ionicons name="lock-closed" size={20} color={palette.gold} /><Text style={styles.cardTitle}>Log in to collect points</Text><Text style={styles.cardBody}>Your verified visits, spins, balance, and rewards stay with your customer account.</Text><Pressable onPress={() => router.push("/login/customer" as never)} style={styles.primary}><Text style={styles.primaryText}>Customer login</Text></Pressable></View>
-      : loading ? <ActivityIndicator color={palette.gold} /> : <View style={styles.balanceCard}><View style={styles.balanceTop}><View><Text style={styles.label}>CURRENT BALANCE</Text><Text style={styles.balance}>{status?.pointsBalance ?? 0} <Text style={styles.points}>points</Text></Text></View><Text style={styles.toReward}>{status?.pointsToReward ?? 500}{"\n"}to reward</Text></View><View style={styles.progress}><View style={[styles.progressFill, { width: `${progress}%` }]} /></View><Text style={styles.lifetime}>{`${status?.lifetimePoints ?? 0} lifetime points · ${status?.pendingSpins ?? 0} spins ready`}</Text></View>}
+      : loading ? <ActivityIndicator color={palette.gold} /> : <View style={styles.balanceCard}><View style={styles.balanceTop}><View><Text style={styles.label}>CURRENT BALANCE</Text><Text style={styles.balance}>{status?.pointsBalance ?? 0} <Text style={styles.points}>points</Text></Text></View><Text style={styles.toReward}>{status?.pointsToReward ?? 500}{"\n"}to reward</Text></View><View style={styles.progress}><View style={[styles.progressFill, { width: `${progress}%` }]} /></View><Text style={styles.lifetime}>{status?.hasSpunToday ? `${status.lifetimePoints} lifetime points · today's spin used` : `${status?.lifetimePoints ?? 0} lifetime points · ${status?.pendingSpins ?? 0} verified spins waiting`}</Text></View>}
     {error ? <Text style={styles.error}>{error}</Text> : null}
     {earned != null && <View style={styles.success}><Ionicons name="trophy" size={22} color={palette.cyan} /><View><Text style={styles.successTitle}>{translate(`You earned ${earned} points!`)}</Text><Text style={styles.cardBody}>{translate(`Your new balance is ${status?.pointsBalance ?? 0} points.`)}</Text></View></View>}
     {unlocked && <RewardCard reward={unlocked} title="New reward unlocked" />}

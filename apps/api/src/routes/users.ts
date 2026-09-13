@@ -4,6 +4,7 @@ import { Prisma } from "@prisma/client";
 import { randomInt, randomUUID } from "node:crypto";
 import { z } from "zod";
 import { prisma } from "../db.js";
+import { bakuDate } from "../lib/baku-date.js";
 import { asyncRoute, HttpError } from "../lib/http.js";
 import { requireAuth } from "../middleware/auth.js";
 import { getOfferLanguage, localizeDeal } from "../lib/deal-translation.js";
@@ -27,7 +28,6 @@ const POINTS_PER_REWARD = 500;
 const WHEEL_SLICES = [10, 25, 15, 30, 10, 15, 25, 50, 30, 15, 10, 25, 15, 10, 10, 30, 25, 15, 10, 60, 25, 15, 30, 10]
   .map((points) => ({ points, weight: points === 10 || points === 15 ? 5 : points === 25 ? 4 : points === 30 ? 3 : points === 50 ? 2 : 1 }));
 const HIGH_REWARD_COOLDOWN_SPINS = 10;
-const BAKU_UTC_OFFSET_MS = 4 * 60 * 60 * 1000;
 
 function pickWheelSlice(allowHighRewards: boolean) {
   const eligibleSlices = WHEEL_SLICES.map((slice, index) => ({ ...slice, index }))
@@ -41,31 +41,30 @@ function pickWheelSlice(allowHighRewards: boolean) {
   return eligibleSlices[eligibleSlices.length - 1]!;
 }
 
-function bakuDate(now = new Date()) {
-  const shifted = new Date(now.getTime() + BAKU_UTC_OFFSET_MS);
-  return new Date(Date.UTC(shifted.getUTCFullYear(), shifted.getUTCMonth(), shifted.getUTCDate()));
-}
-
 function serializePointReward(reward: { id: string; rewardCode: string; pointsSpent: number; discountPct: number; maxBillAzn: Prisma.Decimal; issuedAt: Date; redeemedAt: Date | null }) {
   return { ...reward, maxBillAzn: Number(reward.maxBillAzn) };
 }
 
 async function getPointsStatus(userId: string) {
-  const [earned, spent, lastSpin, pendingSpins, activeRewards] = await Promise.all([
+  const today = bakuDate();
+  const [earned, spent, lastSpin, pendingSpins, todaysSpinClaim, activeRewards] = await Promise.all([
     prisma.pointSpin.aggregate({ where: { userId }, _sum: { points: true } }),
     prisma.pointReward.aggregate({ where: { userId }, _sum: { pointsSpent: true } }),
     prisma.pointSpin.findFirst({ where: { userId }, orderBy: { createdAt: "desc" } }),
     prisma.redemption.count({ where: { userId, redeemedAt: { not: null }, pointSpin: null } }),
+    prisma.dailySpinClaim.findUnique({ where: { userId_spinDate: { userId, spinDate: today } }, select: { id: true } }),
     prisma.pointReward.findMany({ where: { userId, redeemedAt: null }, orderBy: { issuedAt: "asc" }, select: { id: true, rewardCode: true, pointsSpent: true, discountPct: true, maxBillAzn: true, issuedAt: true, redeemedAt: true } }),
   ]);
   const lifetimePoints = earned._sum.points ?? 0;
   const pointsBalance = Math.max(0, lifetimePoints - (spent._sum.pointsSpent ?? 0));
+  const hasSpunToday = todaysSpinClaim !== null;
   return {
     pointsBalance,
     lifetimePoints,
     pointsToReward: Math.max(0, POINTS_PER_REWARD - pointsBalance),
     rewardThreshold: POINTS_PER_REWARD,
-    canSpin: pendingSpins > 0,
+    canSpin: pendingSpins > 0 && !hasSpunToday,
+    hasSpunToday,
     pendingSpins,
     lastSpin: lastSpin ? { points: lastSpin.points, createdAt: lastSpin.createdAt } : null,
     activeRewards: activeRewards.map(serializePointReward),
@@ -189,6 +188,14 @@ usersRouter.post("/me/points/spin", asyncRoute(async (req, res) => {
 
   try {
     rewardUnlocked = await prisma.$transaction(async (tx) => {
+      const spinDate = bakuDate();
+      const todaysSpinClaim = await tx.dailySpinClaim.findUnique({
+        where: { userId_spinDate: { userId, spinDate } },
+        select: { id: true },
+      });
+      if (todaysSpinClaim) {
+        throw new HttpError(409, "You have already used today's spin. You can spin again tomorrow if you have a merchant-verified visit.", "DAILY_SPIN_LIMIT_REACHED");
+      }
       const eligibleVisit = await tx.redemption.findFirst({
         where: { userId, redeemedAt: { not: null }, pointSpin: null },
         orderBy: { redeemedAt: "asc" },
@@ -204,7 +211,8 @@ usersRouter.post("/me/points/spin", asyncRoute(async (req, res) => {
       const outcome = pickWheelSlice(!recentSpins.some((spin) => spin.points >= 50));
       wheelIndex = outcome.index;
       pointsEarned = outcome.points;
-      await tx.pointSpin.create({ data: { userId, redemptionId: eligibleVisit.id, spinDate: bakuDate(), points: pointsEarned } });
+      await tx.dailySpinClaim.create({ data: { userId, spinDate } });
+      await tx.pointSpin.create({ data: { userId, redemptionId: eligibleVisit.id, spinDate, points: pointsEarned } });
       const [earned, spent] = await Promise.all([
         tx.pointSpin.aggregate({ where: { userId }, _sum: { points: true } }),
         tx.pointReward.aggregate({ where: { userId }, _sum: { pointsSpent: true } }),
@@ -219,6 +227,13 @@ usersRouter.post("/me/points/spin", asyncRoute(async (req, res) => {
   } catch (error) {
     if (error instanceof HttpError) throw error;
     if (error instanceof Prisma.PrismaClientKnownRequestError && (error.code === "P2002" || error.code === "P2034")) {
+      const todaysSpinClaim = await prisma.dailySpinClaim.findUnique({
+        where: { userId_spinDate: { userId, spinDate: bakuDate() } },
+        select: { id: true },
+      });
+      if (todaysSpinClaim) {
+        throw new HttpError(409, "You have already used today's spin. You can spin again tomorrow if you have a merchant-verified visit.", "DAILY_SPIN_LIMIT_REACHED");
+      }
       throw new HttpError(409, "That verified visit has already been used for a spin. Verify another in-store visit to spin again.", "VISIT_SPIN_USED");
     }
     throw error;
@@ -251,6 +266,7 @@ usersRouter.delete("/me", asyncRoute(async (req, res) => {
     prisma.notificationLog.deleteMany({ where: { userId: user.id } }),
     prisma.pointReward.deleteMany({ where: { userId: user.id } }),
     prisma.pointSpin.deleteMany({ where: { userId: user.id } }),
+    prisma.dailySpinClaim.deleteMany({ where: { userId: user.id } }),
     prisma.emailVerificationToken.deleteMany({ where: { userId: user.id } }),
     prisma.venueClaimRequest.deleteMany({ where: { requestingUserId: user.id } }),
     prisma.merchantEnrollmentRequest.deleteMany({ where: { requestingUserId: user.id } }),

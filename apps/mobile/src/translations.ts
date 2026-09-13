@@ -85,13 +85,14 @@ const messages: Record<string, Translation> = {
   "WhereToGo · Great food. Great deals. Every day.": ["WhereToGo · Möhtəşəm yemək. Möhtəşəm təkliflər. Hər gün.", "WhereToGo · Отличная еда. Выгодные предложения. Каждый день."],
 
   // Rewards
-  "Visit a participating venue and show your offer QR. After the merchant verifies it, one spin unlocks.": ["İştirakçı məkana get və təklif QR-ını göstər. Tərəfdaş təsdiqlədikdən sonra bir fırlatma açılır.", "Посетите заведение и покажите QR предложения. После подтверждения партнёром откроется одно вращение."],
+  "Visit a participating venue and show your offer QR. After the merchant verifies it, one spin unlocks. You can use a maximum of one spin per day.": ["İştirakçı məkana get və təklif QR-ını göstər. Tərəfdaş təsdiqlədikdən sonra bir fırlatma açılır. Gündə maksimum bir dəfə fırlada bilərsən.", "Посетите заведение и покажите QR предложения. После подтверждения партнёром откроется одно вращение. Можно использовать не более одного вращения в день."],
   "Visit venue": ["Məkana get", "Посетить место"],
   "Show QR": ["QR göstər", "Показать QR"],
   "Get verified": ["Təsdiqlət", "Подтвердить"],
   "Spin": ["Fırlat", "Крутить"],
   "Spinning": ["Fırlanır", "Вращение"],
   "Locked": ["Bağlıdır", "Заблокировано"],
+  "Done today": ["Bu günlük bitdi", "На сегодня готово"],
   "Log in to collect points": ["Xal toplamaq üçün daxil ol", "Войдите, чтобы собирать баллы"],
   "Your verified visits, spins, balance, and rewards stay with your customer account.": ["Təsdiqlənmiş ziyarətlərin, fırlatmaların, balansın və mükafatların müştəri hesabında saxlanılır.", "Подтверждённые визиты, вращения, баланс и награды сохраняются в аккаунте клиента."],
   "Current balance": ["Cari balans", "Текущий баланс"],
@@ -99,9 +100,12 @@ const messages: Record<string, Translation> = {
   "to reward": ["mükafata qalıb", "до награды"],
   "lifetime points": ["ümumi xal", "баллов за всё время"],
   "spins ready": ["fırlatma hazırdır", "вращений доступно"],
+  "verified spins waiting": ["təsdiqlənmiş fırlatma gözləyir", "подтверждённых вращений ожидают"],
+  "today's spin used": ["bugünkü fırlatma istifadə edildi", "сегодняшнее вращение использовано"],
   "New reward unlocked": ["Yeni mükafat açıldı", "Открыта новая награда"],
   "Ready to use": ["İstifadəyə hazırdır", "Готово к использованию"],
   "The spin could not be completed.": ["Fırlatmanı tamamlamaq mümkün olmadı.", "Не удалось завершить вращение."],
+  "You have already used today's spin. You can spin again tomorrow if you have a merchant-verified visit.": ["Bugünkü fırlatmanı artıq istifadə etmisən. Tərəfdaş tərəfindən təsdiqlənmiş ziyarətin varsa, sabah yenidən fırlada bilərsən.", "Вы уже использовали сегодняшнее вращение. Завтра вы сможете вращать снова, если у вас есть визит, подтверждённый партнёром."],
   "Could not load your points.": ["Xallarını yükləmək mümkün olmadı.", "Не удалось загрузить ваши баллы."],
   "You earned": ["Qazandın:", "Вы заработали"],
   "Your new balance is": ["Yeni balansın:", "Ваш новый баланс:"],
@@ -355,6 +359,10 @@ function dynamicTranslation(source: string, language: Exclude<AppLanguage, "en">
   if (match) return choose(`Yeni balansın ${match[1]} xaldır.`, `Ваш новый баланс: ${match[1]} баллов.`);
   match = source.match(/^(\d+) lifetime points · (\d+) spins ready$/i);
   if (match) return choose(`Ümumi ${match[1]} xal · ${match[2]} fırlatma hazırdır`, `${match[1]} баллов за всё время · доступно вращений: ${match[2]}`);
+  match = source.match(/^(\d+) lifetime points · today's spin used$/i);
+  if (match) return choose(`Ümumi ${match[1]} xal · bugünkü fırlatma istifadə edildi`, `${match[1]} баллов за всё время · сегодняшнее вращение использовано`);
+  match = source.match(/^(\d+) lifetime points · (\d+) verified spins waiting$/i);
+  if (match) return choose(`Ümumi ${match[1]} xal · ${match[2]} təsdiqlənmiş fırlatma gözləyir`, `${match[1]} баллов за всё время · подтверждённых вращений ожидают: ${match[2]}`);
   match = source.match(/^(\d+)% off bills up to ([\d.]+) AZN$/i);
   if (match) return choose(`${match[2]} AZN-dək hesablara ${match[1]}% endirim`, `Скидка ${match[1]}% на счета до ${match[2]} AZN`);
   match = source.match(/^(\d+)% OFF$/i);

@@ -88,6 +88,7 @@ model User {
   auditLogs                 AuditLog[]                 @relation("AuditActor")
   emailVerificationTokens   EmailVerificationToken[]
   pointSpins                PointSpin[]
+  dailySpinClaims           DailySpinClaim[]
   pointRewards              PointReward[]
 
   @@map("users")
@@ -319,6 +320,17 @@ model PointSpin {
 
   @@index([userId, createdAt])
   @@map("point_spins")
+}
+
+model DailySpinClaim {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  spinDate  DateTime @map("spin_date") @db.Date
+  createdAt DateTime @default(now()) @map("created_at")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, spinDate])
+  @@map("daily_spin_claims")
 }
 
 model PointReward {
