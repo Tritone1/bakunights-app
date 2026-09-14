@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json.schemastore.org/eas.json",
+  "cli": {
+    "version": ">= 23.2.0",
+    "appVersionSource": "remote",
+    "requireCommit": true
+  },
+  "build": {
+    "preview-android": {
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      }
+    },
+    "preview-ios-simulator": {
+      "distribution": "internal",
+      "ios": {
+        "simulator": true
+      }
+    },
+    "production": {
+      "autoIncrement": true
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}

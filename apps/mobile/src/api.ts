@@ -1,7 +1,7 @@
 import { getAppLanguage } from "./language";
 
 const explicitApiUrl = process.env.EXPO_PUBLIC_API_URL?.replace(/\/$/, "");
-export const apiUrl = explicitApiUrl || "https://bakunights-app-production.up.railway.app/api";
+export const apiUrl = explicitApiUrl || "https://wheretogo.az/api";
 export const appUrl = apiUrl.replace(/\/api$/, "");
 
 export class ApiError extends Error {

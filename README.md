@@ -114,7 +114,7 @@ Use separate restricted keys for browser and server contexts. In Google Cloud Co
 
 1. Enable billing for the Google Cloud project.
 2. Enable **Maps JavaScript API**, **Places API (New)**, **Geocoding API**, and **Directions API** as used by the application.
-3. Add `https://bakunights-app-production.up.railway.app/*` to the browser key's allowed HTTP referrers. Add the custom production domain too if one is introduced.
+3. Add `https://wheretogo.az/*` and `https://www.wheretogo.az/*` to the browser key's allowed HTTP referrers. Keep the Railway-provided hostname only while it remains a supported fallback.
 4. Redeploy Railway after setting `VITE_GOOGLE_MAPS_API_KEY`.
 
 The API logs configuration warnings during startup. The web interface also reports missing, rejected, or failed Google Maps loading and retains the OpenStreetMap fallback.

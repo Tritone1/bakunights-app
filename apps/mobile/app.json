@@ -4,6 +4,7 @@
     "slug": "exp19216801018081",
     "owner": "tritone",
     "version": "1.0.0",
+    "description": "Discover nearby restaurants and live offers in Baku, save deals, verify visits, and earn rewards.",
     "orientation": "portrait",
     "platforms": [
       "ios",
@@ -15,6 +16,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.haragedek.app",
+      "buildNumber": "1",
       "config": {
         "usesNonExemptEncryption": false
       },
@@ -35,7 +37,8 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.haragedek.app"
+      "package": "com.haragedek.app",
+      "versionCode": 1
     },
     "web": {
       "output": "static",
