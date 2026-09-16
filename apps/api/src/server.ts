@@ -5,7 +5,9 @@ import cors from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
 import pg from "pg";
+import { z } from "zod";
 import { existsSync } from "node:fs";
+import { readFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { env } from "./env.js";
@@ -19,7 +21,7 @@ import { merchantRouter } from "./routes/merchant.js";
 import { adminRouter } from "./routes/admin.js";
 import { pushRouter } from "./routes/push.js";
 import { placesRouter } from "./routes/places.js";
-import { errorHandler, notFound } from "./lib/http.js";
+import { asyncRoute, errorHandler, notFound } from "./lib/http.js";
 import { sendSavedDealExpiryNotifications } from "./lib/push.js";
 import { recomputeAllVenueTrust } from "./lib/trust.js";
 import { isImageStorageConfigured } from "./lib/image-storage.js";
@@ -29,6 +31,59 @@ import { backfillDealTranslations, translationConfigured } from "./lib/deal-tran
 const app = express();
 const PgSession = connectPgSimple(session);
 const pool = new pg.Pool({ connectionString: env.DATABASE_URL });
+const SITE_URL = "https://wheretogo.az";
+
+function escapeHtml(value: string) {
+  return value.replace(/[&<>"']/g, (character) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+  })[character]!);
+}
+
+function escapeXml(value: string) {
+  return escapeHtml(value);
+}
+
+function publicImageUrl(value: string | null) {
+  if (!value || value.startsWith("data:")) return `${SITE_URL}/wheretogo-hero-wide.png`;
+  try { return new URL(value, SITE_URL).toString(); }
+  catch { return `${SITE_URL}/wheretogo-hero-wide.png`; }
+}
+
+function replaceMetadata(html: string, metadata: {
+  title: string;
+  description: string;
+  canonical: string;
+  image?: string | null;
+  type?: "website" | "restaurant";
+  robots?: "index, follow" | "noindex, nofollow";
+  structuredData?: Record<string, unknown>;
+}) {
+  const title = escapeHtml(metadata.title);
+  const description = escapeHtml(metadata.description);
+  const canonical = escapeHtml(metadata.canonical);
+  const image = escapeHtml(publicImageUrl(metadata.image ?? null));
+  const type = metadata.type ?? "website";
+  const robots = metadata.robots ?? "index, follow";
+  let output = html
+    .replace(/<title>[^<]*<\/title>/, `<title>${title}</title>`)
+    .replace(/<meta name="description" content="[^"]*" \/>/, `<meta name="description" content="${description}" />`)
+    .replace(/<meta name="robots" content="[^"]*" \/>/, `<meta name="robots" content="${robots}" />`)
+    .replace(/<link rel="canonical" href="[^"]*" \/>/, `<link rel="canonical" href="${canonical}" />`)
+    .replace(/<meta property="og:type" content="[^"]*" \/>/, `<meta property="og:type" content="${type}" />`)
+    .replace(/<meta property="og:title" content="[^"]*" \/>/, `<meta property="og:title" content="${title}" />`)
+    .replace(/<meta property="og:description" content="[^"]*" \/>/, `<meta property="og:description" content="${description}" />`)
+    .replace(/<meta property="og:url" content="[^"]*" \/>/, `<meta property="og:url" content="${canonical}" />`)
+    .replace(/<meta property="og:image" content="[^"]*" \/>/, `<meta property="og:image" content="${image}" />`)
+    .replace(/<meta name="twitter:title" content="[^"]*" \/>/, `<meta name="twitter:title" content="${title}" />`)
+    .replace(/<meta name="twitter:description" content="[^"]*" \/>/, `<meta name="twitter:description" content="${description}" />`)
+    .replace(/<meta name="twitter:image" content="[^"]*" \/>/, `<meta name="twitter:image" content="${image}" />`);
+  if (metadata.structuredData) {
+    const json = JSON.stringify(metadata.structuredData).replace(/</g, "\\u003c");
+    output = output.replace(/<script id="page-structured-data" type="application\/ld\+json">[\s\S]*?<\/script>/,
+      `<script id="page-structured-data" type="application/ld+json">${json}</script>`);
+  }
+  return output;
+}
 
 app.set("trust proxy", 1);
 app.use(helmet({
@@ -98,6 +153,66 @@ app.use("/api/places", placesRouter);
 if (env.NODE_ENV === "production") {
   const webDist = resolve(dirname(fileURLToPath(import.meta.url)), "../../web/dist");
   if (existsSync(webDist)) {
+    const indexFile = resolve(webDist, "index.html");
+    app.get("/robots.txt", (_req, res) => {
+      res.type("text/plain").send(`User-agent: *\nAllow: /\nDisallow: /admin\nDisallow: /merchant\nDisallow: /profile\nDisallow: /saved\nDisallow: /login\nDisallow: /register\nSitemap: ${SITE_URL}/sitemap.xml\n`);
+    });
+    app.get("/sitemap.xml", asyncRoute(async (_req, res) => {
+      const restaurants = await prisma.restaurant.findMany({
+        where: { isActive: true },
+        select: { id: true },
+        orderBy: { name: "asc" },
+      });
+      const urls = [SITE_URL, ...restaurants.map(({ id }) => `${SITE_URL}/venues/${encodeURIComponent(id)}`)];
+      const body = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.map((url) => `  <url><loc>${escapeXml(url)}</loc></url>`).join("\n")}\n</urlset>\n`;
+      res.setHeader("Cache-Control", "public, max-age=900");
+      res.type("application/xml").send(body);
+    }));
+    app.get("/venues/:id", asyncRoute(async (req, res) => {
+      const id = z.string().parse(req.params.id);
+      const restaurant = await prisma.restaurant.findFirst({
+        where: { id, isActive: true },
+        select: { id: true, name: true, address: true, cuisine: true, lat: true, lng: true, phone: true, photoUrl: true },
+      });
+      const baseHtml = await readFile(indexFile, "utf8");
+      if (!restaurant) {
+        res.status(404).type("html").send(replaceMetadata(baseHtml, {
+          title: "Venue not found | WhereToGo",
+          description: "This venue is not available on WhereToGo.",
+          canonical: `${SITE_URL}/venues/${encodeURIComponent(id)}`,
+          robots: "noindex, nofollow",
+        }));
+        return;
+      }
+      const canonical = `${SITE_URL}/venues/${encodeURIComponent(restaurant.id)}`;
+      const image = publicImageUrl(restaurant.photoUrl);
+      const description = `${restaurant.name} in Baku — view the menu, location and live offers on WhereToGo.`;
+      res.setHeader("Cache-Control", "public, max-age=300");
+      res.type("html").send(replaceMetadata(baseHtml, {
+        title: `${restaurant.name} — Menu, Location & Offers | WhereToGo`,
+        description,
+        canonical,
+        image,
+        type: "restaurant",
+        structuredData: {
+          "@context": "https://schema.org",
+          "@type": "Restaurant",
+          name: restaurant.name,
+          url: canonical,
+          image,
+          address: {
+            "@type": "PostalAddress",
+            streetAddress: restaurant.address,
+            addressLocality: "Baku",
+            addressCountry: "AZ",
+          },
+          geo: { "@type": "GeoCoordinates", latitude: restaurant.lat, longitude: restaurant.lng },
+          ...(restaurant.phone ? { telephone: restaurant.phone } : {}),
+          ...(restaurant.cuisine ? { servesCuisine: restaurant.cuisine } : {}),
+          hasMenu: canonical,
+        },
+      }));
+    }));
     app.get("/sw.js", (_req, res) => {
       res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
       res.sendFile(resolve(webDist, "sw.js"));
@@ -106,7 +221,16 @@ if (env.NODE_ENV === "production") {
     app.use((req, res, next) => {
       if (req.method !== "GET" || req.path.startsWith("/api/")) return next();
       res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
-      res.sendFile(resolve(webDist, "index.html"));
+      void readFile(indexFile, "utf8").then((baseHtml) => {
+        const privateRoute = /^\/(admin|merchant|profile|saved|login|register|verify-email)(\/|$)/.test(req.path);
+        const canonical = `${SITE_URL}${req.path === "/" ? "/" : req.path}`;
+        res.type("html").send(replaceMetadata(baseHtml, {
+          title: "WhereToGo — Great Food. Great Deals. Every Day.",
+          description: "Discover restaurants, menus and live food deals near you with WhereToGo.",
+          canonical,
+          robots: privateRoute ? "noindex, nofollow" : "index, follow",
+        }));
+      }).catch(next);
     });
   }
 }

@@ -69,12 +69,6 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     document.documentElement.lang = language;
     document.documentElement.dataset.language = language;
-    document.title = language === "az"
-      ? "WhereToGo — Möhtəşəm yemək. Möhtəşəm təkliflər. Hər gün."
-      : language === "ru" ? "WhereToGo — Отличная еда. Отличные предложения. Каждый день." : "WhereToGo — Great Food. Great Deals. Every Day.";
-    document.querySelector<HTMLMetaElement>('meta[name="description"]')?.setAttribute("content", language === "az"
-      ? "WhereToGo hər gün möhtəşəm yeməklər və təkliflər tapmağa kömək edir."
-      : language === "ru" ? "WhereToGo помогает каждый день находить отличную еду и выгодные предложения." : "WhereToGo helps you discover great food and great deals every day.");
     try { window.localStorage.setItem(STORAGE_KEY, language); } catch { /* Language still applies when storage is unavailable. */ }
     localizeTree(document.body, language);
 

@@ -20,6 +20,7 @@ import { Reveal } from "./components/Reveal";
 import { NavigationOptionsDialog } from "./components/NavigationOptionsDialog";
 import { ArrowLeft, Home } from "lucide-react";
 import { loadGoogleMaps } from "./lib/googleMaps";
+import { defaultMetadata, setPageMetadata } from "./lib/seo";
 
 type Category = "Restaurants" | "Bars" | "Pubs" | "Lounges";
 
@@ -686,6 +687,14 @@ function LocationPickerModal({ apiKey, detectedPosition, currentPosition, onConf
 export default function App() {
   const { pathname: path } = useLocation();
   const { user, loading } = useAuth();
+  const { language } = useLanguage();
+
+  useEffect(() => {
+    if (path.startsWith("/venues/")) return;
+    const privateRoute = path.startsWith("/admin") || path.startsWith("/merchant") || path.startsWith("/login")
+      || path.startsWith("/register") || path.startsWith("/profile") || path.startsWith("/saved") || path.startsWith("/verify-email");
+    setPageMetadata({ ...defaultMetadata(language, path), index: !privateRoute });
+  }, [language, path]);
 
   if (loading) return <main className="grid min-h-screen place-items-center bg-night text-sm text-white/60">Loading WhereToGo...</main>;
   if (user?.role === "MERCHANT" && !path.startsWith("/merchant")) return <Navigate to="/merchant" replace />;

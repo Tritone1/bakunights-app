@@ -8,6 +8,7 @@ import { DealCard } from "../components/DealCard";
 import { ErrorState, LoadingState } from "../components/States";
 import { SafeImage } from "../components/SafeImage";
 import { loadGoogleMaps } from "../lib/googleMaps";
+import { setPageMetadata } from "../lib/seo";
 import type { Deal, Restaurant } from "../types";
 
 type MenuItem = { id: string; name: string; priceAzn: string | number; description?: string | null; photoUrl?: string | null };
@@ -43,6 +44,36 @@ export function VenuePage() {
     api<ReviewsResponse>(`/restaurants/${id}/reviews?lang=${language}`).then((result) => { setReviews(result); setReviewError(""); })
       .catch((reason) => setReviewError(reason instanceof Error ? reason.message : "Google reviews are temporarily unavailable."));
   }, [id, language]);
+
+  useEffect(() => {
+    if (!data) return;
+    const venue = data.restaurant;
+    const path = `/venues/${encodeURIComponent(venue.id)}`;
+    setPageMetadata({
+      title: `${venue.name} — Menu, Location & Offers | WhereToGo`,
+      description: `${venue.name} in Baku — view the menu, location and live offers on WhereToGo.`,
+      path,
+      image: venue.photoUrl,
+      type: "restaurant",
+      structuredData: {
+        "@context": "https://schema.org",
+        "@type": "Restaurant",
+        name: venue.name,
+        url: `https://wheretogo.az${path}`,
+        image: venue.photoUrl || "https://wheretogo.az/wheretogo-hero-wide.png",
+        address: {
+          "@type": "PostalAddress",
+          streetAddress: venue.address,
+          addressLocality: "Baku",
+          addressCountry: "AZ",
+        },
+        geo: { "@type": "GeoCoordinates", latitude: venue.lat, longitude: venue.lng },
+        ...(venue.phone ? { telephone: venue.phone } : {}),
+        ...(venue.cuisine ? { servesCuisine: venue.cuisine } : {}),
+        hasMenu: `https://wheretogo.az${path}`,
+      },
+    });
+  }, [data]);
 
   function requireCustomer() {
     if (user) return true;
