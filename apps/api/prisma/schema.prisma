@@ -113,6 +113,8 @@ model Restaurant {
   name                  String
   cuisine               String
   dietaryTags           String[]            @default([]) @map("dietary_tags")
+  amenities             String[]            @default([])
+  priceLevel            Int                 @default(2) @map("price_level")
   address               String
   lat                   Float
   lng                   Float

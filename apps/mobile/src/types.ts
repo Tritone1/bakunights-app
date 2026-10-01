@@ -8,6 +8,9 @@ export type Restaurant = {
   lng: number;
   photoUrl?: string | null;
   phone?: string | null;
+  hoursJson?: { open?: string | null; close?: string | null } | null;
+  amenities?: string[];
+  priceLevel?: number;
   isVerifiedTrusted?: boolean;
   honestyRate?: number | null;
   liveDeal?: Deal | null;

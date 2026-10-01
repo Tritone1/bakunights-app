@@ -13,7 +13,7 @@ type MerchantDeal = {
   scope: OfferScope; scopeCategoryId?: string | null; offerMenuItems: { menuItemId: string; overridePriceAzn?: string | number | null; quantity?: number | null; freeQuantity?: number | null; menuItem: MenuItem }[];
   _count: { views: number; savedBy: number; redemptions: number };
 };
-type ManagedVenue = { id: string; name: string; address: string; cuisine: string; lat: number; lng: number; phone?: string | null; photoUrl: string | null; googlePlaceId?: string | null; hoursJson?: { open?: string | null; close?: string | null } | null; deals: MerchantDeal[]; _count: { followers: number } };
+type ManagedVenue = { id: string; name: string; address: string; cuisine: string; lat: number; lng: number; phone?: string | null; photoUrl: string | null; googlePlaceId?: string | null; hoursJson?: { open?: string | null; close?: string | null } | null; amenities: string[]; priceLevel: number; deals: MerchantDeal[]; _count: { followers: number } };
 type MenuCategory = { id: string; name: string; sortOrder: number; isGlobal: boolean; createdByVenueId?: string | null };
 type VenueMenuCategory = { venueId: string; categoryId: string; sortOrder: number; category: MenuCategory };
 type VenueMenuCategoryOptions = { selected: VenueMenuCategory[]; available: MenuCategory[] };

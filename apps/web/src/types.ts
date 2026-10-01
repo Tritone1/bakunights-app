@@ -16,7 +16,9 @@ export type Restaurant = {
   lng: number;
   photoUrl?: string;
   phone?: string;
-  hoursJson?: string;
+  hoursJson?: { open?: string | null; close?: string | null } | null;
+  amenities?: string[];
+  priceLevel?: number;
   isVerifiedTrusted?: boolean;
   honestyRate?: number | null;
 };

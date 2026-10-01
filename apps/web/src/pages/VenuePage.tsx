@@ -10,6 +10,7 @@ import { SafeImage } from "../components/SafeImage";
 import { loadGoogleMaps } from "../lib/googleMaps";
 import { setPageMetadata } from "../lib/seo";
 import type { Deal, Restaurant } from "../types";
+import { amenityLabel, isVenueOpenNow } from "../lib/venueAmenities";
 
 type MenuItem = { id: string; name: string; priceAzn: string | number; description?: string | null; photoUrl?: string | null };
 type MenuCategory = { id: string; name: string; sortOrder: number; items: MenuItem[] };
@@ -120,7 +121,7 @@ export function VenuePage() {
 
     <main className="mx-auto max-w-6xl px-5 py-9 sm:px-8">
       <div className="flex flex-wrap gap-3"><button onClick={() => void toggleFollow()} disabled={busy === "follow"} className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/[0.06] px-4 py-3 font-semibold hover:bg-white/10"><Heart size={18} fill={data.followed ? "currentColor" : "none"} />{data.followed ? "Following" : "Follow venue"}</button><a href={mapsUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-xl bg-cyan-300 px-4 py-3 font-bold text-[#07151a]"><Navigation size={18} />Navigate me<ExternalLink size={14} /></a></div>
-      <div className="mt-5 flex flex-wrap gap-2">{venue.dietaryTags.map((tag) => <span key={tag} className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs text-white/60">{tag}</span>)}</div>
+      <div className="mt-5 flex flex-wrap gap-2"><span className={`rounded-full border px-3 py-1.5 text-xs ${isVenueOpenNow(venue.hoursJson) ? "border-emerald-300/30 bg-emerald-300/10 text-emerald-200" : "border-white/10 bg-white/[0.04] text-white/55"}`}>{isVenueOpenNow(venue.hoursJson) ? "Open now" : "Currently closed"}</span><span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs text-white/60">{"₼".repeat(venue.priceLevel ?? 2)}</span>{(venue.amenities ?? []).map((amenity) => <span key={amenity} className="rounded-full border border-cyan-300/20 bg-cyan-300/[0.06] px-3 py-1.5 text-xs text-cyan-100">{amenityLabel(amenity)}</span>)}{venue.dietaryTags.map((tag) => <span key={tag} className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs text-white/60">{tag}</span>)}</div>
 
       <section className="mt-12"><Heading eyebrow="WhereToGo navigation" title="Venue location" /><VenueLocationMap venue={venue} mapsUrl={mapsUrl} /></section>
 

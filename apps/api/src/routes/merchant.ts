@@ -13,6 +13,7 @@ import { rescheduleDealWindow } from "../lib/deal-schedule.js";
 
 export const merchantRouter = Router();
 const venueType = z.enum(["Restaurant", "Pub", "Bar", "Lounge", "Cafe"]);
+const venueAmenity = z.enum(["SHISHA", "VIP_ROOM", "OUTDOOR_SEATING", "ROOFTOP", "LIVE_MUSIC", "SPORTS_SCREENS", "KARAOKE", "PARKING"]);
 const menuUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 const imageValue = z.string().trim().max(3_000_000).refine((value) => /^https?:\/\//i.test(value) || /^data:image\/(jpeg|png|webp);base64,/i.test(value), "Use an image URL or uploaded JPG, PNG, or WebP image");
 const venueImageValue = z.string().trim().max(3_000_000).refine((value) => /^https?:\/\//i.test(value) || /^data:image\/(jpeg|png|webp);base64,/i.test(value) || /^\/api\/restaurants\/[a-z0-9_-]+\/photo$/i.test(value), "Use an uploaded JPG, PNG, or WebP image");
@@ -244,6 +245,8 @@ const venueProfileInput = z.object({
   lng: z.coerce.number().min(-180).max(180),
   photoUrl: venueImageValue.nullable(),
   hoursJson: openingHoursInput,
+  amenities: z.array(venueAmenity).max(8).optional(),
+  priceLevel: z.coerce.number().int().min(1).max(3).optional(),
 });
 
 async function assertOwner(userId: string, restaurantId: string) {
@@ -375,7 +378,7 @@ merchantRouter.patch("/venues/:venueId/profile", asyncRoute(async (req, res) => 
     prisma.restaurant.update({
       where: { id: venueId },
       data: { ...profileFields, photoUrl, hoursJson: hoursJson === undefined ? undefined : (hoursJson ?? Prisma.DbNull) },
-      select: { id: true, name: true, cuisine: true, address: true, phone: true, lat: true, lng: true, photoUrl: true, hoursJson: true },
+      select: { id: true, name: true, cuisine: true, address: true, phone: true, lat: true, lng: true, photoUrl: true, hoursJson: true, amenities: true, priceLevel: true },
     }),
     prisma.user.update({ where: { id: req.user!.id }, data: { merchantVenueType: input.cuisine } }),
   ]);

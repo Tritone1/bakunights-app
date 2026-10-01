@@ -116,7 +116,7 @@ restaurantsRouter.get("/", asyncRoute(async (req, res) => {
       ] } : {}),
     },
     select: {
-      id: true, name: true, address: true, cuisine: true, dietaryTags: true,
+      id: true, name: true, address: true, cuisine: true, dietaryTags: true, amenities: true, priceLevel: true, hoursJson: true,
       lat: true, lng: true, phone: true, photoUrl: true, rating: true,
       isVerifiedTrusted: true, honestyRate: true,
       deals: {
@@ -148,6 +148,8 @@ restaurantsRouter.get("/:id", asyncRoute(async (req, res) => {
       name: true,
       cuisine: true,
       dietaryTags: true,
+      amenities: true,
+      priceLevel: true,
       address: true,
       lat: true,
       lng: true,

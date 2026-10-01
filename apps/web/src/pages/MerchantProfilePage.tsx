@@ -5,6 +5,7 @@ import { useAuth } from "../context/AuthContext";
 import { api } from "../lib/api";
 import { SafeImage } from "../components/SafeImage";
 import { normalizeVenueType, VENUE_TYPES } from "../lib/venueTypes";
+import { VENUE_AMENITIES } from "../lib/venueAmenities";
 
 export type MerchantProfileVenue = {
   id: string;
@@ -16,6 +17,8 @@ export type MerchantProfileVenue = {
   phone?: string | null;
   photoUrl: string | null;
   hoursJson?: { open?: string | null; close?: string | null } | null;
+  amenities: string[];
+  priceLevel: number;
 };
 
 type AccountProfile = {
@@ -189,6 +192,8 @@ function VenueProfileForm({ venue, busy, setBusy, onSaved, onError }: { venue: M
           lng: Number(form.get("lng")),
           photoUrl,
           hoursJson: openTime && closeTime ? { open: openTime, close: closeTime } : null,
+          amenities: form.getAll("amenities").map(String),
+          priceLevel: Number(form.get("priceLevel")),
         }),
       });
       await onSaved();
@@ -218,6 +223,8 @@ function VenueProfileForm({ venue, busy, setBusy, onSaved, onError }: { venue: M
       <label><span className="form-label">Opening time</span><input name="openTime" type="time" defaultValue={venue.hoursJson?.open ?? ""} className="form-field" /></label>
       <label><span className="form-label">Closing time</span><input name="closeTime" type="time" defaultValue={venue.hoursJson?.close ?? ""} className="form-field" /></label>
       <p className="text-xs text-white/40 md:col-span-2">Set your daily opening hours so breakfast offers only run once you're actually open.</p>
+      <label className="md:col-span-2"><span className="form-label">Price level</span><select name="priceLevel" className="form-field" defaultValue={venue.priceLevel ?? 2}><option value="1">₼ · Budget-friendly</option><option value="2">₼₼ · Mid-range</option><option value="3">₼₼₼ · Premium</option></select></label>
+      <fieldset className="md:col-span-2"><legend className="form-label">Facilities and experiences</legend><p className="mt-1 text-xs text-white/40">Select everything customers can reliably expect at this venue.</p><div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">{VENUE_AMENITIES.map((amenity) => <label key={amenity.value} className="flex cursor-pointer items-center gap-3 rounded-xl border border-white/10 bg-black/10 p-3 text-sm text-white/75 transition hover:border-gold/30"><input name="amenities" type="checkbox" value={amenity.value} defaultChecked={(venue.amenities ?? []).includes(amenity.value)} className="h-4 w-4 accent-amber-500" /><span>{amenity.label}</span></label>)}</div></fieldset>
       <label className="md:col-span-2"><span className="form-label">Venue image</span><div className="mt-1 flex flex-col gap-3 rounded-xl border border-white/10 bg-black/10 p-3 sm:flex-row sm:items-center">{photoUrl ? <SafeImage src={photoUrl} alt={`${venue.name} preview`} className="h-24 w-28 rounded-lg object-cover" /> : <span className="grid h-24 w-28 place-items-center rounded-lg bg-white/5 text-white/30"><ImagePlus size={25} /></span>}<div className="flex flex-wrap gap-2"><label className="cursor-pointer rounded-lg border border-white/15 px-3 py-2 text-sm font-bold hover:bg-white/10"><input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" onChange={(event) => void chooseImage(event.target.files?.[0])} />Choose image</label>{photoUrl && <button type="button" onClick={() => setPhotoUrl(null)} className="rounded-lg border border-red-400/20 px-3 py-2 text-sm font-bold text-red-300">Remove</button>}<p className="w-full text-xs text-white/35">JPG, PNG, or WebP up to 2 MB.</p></div></div></label>
       <button disabled={Boolean(busy)} className="panel-button justify-center md:col-span-2"><Save size={17} />{busy === busyKey ? "Saving venue..." : "Save venue profile"}</button>
     </div>

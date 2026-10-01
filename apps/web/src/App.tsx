@@ -21,8 +21,9 @@ import { NavigationOptionsDialog } from "./components/NavigationOptionsDialog";
 import { ArrowLeft, Home } from "lucide-react";
 import { loadGoogleMaps } from "./lib/googleMaps";
 import { defaultMetadata, setPageMetadata } from "./lib/seo";
+import { amenityLabel, isVenueOpenNow, VENUE_AMENITIES } from "./lib/venueAmenities";
 
-type Category = "Restaurants" | "Bars" | "Pubs" | "Lounges";
+type Category = "Restaurants" | "Cafes" | "Bars" | "Pubs" | "Lounges";
 
 type Venue = {
   id: string;
@@ -41,12 +42,17 @@ type Venue = {
   lat: number;
   lng: number;
   priceRange: string;
+  priceLevel: number;
+  amenities: string[];
+  hoursJson?: { open?: string | null; close?: string | null } | null;
+  hasLiveDeal: boolean;
   image: string;
 };
 
 type HomepageRestaurant = {
   id: string; name: string; address: string; cuisine: string; dietaryTags: string[];
   lat: number; lng: number; phone?: string | null; photoUrl?: string | null; rating: number;
+  amenities: string[]; priceLevel: number; hoursJson?: { open?: string | null; close?: string | null } | null;
   liveDeal?: Deal | null;
 };
 
@@ -76,7 +82,7 @@ const IMAGES = {
   lounge: "https://images.unsplash.com/photo-1615887584283-91f1be7fdc34?w=600&h=400&fit=crop",
 };
 
-const CATEGORIES = ["All", "Restaurants", "Bars", "Pubs", "Lounges"] as const;
+const CATEGORIES = ["All", "Restaurants", "Cafes", "Bars", "Pubs", "Lounges"] as const;
 type CategoryFilter = (typeof CATEGORIES)[number];
 
 function venueCategory(cuisine: string): Category {
@@ -84,6 +90,7 @@ function venueCategory(cuisine: string): Category {
   if (value.includes("lounge")) return "Lounges";
   if (value.includes("pub")) return "Pubs";
   if (value.includes("bar")) return "Bars";
+  if (value.includes("cafe") || value.includes("café")) return "Cafes";
   return "Restaurants";
 }
 
@@ -111,10 +118,14 @@ function toVenue(restaurant: HomepageRestaurant, origin: UserPosition | null): V
     dealTag: deal?.tag?.toUpperCase() ?? "VENUE",
     dealColor: category === "Bars" ? "#ec4899" : category === "Pubs" ? "#10b981" : category === "Lounges" ? "#8b5cf6" : "#f59e0b",
     open: endTime ? `Offer ends ${endTime}` : "No current offer",
-    tags: [restaurant.cuisine, ...(restaurant.dietaryTags ?? [])].filter(Boolean).slice(0, 4),
+    tags: [restaurant.cuisine, ...(restaurant.amenities ?? []).map(amenityLabel), ...(restaurant.dietaryTags ?? [])].filter(Boolean).slice(0, 4),
     lat: restaurant.lat,
     lng: restaurant.lng,
-    priceRange: "",
+    priceRange: "₼".repeat(restaurant.priceLevel ?? 2),
+    priceLevel: restaurant.priceLevel ?? 2,
+    amenities: restaurant.amenities ?? [],
+    hoursJson: restaurant.hoursJson,
+    hasLiveDeal: Boolean(deal),
     image: restaurant.photoUrl || deal?.photoUrl || fallbackImage(category),
   };
 }
@@ -271,6 +282,13 @@ function VenueDirectory({ venues, query, setQuery, onNavigate, origin }: { venue
   const { language } = useLanguage();
   const navigate = useNavigate();
   const [category, setCategory] = useState<CategoryFilter>("All");
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [openNowOnly, setOpenNowOnly] = useState(false);
+  const [liveOfferOnly, setLiveOfferOnly] = useState(false);
+  const [selectedAmenities, setSelectedAmenities] = useState<string[]>([]);
+  const [maxDistanceKm, setMaxDistanceKm] = useState(0);
+  const [minimumRating, setMinimumRating] = useState(0);
+  const [priceLevel, setPriceLevel] = useState(0);
   const [saved, setSaved] = useState<Set<string>>(new Set());
   const [saveNotice, setSaveNotice] = useState("");
   useEffect(() => {
@@ -280,10 +298,24 @@ function VenueDirectory({ venues, query, setQuery, onNavigate, origin }: { venue
   const filtered = useMemo(() => {
     const search = query.trim().toLowerCase();
     return venues
-      .filter((venue) => (category === "All" || venue.category === category) && (!search || [venue.name, venue.category, venue.address, venue.deal, ...venue.tags].join(" ").toLowerCase().includes(search)))
+      .filter((venue) => (category === "All" || venue.category === category)
+        && (!search || [venue.name, venue.category, venue.address, venue.deal, ...venue.tags, ...venue.amenities.map(amenityLabel)].join(" ").toLowerCase().includes(search))
+        && (!openNowOnly || isVenueOpenNow(venue.hoursJson))
+        && (!liveOfferOnly || venue.hasLiveDeal)
+        && (!minimumRating || venue.rating >= minimumRating)
+        && (!priceLevel || venue.priceLevel === priceLevel)
+        && (!maxDistanceKm || !origin || distanceKm(origin, venue) <= maxDistanceKm)
+        && selectedAmenities.every((amenity) => venue.amenities.includes(amenity)))
       .map((venue) => origin ? { ...venue, distance: `${distanceKm(origin, venue).toFixed(1)} km` } : venue)
       .sort((a, b) => origin ? distanceKm(origin, a) - distanceKm(origin, b) : a.name.localeCompare(b.name));
-  }, [category, origin, query, venues]);
+  }, [category, liveOfferOnly, maxDistanceKm, minimumRating, openNowOnly, origin, priceLevel, query, selectedAmenities, venues]);
+  const activeFilterCount = Number(openNowOnly) + Number(liveOfferOnly) + Number(Boolean(maxDistanceKm)) + Number(Boolean(minimumRating)) + Number(Boolean(priceLevel)) + selectedAmenities.length;
+  function toggleAmenity(amenity: string) {
+    setSelectedAmenities((current) => current.includes(amenity) ? current.filter((value) => value !== amenity) : [...current, amenity]);
+  }
+  function clearFilters() {
+    setOpenNowOnly(false); setLiveOfferOnly(false); setSelectedAmenities([]); setMaxDistanceKm(0); setMinimumRating(0); setPriceLevel(0);
+  }
   async function toggleSaved(dealId: string) {
     if (!user) { navigate("/login/customer?next=/"); return; }
     const wasSaved = saved.has(dealId);
@@ -297,9 +329,18 @@ function VenueDirectory({ venues, query, setQuery, onNavigate, origin }: { venue
     <SectionHeading eyebrow="Curated for tonight" title="Find your next stop" action={<span className="hidden text-xs text-muted sm:block">{filtered.length} venues</span>} />
     <SearchBox value={query} onChange={setQuery} mobile />
     {saveNotice && <p className="mb-3 rounded-xl border border-red-400/25 bg-red-500/10 p-3 text-sm text-red-100">{saveNotice}</p>}
-    <div className="no-scrollbar mt-5 flex gap-2 overflow-x-auto pb-2 lg:mt-0">{CATEGORIES.map((item) => <button key={item} onClick={() => setCategory(item)} className={`shrink-0 rounded-full border px-4 py-2 text-xs font-semibold transition ${category === item ? "border-gold bg-gold text-night" : "border-white/[0.08] bg-white/[0.035] text-muted hover:border-white/20 hover:text-white"}`}>{item}</button>)}</div>
+    <div className="mt-5 flex flex-wrap items-center gap-2 lg:mt-0"><div className="no-scrollbar flex flex-1 gap-2 overflow-x-auto pb-2">{CATEGORIES.map((item) => <button key={item} onClick={() => setCategory(item)} className={`shrink-0 rounded-full border px-4 py-2 text-xs font-semibold transition ${category === item ? "border-gold bg-gold text-night" : "border-white/[0.08] bg-white/[0.035] text-muted hover:border-white/20 hover:text-white"}`}>{item}</button>)}</div><button type="button" onClick={() => setFiltersOpen((value) => !value)} className={`shrink-0 rounded-full border px-4 py-2 text-xs font-bold transition ${filtersOpen || activeFilterCount ? "border-cyan-300/50 bg-cyan-300/10 text-cyan-200" : "border-white/10 text-white/65"}`}>Filters{activeFilterCount ? ` · ${activeFilterCount}` : ""}</button></div>
+    {filtersOpen && <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.035] p-4 sm:p-5"><div className="flex items-center justify-between"><div><p className="text-xs font-bold uppercase tracking-[.18em] text-gold">Refine venues</p><p className="mt-1 text-sm text-white/45">Selected facilities must all be available.</p></div>{activeFilterCount > 0 && <button type="button" onClick={clearFilters} className="text-xs font-bold text-cyan-300">Clear all</button>}</div><div className="mt-4 flex flex-wrap gap-2"><FilterChip active={openNowOnly} onClick={() => setOpenNowOnly((value) => !value)}>Open now</FilterChip><FilterChip active={liveOfferOnly} onClick={() => setLiveOfferOnly((value) => !value)}>Live offer</FilterChip>{VENUE_AMENITIES.map((amenity) => <FilterChip key={amenity.value} active={selectedAmenities.includes(amenity.value)} onClick={() => toggleAmenity(amenity.value)}>{amenity.label}</FilterChip>)}</div><div className="mt-4 grid gap-3 sm:grid-cols-3"><FilterSelect label="Distance" value={maxDistanceKm} onChange={setMaxDistanceKm} disabled={!origin} options={[{ value: 0, label: origin ? "Any distance" : "Enable location" }, { value: 1, label: "Within 1 km" }, { value: 3, label: "Within 3 km" }, { value: 5, label: "Within 5 km" }, { value: 10, label: "Within 10 km" }]} /><FilterSelect label="Rating" value={minimumRating} onChange={setMinimumRating} options={[{ value: 0, label: "Any rating" }, { value: 3, label: "3.0+" }, { value: 4, label: "4.0+" }, { value: 4.5, label: "4.5+" }]} /><FilterSelect label="Price" value={priceLevel} onChange={setPriceLevel} options={[{ value: 0, label: "Any price" }, { value: 1, label: "₼ · Budget" }, { value: 2, label: "₼₼ · Mid-range" }, { value: 3, label: "₼₼₼ · Premium" }]} /></div></div>}
     {filtered.length ? <div className="mt-7 grid gap-5 md:grid-cols-2 xl:grid-cols-3">{filtered.map((venue, index) => <Reveal key={venue.id} delay={Math.min(index, 5) * 100} className="h-full"><VenueCard venue={venue} saved={Boolean(venue.dealId && saved.has(venue.dealId))} onToggleSave={venue.dealId ? () => void toggleSaved(venue.dealId!) : undefined} onNavigate={() => onNavigate(venue)} /></Reveal>)}</div> : <div className="mt-8 grid min-h-64 place-items-center rounded-2xl border border-dashed border-white/10 bg-card/50 text-center"><div><Icon name="search" size={30} className="mx-auto text-gold" /><h3 className="mt-3 font-display text-2xl text-white">No venues found</h3><p className="mt-1 text-sm text-muted">No active venue matches this search yet.</p></div></div>}
   </section>;
+}
+
+function FilterChip({ active, onClick, children }: { active: boolean; onClick: () => void; children: ReactNode }) {
+  return <button type="button" onClick={onClick} aria-pressed={active} className={`rounded-full border px-3.5 py-2 text-xs font-semibold transition ${active ? "border-gold bg-gold text-night" : "border-white/10 bg-black/10 text-white/65 hover:border-white/25"}`}>{children}</button>;
+}
+
+function FilterSelect({ label, value, onChange, options, disabled = false }: { label: string; value: number; onChange: (value: number) => void; options: { value: number; label: string }[]; disabled?: boolean }) {
+  return <label><span className="mb-1.5 block text-[10px] font-bold uppercase tracking-[.15em] text-white/40">{label}</span><select value={value} disabled={disabled} onChange={(event) => onChange(Number(event.target.value))} className="form-field disabled:opacity-45">{options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>;
 }
 
 function mapEmbed(venue: Venue) {
