@@ -65,7 +65,7 @@ export default function OfferDetailScreen() {
           setData((current) => current?.redemption?.id === redemptionId
             ? { ...current, redemption: { ...current.redemption, redeemedAt: result.redemption!.redeemedAt } }
             : current);
-          setNotice("Visit confirmed by the merchant. Your reward spin is now unlocked.");
+          setNotice("Visit confirmed. You can use one spin today if you have not already spun.");
         }
       } catch {
         // Keep the QR visible and retry after temporary connection failures.
@@ -136,7 +136,7 @@ export default function OfferDetailScreen() {
   }
 
   async function claim() {
-    if (!data || !requireCustomer() || data.redemption) return;
+    if (!data || !requireCustomer() || (data.redemption && !data.redemption.redeemedAt)) return;
     setBusy("claim");
     try {
       const result = await api<{ redemption: Redemption }>(`/deals/${data.deal.id}/claim`, { method: "POST" });
@@ -189,8 +189,8 @@ export default function OfferDetailScreen() {
     <View style={styles.proof}><View style={[styles.proofIcon, data.redemption?.redeemedAt && styles.proofIconConfirmed]}><Ionicons name={data.redemption?.redeemedAt ? "checkmark" : "qr-code"} size={25} color={data.redemption?.redeemedAt ? palette.green : palette.gold} /></View><Text style={styles.proofLabel}>YOUR PROOF</Text><Text style={styles.proofTitle}>{data.redemption?.redeemedAt ? "Visit Confirmed" : data.redemption ? "Show this QR" : "Claim Offer"}</Text>
       {data.redemption?.qrDataUrl && <Image source={{ uri: data.redemption.qrDataUrl }} style={styles.qr} />}
       {data.redemption && <Text selectable style={styles.code}>{data.redemption.redemptionCode}</Text>}
-      {!data.redemption && <Pressable onPress={() => void claim()} disabled={busy === "claim"} style={styles.primary}><Text style={styles.primaryText}>{busy === "claim" ? "Creating QR…" : "Claim offer & create QR"}</Text></Pressable>}
-      <Text style={styles.proofHelp}>{data.redemption ? "The merchant scans this QR to verify your visit—no manual typing needed." : "Claiming creates a unique QR that the merchant scans at the venue."}</Text>
+      {(!data.redemption || data.redemption.redeemedAt) && <Pressable onPress={() => void claim()} disabled={busy === "claim"} style={styles.primary}><Text style={styles.primaryText}>{busy === "claim" ? "Creating QR…" : data.redemption?.redeemedAt ? "Claim this deal again" : "Claim offer & create QR"}</Text></Pressable>}
+      <Text style={styles.proofHelp}>{data.redemption?.redeemedAt ? "You can reuse this deal. Extra claims do not add another daily spin or carry over to another day." : data.redemption ? "The merchant scans this QR to verify your visit—no manual typing needed." : "Claiming creates a unique QR that the merchant scans at the venue."}</Text>
     </View>
 
     <View style={styles.rate}><Text style={styles.eyebrow}>RATE THIS OFFER</Text><Text style={styles.sectionTitle}>Was this offer worth it?</Text><View style={styles.ratingRow}>{[1, 2, 3, 4, 5].map((value) => <Pressable key={value} onPress={() => setRating(value)} hitSlop={6}><Ionicons name={value <= rating ? "star" : "star-outline"} size={34} color={palette.gold} /></Pressable>)}{rating > 0 && <Pressable onPress={() => void submitRating()} disabled={busy === "rating"} style={styles.submit}><Text style={styles.submitText}>{busy === "rating" ? "Saving…" : "Submit"}</Text></Pressable>}</View></View>

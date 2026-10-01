@@ -10,6 +10,7 @@ import { persistImage } from "../lib/image-storage.js";
 import { syncDealTranslationsBestEffort } from "../lib/deal-translation.js";
 import { FLASH_DEAL_MAX_DURATION_MS, flashDealValidationError } from "../lib/flash-deal.js";
 import { rescheduleDealWindow } from "../lib/deal-schedule.js";
+import { bakuDate, bakuDayRange } from "../lib/baku-date.js";
 
 export const merchantRouter = Router();
 const venueType = z.enum(["Restaurant", "Pub", "Bar", "Lounge", "Cafe"]);
@@ -814,8 +815,21 @@ merchantRouter.post("/redemptions/redeem", asyncRoute(async (req, res) => {
   if (!redemption) throw new HttpError(404, "Redemption code not found.");
   await assertOwner(req.user!.id, redemption.deal.restaurantId);
   if (redemption.redeemedAt) throw new HttpError(409, "This code has already been redeemed.");
+  const now = new Date();
+  const todayRange = bakuDayRange(now);
+  const [todaysSpinClaim, priorVerifiedVisitToday] = await Promise.all([
+    prisma.dailySpinClaim.findUnique({
+      where: { userId_spinDate: { userId: redemption.userId, spinDate: bakuDate(now) } },
+      select: { id: true },
+    }),
+    prisma.redemption.findFirst({
+      where: { userId: redemption.userId, redeemedAt: { gte: todayRange.start, lt: todayRange.end } },
+      select: { id: true },
+    }),
+  ]);
   const updated = await prisma.redemption.update({
-    where: { id: redemption.id }, data: { redeemedAt: new Date() },
+    where: { id: redemption.id }, data: { redeemedAt: now },
   });
-  res.json({ kind: "DEAL", spinUnlocked: true, redemption: { ...updated, deal: redemption.deal, user: redemption.user } });
+  const spinStatus = todaysSpinClaim ? "USED_TODAY" : priorVerifiedVisitToday ? "ALREADY_AVAILABLE" : "UNLOCKED";
+  res.json({ kind: "DEAL", spinUnlocked: spinStatus === "UNLOCKED", spinStatus, redemption: { ...updated, deal: redemption.deal, user: redemption.user } });
 }));

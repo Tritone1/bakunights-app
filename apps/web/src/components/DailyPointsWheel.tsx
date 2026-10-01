@@ -124,7 +124,7 @@ export function DailyPointsWheel() {
       <div>
         <p className="mb-2 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[.24em] text-cyan-300"><Sparkles size={14} />Verified visit rewards</p>
         <h2 className="font-display text-4xl font-semibold text-white sm:text-5xl">Spin. Earn. Save.</h2>
-        <p className="mt-4 max-w-xl text-sm leading-6 text-white/55">Visit a participating venue and show your in-app QR code. After the merchant verifies your visit, one spin unlocks. You can use a maximum of one spin per day to collect points toward a reward.</p>
+        <p className="mt-4 max-w-xl text-sm leading-6 text-white/55">Have at least one deal verified today to unlock today's spin. You can spin only once per calendar day; extra verified deals do not add spins and never carry over to another day.</p>
         <div className="mt-5 flex flex-wrap gap-2 text-[10px] font-black uppercase tracking-[.14em]"><span className="rounded-full border border-cyan-300/25 bg-cyan-300/10 px-3 py-1.5 text-cyan-200">1 · Visit venue</span><span className="rounded-full border border-orange-300/25 bg-orange-300/10 px-3 py-1.5 text-orange-200">2 · Show your QR</span><span className="rounded-full border border-gold/25 bg-gold/10 px-3 py-1.5 text-amber-200">3 · Merchant verifies</span><span className="rounded-full border border-emerald-300/25 bg-emerald-300/10 px-3 py-1.5 text-emerald-200">4 · Spin for points</span></div>
 
         {!user ? <div className="mt-7 rounded-2xl border border-gold/25 bg-gold/10 p-5"><p className="flex items-center gap-2 font-bold text-amber-100"><LockKeyhole size={18} />Log in to start collecting points</p><p className="mt-1 text-sm text-white/50">Your verified visits, spins, and balance are saved to your customer account.</p><Link to="/login/customer?next=/" className="mt-4 inline-flex rounded-full bg-gold px-5 py-2.5 text-sm font-black text-night">Customer login</Link></div> : <>
@@ -134,7 +134,7 @@ export function DailyPointsWheel() {
             <div className="mt-2 flex justify-between text-[10px] font-bold uppercase tracking-wider text-white/30"><span>0</span><span>500-point reward</span></div>
           </div>
 
-          <button type="button" onClick={() => void spin()} disabled={spinning || loading || !status?.canSpin} className="mt-5 inline-flex items-center gap-2 rounded-full bg-gold px-6 py-3 text-sm font-black text-night transition hover:bg-amber-300 disabled:cursor-not-allowed disabled:opacity-45"><Coins size={19} />{spinning ? "Spinning..." : loading ? "Loading points..." : status?.canSpin ? "Spin today" : status?.hasSpunToday ? "Today's spin used — come back tomorrow" : "Verify an in-store visit to unlock"}</button>
+          <button type="button" onClick={() => void spin()} disabled={spinning || loading || !status?.canSpin} className="mt-5 inline-flex items-center gap-2 rounded-full bg-gold px-6 py-3 text-sm font-black text-night transition hover:bg-amber-300 disabled:cursor-not-allowed disabled:opacity-45"><Coins size={19} />{spinning ? "Spinning..." : loading ? "Loading points..." : status?.canSpin ? "Spin today" : status?.hasSpunToday ? "Today's spin used — come back tomorrow" : "Verify one deal today to unlock"}</button>
         </>}
 
         {error && <p className="mt-4 rounded-xl border border-red-400/25 bg-red-500/10 p-3 text-sm text-red-100">{error}</p>}

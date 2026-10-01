@@ -1,5 +1,4 @@
 import { Ionicons } from "@expo/vector-icons";
-import { CameraView, useCameraPermissions } from "expo-camera";
 import * as Location from "expo-location";
 import { useRouter } from "expo-router";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
@@ -22,7 +21,7 @@ import { useAuth } from "@/src/AuthContext";
 import { useLanguage } from "@/src/LanguageContext";
 import { LocalizedText as Text, LocalizedTextInput as TextInput } from "@/src/LocalizedText";
 import { displayFont, palette } from "@/src/theme";
-import type { Deal, Restaurant } from "@/src/types";
+import type { Deal } from "@/src/types";
 
 type Preferences = {
   radius: number;
@@ -86,7 +85,6 @@ export default function AccountScreen() {
   const { language, cycleLanguage, translate } = useLanguage();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [saved, setSaved] = useState<Deal[]>([]);
-  const [venues, setVenues] = useState<Restaurant[]>([]);
   const [enrollment, setEnrollment] = useState<Enrollment | null>(null);
   const [openSection, setOpenSection] = useState<SectionKey | null>(null);
   const [busy, setBusy] = useState("");
@@ -113,11 +111,6 @@ export default function AccountScreen() {
   const [showDelete, setShowDelete] = useState(false);
   const [deletePassword, setDeletePassword] = useState("");
   const [deleteOwnedVenues, setDeleteOwnedVenues] = useState(false);
-
-  const [code, setCode] = useState("");
-  const [venueId, setVenueId] = useState("");
-  const [billAmount, setBillAmount] = useState("");
-  const [scanning, setScanning] = useState(false);
 
   const showMessage = useCallback((message: string, isError = false) => {
     setNotice(isError ? "" : message);
@@ -159,13 +152,6 @@ export default function AccountScreen() {
           setContactEmail(value.contactEmail);
           setProofNotes(value.proofNotes);
         }
-      }));
-    }
-    if (user.role === "MERCHANT") {
-      requests.push(api<{ restaurants: Restaurant[] }>("/merchant/dashboard").then(({ restaurants }) => {
-        if (!active) return;
-        setVenues(restaurants);
-        setVenueId((value) => value || restaurants[0]?.id || "");
       }));
     }
     Promise.all(requests).catch((reason) => active && showMessage(reason instanceof Error ? reason.message : "Account details could not load.", true));
@@ -257,22 +243,6 @@ export default function AccountScreen() {
     finally { setBusy(""); }
   }
 
-  async function verify(value = code) {
-    const normalized = value.trim().toUpperCase();
-    if (!normalized) return;
-    setBusy("verify"); setError(""); setNotice("");
-    try {
-      const reward = normalized.startsWith("PTS-");
-      const result = await api<{ kind: "DEAL" | "POINT_REWARD"; redemption?: { user?: { name?: string } }; reward?: { discountAmountAzn: number } }>("/merchant/redemptions/redeem", {
-        method: "POST",
-        body: JSON.stringify({ code: normalized, venueId: reward ? venueId : undefined, billAmountAzn: reward ? Number(billAmount) : undefined }),
-      });
-      showMessage(result.kind === "DEAL" ? `Visit verified${result.redemption?.user?.name ? ` for ${result.redemption.user.name}` : ""}. One reward spin is now unlocked.` : `Reward verified. Apply ${result.reward?.discountAmountAzn ?? 0} AZN discount.`);
-      setCode(""); setBillAmount(""); setScanning(false);
-    } catch (reason) { showMessage(reason instanceof Error ? reason.message : "This QR/code could not be verified.", true); }
-    finally { setBusy(""); }
-  }
-
   if (authLoading) return <SafeAreaView style={styles.center}><ActivityIndicator color={palette.gold} /></SafeAreaView>;
   if (!user) return <GuestAccount onCustomer={() => router.push("/login/customer" as never)} onMerchant={() => router.push("/login/merchant" as never)} />;
 
@@ -295,7 +265,6 @@ export default function AccountScreen() {
           <SavedOffers deals={saved} onOpen={(id) => router.push({ pathname: "/deals/[id]", params: { id } } as never)} />
         </>}
 
-        {user.role === "MERCHANT" && <MerchantScannerCard venues={venues} venueId={venueId} setVenueId={setVenueId} code={code} setCode={setCode} billAmount={billAmount} setBillAmount={setBillAmount} busy={busy === "verify"} onScan={() => setScanning(true)} onVerify={() => void verify()} />}
         {user.role === "ADMIN" && <View style={styles.panel}><Text style={styles.eyebrow}>WHERETOGO OPERATIONS</Text><Text style={styles.panelTitle}>Admin account</Text><Text style={styles.body}>Use the web dashboard for the full moderation workspace.</Text></View>}
 
         <Text style={styles.groupLabel}>ACCOUNT SETTINGS</Text>
@@ -347,7 +316,6 @@ export default function AccountScreen() {
         <Pressable onPress={() => setShowDelete(true)} style={[styles.actionRow, styles.dangerRow]}><View style={[styles.actionIcon, styles.dangerIcon]}><Ionicons name="trash-outline" size={19} color="#f87171" /></View><View style={styles.actionCopy}><Text style={styles.dangerTitle}>Delete account</Text><Text style={styles.actionDetail}>Permanently remove your account and data</Text></View><Ionicons name="chevron-forward" size={18} color="#f87171" /></Pressable>
       </ScrollView>
     </KeyboardAvoidingView>
-    <Scanner visible={scanning} onClose={() => setScanning(false)} onScan={(value) => { setCode(value); setScanning(false); if (!value.trim().toUpperCase().startsWith("PTS-")) void verify(value); }} />
     <DeleteAccountModal visible={showDelete} password={deletePassword} setPassword={setDeletePassword} merchant={user.role === "MERCHANT"} deleteOwnedVenues={deleteOwnedVenues} setDeleteOwnedVenues={setDeleteOwnedVenues} busy={busy === "delete"} onClose={() => { setShowDelete(false); setDeletePassword(""); }} onDelete={() => void deleteAccount()} />
   </SafeAreaView>;
 }
@@ -385,18 +353,8 @@ function EnrollmentStatus({ enrollment }: { enrollment: Enrollment }) {
   return <View style={[styles.statusBox, rejected && styles.statusRejected]}><View style={styles.statusHeading}><Ionicons name={rejected ? "alert-circle" : enrollment.status === "approved" ? "checkmark-circle" : "time"} size={18} color={rejected ? "#fca5a5" : enrollment.status === "approved" ? "#6ee7b7" : palette.gold} /><Text style={styles.statusTitle}>Application {enrollment.status}</Text></View><Text style={styles.statusDetail}>{enrollment.venueName} · {enrollment.venueAddress}</Text>{enrollment.reviewNotes ? <Text style={styles.reviewNote}>Admin note: {enrollment.reviewNotes}</Text> : null}</View>;
 }
 
-function MerchantScannerCard({ venues, venueId, setVenueId, code, setCode, billAmount, setBillAmount, busy, onScan, onVerify }: { venues: Restaurant[]; venueId: string; setVenueId: (value: string) => void; code: string; setCode: (value: string) => void; billAmount: string; setBillAmount: (value: string) => void; busy: boolean; onScan: () => void; onVerify: () => void }) {
-  return <View style={styles.panel}><Text style={styles.eyebrow}>CUSTOMER PROOF</Text><Text style={styles.panelTitle}>Verify QR or reward</Text><Text style={styles.body}>Scan the customer&apos;s QR. Manual entry remains available below.</Text><PrimaryButton label="Scan customer QR" icon="camera" onPress={onScan} />{venues.length > 1 && <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.venuePills}>{venues.map((venue) => <Pressable key={venue.id} onPress={() => setVenueId(venue.id)} style={[styles.choice, venueId === venue.id && styles.choiceActive]}><Text style={[styles.choiceText, venueId === venue.id && styles.choiceTextActive]}>{venue.name}</Text></Pressable>)}</ScrollView>}<Field label="QR OR CODE" value={code} onChangeText={setCode} autoCapitalize="characters" placeholder="GS-... or PTS-..." />{code.trim().toUpperCase().startsWith("PTS-") && <Field label="BILL AMOUNT (AZN)" value={billAmount} onChangeText={setBillAmount} keyboardType="decimal-pad" placeholder="0.00" />}<PrimaryButton label={busy ? "Verifying..." : "Verify code"} disabled={busy || code.trim().length < 4} onPress={onVerify} /></View>;
-}
-
 function DeleteAccountModal({ visible, password, setPassword, merchant, deleteOwnedVenues, setDeleteOwnedVenues, busy, onClose, onDelete }: { visible: boolean; password: string; setPassword: (value: string) => void; merchant: boolean; deleteOwnedVenues: boolean; setDeleteOwnedVenues: (value: boolean) => void; busy: boolean; onClose: () => void; onDelete: () => void }) {
   return <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}><KeyboardAvoidingView style={styles.modalBackdrop} behavior={Platform.OS === "ios" ? "padding" : undefined}><View style={styles.deleteModal}><View style={styles.deleteBadge}><Ionicons name="trash-outline" size={23} color="#f87171" /></View><Text style={styles.deleteTitle}>Delete your account?</Text><Text style={styles.deleteCopy}>This cannot be undone. Enter your current password to permanently remove your account and personal data.</Text><Field label="CURRENT PASSWORD" value={password} onChangeText={setPassword} secureTextEntry autoFocus />{merchant && <View style={styles.switchRow}><View style={styles.switchCopy}><Text style={styles.switchTitle}>Delete owned venues</Text><Text style={styles.switchDetail}>Required if venues still belong to you</Text></View><Switch value={deleteOwnedVenues} onValueChange={setDeleteOwnedVenues} trackColor={{ false: "#343441", true: "#7f1d1d" }} thumbColor={deleteOwnedVenues ? "#f87171" : "#aaaabc"} /></View>}<View style={styles.modalActions}><Pressable onPress={onClose} style={styles.cancelButton}><Text style={styles.secondaryText}>Cancel</Text></Pressable><Pressable onPress={onDelete} disabled={!password || busy} style={[styles.deleteButton, (!password || busy) && styles.disabled]}><Text style={styles.deleteButtonText}>{busy ? "Deleting..." : "Delete permanently"}</Text></Pressable></View></View></KeyboardAvoidingView></Modal>;
-}
-
-function Scanner({ visible, onClose, onScan }: { visible: boolean; onClose: () => void; onScan: (value: string) => void }) {
-  const [permission, requestPermission] = useCameraPermissions();
-  const [locked, setLocked] = useState(false);
-  return <Modal visible={visible} animationType="slide" onShow={() => setLocked(false)} onRequestClose={onClose}><SafeAreaView style={styles.scanner}><View style={styles.scannerHeader}><View><Text style={styles.eyebrow}>CAMERA SCANNER</Text><Text style={styles.scannerTitle}>Scan customer proof</Text></View><Pressable onPress={onClose} style={styles.close}><Ionicons name="close" size={23} color={palette.white} /></Pressable></View>{!permission?.granted ? <View style={styles.permission}><Ionicons name="camera-outline" size={36} color={palette.gold} /><Text style={styles.body}>Camera permission is required to scan customer QR codes.</Text><PrimaryButton label="Allow camera" onPress={() => void requestPermission()} /></View> : <View style={styles.cameraWrap}><CameraView style={StyleSheet.absoluteFill} barcodeScannerSettings={{ barcodeTypes: ["qr"] }} onBarcodeScanned={locked ? undefined : ({ data }) => { setLocked(true); onScan(data); }} /><View style={styles.scanFrame} /><Text style={styles.scanHelp}>Place the customer&apos;s QR inside the frame</Text></View>}</SafeAreaView></Modal>;
 }
 
 const styles = StyleSheet.create({

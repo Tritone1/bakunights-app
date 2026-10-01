@@ -4,7 +4,7 @@ import { Prisma } from "@prisma/client";
 import { randomInt, randomUUID } from "node:crypto";
 import { z } from "zod";
 import { prisma } from "../db.js";
-import { bakuDate } from "../lib/baku-date.js";
+import { bakuDate, bakuDayRange } from "../lib/baku-date.js";
 import { asyncRoute, HttpError } from "../lib/http.js";
 import { requireAuth } from "../middleware/auth.js";
 import { getOfferLanguage, localizeDeal } from "../lib/deal-translation.js";
@@ -46,18 +46,21 @@ function serializePointReward(reward: { id: string; rewardCode: string; pointsSp
 }
 
 async function getPointsStatus(userId: string) {
-  const today = bakuDate();
-  const [earned, spent, lastSpin, pendingSpins, todaysSpinClaim, activeRewards] = await Promise.all([
+  const now = new Date();
+  const today = bakuDate(now);
+  const todayRange = bakuDayRange(now);
+  const [earned, spent, lastSpin, verifiedVisitsToday, todaysSpinClaim, activeRewards] = await Promise.all([
     prisma.pointSpin.aggregate({ where: { userId }, _sum: { points: true } }),
     prisma.pointReward.aggregate({ where: { userId }, _sum: { pointsSpent: true } }),
     prisma.pointSpin.findFirst({ where: { userId }, orderBy: { createdAt: "desc" } }),
-    prisma.redemption.count({ where: { userId, redeemedAt: { not: null }, pointSpin: null } }),
+    prisma.redemption.count({ where: { userId, redeemedAt: { gte: todayRange.start, lt: todayRange.end }, pointSpin: null } }),
     prisma.dailySpinClaim.findUnique({ where: { userId_spinDate: { userId, spinDate: today } }, select: { id: true } }),
     prisma.pointReward.findMany({ where: { userId, redeemedAt: null }, orderBy: { issuedAt: "asc" }, select: { id: true, rewardCode: true, pointsSpent: true, discountPct: true, maxBillAzn: true, issuedAt: true, redeemedAt: true } }),
   ]);
   const lifetimePoints = earned._sum.points ?? 0;
   const pointsBalance = Math.max(0, lifetimePoints - (spent._sum.pointsSpent ?? 0));
   const hasSpunToday = todaysSpinClaim !== null;
+  const pendingSpins = hasSpunToday ? 0 : Math.min(verifiedVisitsToday, 1);
   return {
     pointsBalance,
     lifetimePoints,
@@ -188,7 +191,9 @@ usersRouter.post("/me/points/spin", asyncRoute(async (req, res) => {
 
   try {
     rewardUnlocked = await prisma.$transaction(async (tx) => {
-      const spinDate = bakuDate();
+      const now = new Date();
+      const spinDate = bakuDate(now);
+      const todayRange = bakuDayRange(now);
       const todaysSpinClaim = await tx.dailySpinClaim.findUnique({
         where: { userId_spinDate: { userId, spinDate } },
         select: { id: true },
@@ -197,11 +202,11 @@ usersRouter.post("/me/points/spin", asyncRoute(async (req, res) => {
         throw new HttpError(409, "You have already used today's spin. You can spin again tomorrow if you have a merchant-verified visit.", "DAILY_SPIN_LIMIT_REACHED");
       }
       const eligibleVisit = await tx.redemption.findFirst({
-        where: { userId, redeemedAt: { not: null }, pointSpin: null },
+        where: { userId, redeemedAt: { gte: todayRange.start, lt: todayRange.end }, pointSpin: null },
         orderBy: { redeemedAt: "asc" },
         select: { id: true },
       });
-      if (!eligibleVisit) throw new HttpError(403, "Visit a participating venue and ask the merchant to verify your app QR code before you spin.", "VERIFIED_VISIT_REQUIRED");
+      if (!eligibleVisit) throw new HttpError(403, "Have a participating venue verify at least one deal today before you spin.", "VERIFIED_VISIT_REQUIRED");
       const recentSpins = await tx.pointSpin.findMany({
         where: { userId },
         orderBy: { createdAt: "desc" },
@@ -234,7 +239,7 @@ usersRouter.post("/me/points/spin", asyncRoute(async (req, res) => {
       if (todaysSpinClaim) {
         throw new HttpError(409, "You have already used today's spin. You can spin again tomorrow if you have a merchant-verified visit.", "DAILY_SPIN_LIMIT_REACHED");
       }
-      throw new HttpError(409, "That verified visit has already been used for a spin. Verify another in-store visit to spin again.", "VISIT_SPIN_USED");
+      throw new HttpError(409, "Today's qualifying visit has already been used. You can spin again tomorrow after a new verification.", "VISIT_SPIN_USED");
     }
     throw error;
   }

@@ -109,7 +109,7 @@ export function OfferDetailPage({
   useEffect(() => setFollowed(initiallyFollowed), [initiallyFollowed]);
   useEffect(() => {
     setConfirmed(initiallyConfirmed);
-    if (initiallyConfirmed && !previouslyConfirmed.current) setNotice("Visit confirmed by the merchant. Your reward spin is now unlocked.");
+    if (initiallyConfirmed && !previouslyConfirmed.current) setNotice("Visit confirmed. You can use one spin today if you have not already spun.");
     previouslyConfirmed.current = initiallyConfirmed;
   }, [initiallyConfirmed]);
   useEffect(() => setClaimed(Boolean(confirmationCode)), [confirmationCode]);
@@ -160,7 +160,7 @@ export function OfferDetailPage({
     setBusy("confirm");
     try {
       await onConfirmVisit?.();
-      if (onConfirmVisit) { setClaimed(true); setNotice("QR proof created. Show it to the merchant to confirm your visit."); }
+      if (onConfirmVisit) { setClaimed(true); setConfirmed(false); setNotice("QR proof created. Show it to the merchant to confirm your visit."); }
       else { setClaimed(true); setConfirmed(true); setNotice("Visit confirmed successfully."); }
     }
     catch (reason) { setNotice(errorMessage(reason, "Could not confirm your visit.")); }
@@ -255,7 +255,7 @@ export function OfferDetailPage({
           {claimed && qrCodeUrl && <SafeImage src={qrCodeUrl} alt={`QR proof for ${code}`} className="mx-auto mt-4 w-48 rounded-xl border-4 border-white bg-white p-2" />}
           {claimed && <p className="mx-auto mt-4 w-fit rounded-xl border border-white/10 bg-black/25 px-4 py-2 font-mono text-sm font-bold tracking-[.16em] text-amber-300">{code}</p>}
           {confirmed
-            ? <p className="mt-4 rounded-xl border border-emerald-400/20 bg-emerald-400/10 px-3 py-3 text-sm font-semibold text-emerald-300">The merchant scanned this proof and confirmed your visit.</p>
+            ? <><p className="mt-4 rounded-xl border border-emerald-400/20 bg-emerald-400/10 px-3 py-3 text-sm font-semibold text-emerald-300">The merchant scanned this proof and confirmed your visit.</p><button type="button" onClick={() => void confirmVisit()} disabled={busy === "confirm"} className="mt-3 w-full rounded-xl bg-amber-500 px-4 py-3 text-sm font-extrabold text-night transition hover:bg-amber-400 disabled:opacity-55">{busy === "confirm" ? "Creating QR…" : "Claim this deal again"}</button><p className="mt-2 text-xs leading-5 text-muted">You can reuse the deal, but extra deal claims never add another daily spin or carry over to another day.</p></>
             : claimed
               ? <p className="mt-4 rounded-xl border border-amber-400/20 bg-amber-400/10 px-3 py-3 text-sm font-semibold text-amber-200">Show this QR code to the merchant. Their scanner confirms the visit and unlocks your spin.</p>
               : <button type="button" onClick={() => void confirmVisit()} disabled={busy === "confirm"} className="mt-5 w-full rounded-xl bg-amber-500 px-4 py-3 text-sm font-extrabold text-night transition hover:bg-amber-400 disabled:opacity-55">{busy === "confirm" ? "Creating QR…" : "Claim & Show QR"}</button>}

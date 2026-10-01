@@ -9,6 +9,7 @@ import { useAuth } from "@/src/AuthContext";
 import { useLanguage } from "@/src/LanguageContext";
 import { useUserLocation } from "@/src/LocationContext";
 import { LocalizedText as Text, LocalizedTextInput as TextInput } from "@/src/LocalizedText";
+import { MerchantDashboard } from "@/src/MerchantDashboard";
 import { displayFont, palette } from "@/src/theme";
 import type { Deal, HomepageStats, Restaurant } from "@/src/types";
 import { amenityLabel, isVenueOpenNow, VENUE_AMENITIES } from "@/src/venueAmenities";
@@ -34,6 +35,12 @@ function openDeal(router: ReturnType<typeof useRouter>, deal: Deal) {
 }
 
 export default function HomeScreen() {
+  const { user } = useAuth();
+  if (user?.role === "MERCHANT" || user?.role === "ADMIN") return <MerchantDashboard />;
+  return <CustomerHomeScreen />;
+}
+
+function CustomerHomeScreen() {
   const router = useRouter();
   const { user, loading: authLoading, logout } = useAuth();
   const { language, cycleLanguage, translate } = useLanguage();

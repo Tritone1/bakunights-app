@@ -294,7 +294,8 @@ model Redemption {
   feedback          RedemptionFeedback?
   pointSpin         PointSpin?
 
-  @@unique([userId, dealId, dealCycle])
+  @@index([userId, dealId, dealCycle, claimedAt])
+  @@index([userId, redeemedAt])
   @@map("redemptions")
 }
 

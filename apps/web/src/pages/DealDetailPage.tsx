@@ -92,7 +92,7 @@ export function DealDetailPage() {
 
   async function confirmVisit() {
     requireUser();
-    if (data?.redemption) return;
+    if (data?.redemption && !data.redemption.redeemedAt) return;
     const result = await api<{ redemption: Redemption }>(`/deals/${deal.id}/claim`, { method: "POST" });
     setData((current) => current ? { ...current, redemption: result.redemption } : current);
   }

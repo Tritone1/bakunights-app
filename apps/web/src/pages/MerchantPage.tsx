@@ -309,7 +309,7 @@ function RedeemCode({ venues }: { venues: ManagedVenue[] }) {
     setMessage("");
     try {
       const result = await api<
-        | { kind: "DEAL"; spinUnlocked: true; redemption: { redemptionCode: string; deal: { title: string }; user: { name: string; email: string } } }
+        | { kind: "DEAL"; spinUnlocked: boolean; spinStatus: "UNLOCKED" | "ALREADY_AVAILABLE" | "USED_TODAY"; redemption: { redemptionCode: string; deal: { title: string }; user: { name: string; email: string } } }
         | { kind: "POINT_REWARD"; reward: { rewardCode: string; discountPct: number; maxBillAzn: number; billAmountAzn: number; discountAmountAzn: number; user: { name: string; email: string } } }
       >("/merchant/redemptions/redeem", {
         method: "POST",
@@ -317,7 +317,7 @@ function RedeemCode({ venues }: { venues: ManagedVenue[] }) {
       });
       setMessage(result.kind === "POINT_REWARD"
         ? `Points reward verified for ${result.reward.user.name || result.reward.user.email}. Apply ${result.reward.discountAmountAzn.toFixed(2)} AZN discount to the ${result.reward.billAmountAzn.toFixed(2)} AZN bill.`
-        : `Verified ${result.redemption.deal.title} for ${result.redemption.user.name || result.redemption.user.email}. One points-wheel spin is now unlocked.`);
+        : `Verified ${result.redemption.deal.title} for ${result.redemption.user.name || result.redemption.user.email}. ${result.spinStatus === "UNLOCKED" ? "Today's points-wheel spin is now unlocked." : result.spinStatus === "ALREADY_AVAILABLE" ? "Today's spin was already available; extra deals do not add another spin." : "Today's spin was already used; this deal does not carry over to tomorrow."}`);
       setCode("");
       setBillAmount("");
     } catch (reason) {
@@ -679,7 +679,6 @@ function DealForm({ venues, categoryOptions, menuItems, editing, onOpenMenu, onC
       }
       return changed ? next : values;
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [usesItemPrices, itemQuantities]);
   useEffect(() => {
     if (offerType !== "discount" || scope !== "SPECIFIC_ITEMS") return;
