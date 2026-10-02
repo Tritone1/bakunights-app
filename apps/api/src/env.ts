@@ -28,6 +28,7 @@ const schema = z.object({
   GMAIL_OAUTH_REFRESH_TOKEN: z.string().optional(),
   OPENAI_API_KEY: z.string().optional(),
   OPENAI_VISION_MODEL: z.string().default("gpt-4o"),
+  OPENAI_CHAT_MODEL: z.string().default("gpt-6-astra"),
 });
 
 export const env = schema.parse(process.env);

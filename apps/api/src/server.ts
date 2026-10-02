@@ -21,6 +21,7 @@ import { merchantRouter } from "./routes/merchant.js";
 import { adminRouter } from "./routes/admin.js";
 import { pushRouter } from "./routes/push.js";
 import { placesRouter } from "./routes/places.js";
+import { conciergeRouter } from "./routes/concierge.js";
 import { asyncRoute, errorHandler, notFound } from "./lib/http.js";
 import { sendSavedDealExpiryNotifications } from "./lib/push.js";
 import { recomputeAllVenueTrust } from "./lib/trust.js";
@@ -150,6 +151,7 @@ app.use("/api/merchant", merchantRouter);
 app.use("/api/admin", adminRouter);
 app.use("/api/push", pushRouter);
 app.use("/api/places", placesRouter);
+app.use("/api/concierge", conciergeRouter);
 if (env.NODE_ENV === "production") {
   const webDist = resolve(dirname(fileURLToPath(import.meta.url)), "../../web/dist");
   if (existsSync(webDist)) {

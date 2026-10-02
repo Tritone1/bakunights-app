@@ -22,6 +22,7 @@ import { ArrowLeft, Home } from "lucide-react";
 import { loadGoogleMaps } from "./lib/googleMaps";
 import { defaultMetadata, setPageMetadata } from "./lib/seo";
 import { amenityLabel, isVenueOpenNow, VENUE_AMENITIES } from "./lib/venueAmenities";
+import { AiConcierge } from "./components/AiConcierge";
 
 type Category = "Restaurants" | "Cafes" | "Bars" | "Pubs" | "Lounges";
 
@@ -829,6 +830,7 @@ function ConsumerApp() {
     <footer className="px-5 py-9 text-center text-[11px] text-muted"><p>© {new Date().getFullYear()} WhereToGo · Great food. Great deals. Every day.</p></footer>
     {navigationVenue && <NavigationOptionsDialog destination={navigationVenue} onClose={() => setNavigationVenue(null)} />}
     {locationPickerOpen && <LocationPickerModal apiKey={mapsApiKey} detectedPosition={userPosition} currentPosition={feedPosition} onClose={() => setLocationPickerOpen(false)} onConfirm={(position, label) => { setManualPosition(position); setLocationLabel(label); setLocationPickerOpen(false); }} />}
+    <AiConcierge location={feedPosition} />
   </div>;
 }
 

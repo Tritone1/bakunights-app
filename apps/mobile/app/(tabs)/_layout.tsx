@@ -24,6 +24,7 @@ export default function TabLayout() {
         tabBarLabelStyle: { fontSize: 11, fontWeight: "700", paddingBottom: 7 },
       }}>
       <Tabs.Screen name="index" options={{ title: translate(merchant ? "Dashboard" : "Home"), tabBarIcon: ({ color, size }) => <Ionicons name={merchant ? "grid" : "home"} color={color} size={size} /> }} />
+      <Tabs.Screen name="assistant" options={{ href: merchant ? null : undefined, title: "Hara AI", tabBarIcon: ({ color, size }) => <Ionicons name="sparkles" color={color} size={size} /> }} />
       <Tabs.Screen name="rewards" options={{ href: merchant ? null : undefined, title: translate("Rewards"), tabBarIcon: ({ color, size }) => <Ionicons name="gift" color={color} size={size} /> }} />
       <Tabs.Screen name="visits" options={{ href: merchant ? null : undefined, title: translate("My visits"), tabBarIcon: ({ color, size }) => <Ionicons name="time" color={color} size={size} /> }} />
       <Tabs.Screen name="menu" options={{ href: merchant ? undefined : null, title: translate("Menu"), tabBarIcon: ({ color, size }) => <Ionicons name="restaurant" color={color} size={size} /> }} />
