@@ -45,8 +45,10 @@ test("fallback concierge understands informal Azerbaijani amenity requests", () 
   assert.match(result.recommendations[0]?.reason ?? "", /VIP otaq/);
 });
 
-test("fallback concierge does not invent a venue when required amenities are absent", () => {
+test("fallback concierge marks alternatives when required amenities are absent", () => {
   const result = buildFallbackConcierge("az", [{ ...venue, amenities: [] }], "qelyan olan yer");
-  assert.deepEqual(result.recommendations, []);
-  assert.match(result.reply, /tapa bilmədim/);
+  assert.equal(result.recommendations[0]?.venueId, "venue-1");
+  assert.doesNotMatch(result.recommendations[0]?.reason ?? "", /şişa/);
+  assert.match(result.reply, /tam uyğun/);
+  assert.match(result.followUp, /təsdiqlənməyib/);
 });

@@ -83,7 +83,8 @@ export function buildFallbackConcierge(language: ConciergeLanguage, venues: Conc
   });
   const hasStructuredRequest = requestedAmenities.length > 0 || wantsOffer;
   const candidates = ranked.filter((item) => item.amenityMatch && item.offerMatch && (hasStructuredRequest || item.score > item.venue.rating - (item.venue.distanceKm ?? 0) / 20));
-  const selected = (candidates.length ? candidates : hasStructuredRequest ? [] : ranked).sort((a, b) => b.score - a.score).slice(0, 3);
+  const showingAlternatives = hasStructuredRequest && candidates.length === 0;
+  const selected = (candidates.length ? candidates : ranked).sort((a, b) => b.score - a.score).slice(0, 3);
 
   if (!selected.length) {
     return {
@@ -94,9 +95,13 @@ export function buildFallbackConcierge(language: ConciergeLanguage, venues: Conc
   }
 
   return {
-    reply: language === "az" ? `Sizə uyğun ${selected.length} məkan tapdım.` : language === "ru" ? `Я нашёл ${selected.length} подходящих варианта.` : `I found ${selected.length} suitable ${selected.length === 1 ? "place" : "places"} for you.`,
-    recommendations: selected.map(({ venue }) => ({ venueId: venue.id, reason: fallbackReason(language, venue, requestedAmenities) })),
-    followUp: language === "az" ? "İstəsəniz, büdcə və ya məsafəyə görə seçimi daha da dəqiqləşdirə bilərəm." : language === "ru" ? "Могу уточнить выбор по бюджету или расстоянию." : "I can narrow these down by budget or distance.",
+    reply: showingAlternatives
+      ? (language === "az" ? "Bu istəyə tam uyğun təsdiqlənmiş məkan tapa bilmədim, amma baxa biləcəyiniz aktiv alternativ var." : language === "ru" ? "Точного подтверждённого совпадения нет, но вот активная альтернатива." : "I couldn't find a confirmed exact match, but here is an active alternative you can check.")
+      : (language === "az" ? `Sizə uyğun ${selected.length} məkan tapdım.` : language === "ru" ? `Я нашёл ${selected.length} подходящих варианта.` : `I found ${selected.length} suitable ${selected.length === 1 ? "place" : "places"} for you.`),
+    recommendations: selected.map(({ venue }) => ({ venueId: venue.id, reason: fallbackReason(language, venue, showingAlternatives ? [] : requestedAmenities) })),
+    followUp: showingAlternatives
+      ? (language === "az" ? "İstədiyiniz imkan bu məkanda təsdiqlənməyib; getməzdən əvvəl məkanla dəqiqləşdirin." : language === "ru" ? "Нужное удобство не подтверждено; уточните у заведения перед визитом." : "The requested facility is not confirmed here; please check with the venue before visiting.")
+      : (language === "az" ? "İstəsəniz, büdcə və ya məsafəyə görə seçimi daha da dəqiqləşdirə bilərəm." : language === "ru" ? "Могу уточнить выбор по бюджету или расстоянию." : "I can narrow these down by budget or distance."),
   };
 }
 
