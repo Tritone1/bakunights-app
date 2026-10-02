@@ -36,9 +36,73 @@ const outputSchema = z.object({
 
 export type ConciergeOutput = z.infer<typeof outputSchema>;
 
+const amenityTerms = [
+  { value: "SHISHA", terms: ["shisha", "sisa", "qelyan", "kalyan", "hookah", "кальян"] },
+  { value: "VIP_ROOM", terms: ["vip", "private room", "xususi otaq", "otaqli", "комната", "кабинет"] },
+  { value: "OUTDOOR_SEATING", terms: ["outdoor", "terrace", "teras", "aciq hava", "veranda"] },
+  { value: "ROOFTOP", terms: ["rooftop", "dam", "terrace view", "панорама", "крыша"] },
+  { value: "LIVE_MUSIC", terms: ["live music", "canli musiqi", "canli muzik", "живая музыка"] },
+  { value: "SPORTS_SCREENS", terms: ["football", "futbol", "sports", "matc", "match", "футбол", "матч"] },
+  { value: "KARAOKE", terms: ["karaoke", "караоке"] },
+  { value: "PARKING", terms: ["parking", "parkinq", "parkovka", "парковка"] },
+] as const;
+
+const stopWords = new Set(["olan", "with", "where", "place", "yer", "mekan", "axtariram", "isteyirem", "quiet", "sakit", "the", "and", "ve", "bir", "room", "otaq", "restoran"]);
+
+function normalizeSearch(value: string) {
+  return value.toLocaleLowerCase("az").normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/[əә]/g, "e").replace(/ı/g, "i").replace(/ş/g, "s").replace(/ç/g, "c").replace(/ğ/g, "g").replace(/ö/g, "o").replace(/ü/g, "u")
+    .replace(/[^a-z0-9а-яё\s]/gi, " ").replace(/\s+/g, " ").trim();
+}
+
+function fallbackReason(language: ConciergeLanguage, venue: ConciergeCatalogVenue, matchedAmenities: string[]) {
+  const amenityLabels = matchedAmenities.map((value) => value === "SHISHA" ? (language === "az" ? "şişa" : language === "ru" ? "кальян" : "shisha")
+    : value === "VIP_ROOM" ? (language === "az" ? "VIP otaq" : language === "ru" ? "VIP-комната" : "VIP room")
+      : value.toLocaleLowerCase().replaceAll("_", " "));
+  if (amenityLabels.length) {
+    const joined = amenityLabels.join(" + ");
+    return language === "az" ? `İstədiyiniz ${joined} imkanları var.` : language === "ru" ? `Есть нужные вам удобства: ${joined}.` : `It has the ${joined} facilities you requested.`;
+  }
+  if (venue.liveOffer) return language === "az" ? `Hazırda aktiv təklifi var: ${venue.liveOffer.title}` : language === "ru" ? `Сейчас действует предложение: ${venue.liveOffer.title}` : `It currently has a live offer: ${venue.liveOffer.title}`;
+  if (venue.distanceKm !== null) return language === "az" ? `Sizdən təxminən ${venue.distanceKm} km məsafədədir.` : language === "ru" ? `Примерно в ${venue.distanceKm} км от вас.` : `It is about ${venue.distanceKm} km from you.`;
+  return language === "az" ? `Reytinqi ${venue.rating.toFixed(1)} olan aktiv məkandır.` : language === "ru" ? `Активное заведение с рейтингом ${venue.rating.toFixed(1)}.` : `An active venue rated ${venue.rating.toFixed(1)}.`;
+}
+
+export function buildFallbackConcierge(language: ConciergeLanguage, venues: ConciergeCatalogVenue[], message: string): ConciergeOutput {
+  const query = normalizeSearch(message);
+  const requestedAmenities = amenityTerms.filter(({ terms }) => terms.some((term) => query.includes(normalizeSearch(term)))).map(({ value }) => value);
+  const wantsOffer = ["deal", "offer", "discount", "endirim", "aksiya", "акция", "скидка"].some((term) => query.includes(term));
+  const tokens = query.split(" ").filter((token) => token.length > 2 && !stopWords.has(token));
+  const ranked = venues.map((venue) => {
+    const searchText = normalizeSearch([venue.name, venue.cuisine, venue.address, ...venue.dietaryTags].join(" "));
+    const normalizedAmenities = venue.amenities.map((amenity) => amenity.toLocaleUpperCase());
+    const amenityMatch = requestedAmenities.every((amenity) => normalizedAmenities.includes(amenity));
+    const offerMatch = !wantsOffer || venue.liveOffer !== null;
+    const textScore = tokens.reduce((score, token) => score + (searchText.includes(token) ? 1 : 0), 0);
+    return { venue, amenityMatch, offerMatch, score: textScore * 10 + venue.rating - (venue.distanceKm ?? 0) / 20 };
+  });
+  const hasStructuredRequest = requestedAmenities.length > 0 || wantsOffer;
+  const candidates = ranked.filter((item) => item.amenityMatch && item.offerMatch && (hasStructuredRequest || item.score > item.venue.rating - (item.venue.distanceKm ?? 0) / 20));
+  const selected = (candidates.length ? candidates : hasStructuredRequest ? [] : ranked).sort((a, b) => b.score - a.score).slice(0, 3);
+
+  if (!selected.length) {
+    return {
+      reply: language === "az" ? "Bu istəyə tam uyğun aktiv məkan tapa bilmədim." : language === "ru" ? "Я не нашёл активного заведения, которое точно соответствует запросу." : "I couldn't find an active venue that exactly matches that request.",
+      recommendations: [],
+      followUp: language === "az" ? "Başqa rayon, büdcə və ya məkan növü sınayaq?" : language === "ru" ? "Попробуем другой район, бюджет или тип заведения?" : "Would you like to try another area, budget, or venue type?",
+    };
+  }
+
+  return {
+    reply: language === "az" ? `Sizə uyğun ${selected.length} məkan tapdım.` : language === "ru" ? `Я нашёл ${selected.length} подходящих варианта.` : `I found ${selected.length} suitable ${selected.length === 1 ? "place" : "places"} for you.`,
+    recommendations: selected.map(({ venue }) => ({ venueId: venue.id, reason: fallbackReason(language, venue, requestedAmenities) })),
+    followUp: language === "az" ? "İstəsəniz, büdcə və ya məsafəyə görə seçimi daha da dəqiqləşdirə bilərəm." : language === "ru" ? "Могу уточнить выбор по бюджету или расстоянию." : "I can narrow these down by budget or distance.",
+  };
+}
+
 export function buildConciergeInstructions(language: ConciergeLanguage, venues: ConciergeCatalogVenue[], nowInBaku: string) {
   const fallbackLanguage = language === "az" ? "Azerbaijani" : language === "ru" ? "Russian" : "English";
-  return `You are Hara, the friendly WhereToGo venue concierge for Baku, Azerbaijan.
+  return `You are the friendly WhereToGo venue guide for Baku, Azerbaijan.
 
 LANGUAGE AND UNDERSTANDING
 - Understand fluent and informal Azerbaijani exceptionally well, including common spelling mistakes, missing Azerbaijani letters, Russian/English loan words, and Latin-keyboard forms. Examples: "qelyan olan sakit yer", "vip otaqli restoran", "usaqlarla hara gede bilerik", "kababa getmek isteyirik".

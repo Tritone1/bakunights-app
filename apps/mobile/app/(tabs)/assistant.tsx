@@ -31,24 +31,24 @@ type Message = { id: string; role: "user" | "assistant"; content: string; recomm
 
 const COPY = {
   az: {
-    subtitle: "Bakıda hara gedək?",
-    greeting: "Salam! ✨ Necə bir məkan axtarırsınız? Şişalı sakit lounge, VIP otaqlı restoran və ya bu axşam endirimli bir yer yaza bilərsiniz.",
+    subtitle: "Bakı üçün məkan bələdçiniz",
+    greeting: "Salam! Bu gün necə bir yer axtarırsınız? İstəyinizi sadəcə yazın — məsələn, “sakit şişa məkanı” və ya “VIP otaqlı restoran”.",
     placeholder: "Məsələn: qelyan ve VIP otaq olan yer...",
     thinking: "Uyğun məkanları yoxlayıram...",
     error: "Hazırda cavab verə bilmədim. Bir az sonra yenidən cəhd edin.",
     prompts: ["Şişa olan sakit yer", "VIP otaqlı restoran", "Bu axşam endirim harada var?"],
   },
   en: {
-    subtitle: "Where should we go in Baku?",
-    greeting: "Hi! ✨ Tell me what kind of place you want—a quiet shisha lounge, a restaurant with a VIP room, or somewhere with a live deal tonight.",
+    subtitle: "Your guide to places in Baku",
+    greeting: "Hi! What kind of place are you looking for today? Just describe it—for example, “a quiet shisha place” or “a restaurant with a VIP room”.",
     placeholder: "Ask about a venue, mood, budget...",
     thinking: "Checking the best matches...",
     error: "I could not answer just now. Please try again shortly.",
     prompts: ["Quiet place with shisha", "Restaurant with a VIP room", "Deals available tonight"],
   },
   ru: {
-    subtitle: "Куда пойти в Баку?",
-    greeting: "Привет! ✨ Расскажите, какое место вы ищете: тихий лаунж с кальяном, ресторан с VIP-комнатой или заведение с акцией сегодня вечером.",
+    subtitle: "Ваш гид по заведениям Баку",
+    greeting: "Привет! Какое место вы ищете сегодня? Просто опишите его — например, «тихое место с кальяном» или «ресторан с VIP-комнатой».",
     placeholder: "Спросите о месте, атмосфере, бюджете...",
     thinking: "Ищу подходящие места...",
     error: "Сейчас не удалось ответить. Попробуйте ещё раз немного позже.",
@@ -56,7 +56,7 @@ const COPY = {
   },
 };
 
-const STORAGE_KEY = "wheretogo-ai-conversation-v1";
+const STORAGE_KEY = "wheretogo-place-guide-conversation-v2";
 const MAX_SAVED_MESSAGES = 30;
 
 function messageId() {
@@ -140,7 +140,7 @@ export default function AssistantScreen() {
 
   return <SafeAreaView style={styles.safe} edges={["top"]}>
     <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === "ios" ? "padding" : undefined} keyboardVerticalOffset={82}>
-      <View style={styles.header}><View style={styles.bot}><Ionicons name="sparkles" size={22} color={palette.night} /></View><View style={styles.headerCopy}><View style={styles.titleRow}><Text style={styles.title}>Hara AI</Text><Text style={styles.gpt}>GPT</Text></View><Text style={styles.subtitle}>{copy.subtitle}</Text></View><View style={styles.online} /><Pressable onPress={newChat} style={styles.reset} accessibilityLabel="New chat"><Ionicons name="refresh" size={17} color={palette.muted} /></Pressable></View>
+      <View style={styles.header}><View style={styles.bot}><Ionicons name="sparkles" size={22} color={palette.night} /></View><View style={styles.headerCopy}><Text style={styles.title}>Hara Gedək?</Text><Text style={styles.subtitle}>{copy.subtitle}</Text></View><View style={styles.online} /><Pressable onPress={newChat} style={styles.reset} accessibilityLabel="New chat"><Ionicons name="refresh" size={17} color={palette.muted} /></Pressable></View>
       <FlatList
         ref={listRef}
         data={messages}
@@ -168,7 +168,7 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   header: { height: 72, borderBottomWidth: 1, borderBottomColor: palette.line, paddingHorizontal: 17, flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: palette.card },
   bot: { width: 43, height: 43, borderRadius: 15, backgroundColor: palette.gold, alignItems: "center", justifyContent: "center" },
-  headerCopy: { flex: 1 }, titleRow: { flexDirection: "row", alignItems: "center", gap: 7 }, title: { color: palette.white, fontFamily: displayFont, fontSize: 22, fontWeight: "700" }, gpt: { color: palette.cyan, fontSize: 8, fontWeight: "900", letterSpacing: 1, borderRadius: 8, backgroundColor: "rgba(103,232,249,.09)", paddingHorizontal: 6, paddingVertical: 3 }, subtitle: { color: palette.muted, fontSize: 10, marginTop: 2 }, online: { width: 9, height: 9, borderRadius: 5, backgroundColor: palette.green, shadowColor: palette.green, shadowOpacity: .8, shadowRadius: 5 }, reset: { width: 35, height: 35, borderRadius: 18, borderWidth: 1, borderColor: palette.line, alignItems: "center", justifyContent: "center" },
+  headerCopy: { flex: 1 }, title: { color: palette.white, fontFamily: displayFont, fontSize: 22, fontWeight: "700" }, subtitle: { color: palette.muted, fontSize: 10, marginTop: 2 }, online: { width: 9, height: 9, borderRadius: 5, backgroundColor: palette.green, shadowColor: palette.green, shadowOpacity: .8, shadowRadius: 5 }, reset: { width: 35, height: 35, borderRadius: 18, borderWidth: 1, borderColor: palette.line, alignItems: "center", justifyContent: "center" },
   messages: { padding: 15, paddingBottom: 20, flexGrow: 1, justifyContent: "flex-end" },
   messageWrap: { marginBottom: 14 }, userWrap: { marginLeft: 48, alignItems: "flex-end" }, assistantWrap: { marginRight: 24, alignItems: "flex-start" },
   bubble: { borderRadius: 19, paddingHorizontal: 14, paddingVertical: 11, maxWidth: "100%" }, userBubble: { backgroundColor: palette.gold, borderBottomRightRadius: 5 }, assistantBubble: { backgroundColor: palette.cardRaised, borderWidth: 1, borderColor: palette.line, borderBottomLeftRadius: 5 }, messageText: { color: "#e8e8ef", fontSize: 13, lineHeight: 20 }, userText: { color: palette.night, fontWeight: "600" },

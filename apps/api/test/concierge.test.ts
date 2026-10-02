@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildConciergeInstructions, parseConciergeOutput, type ConciergeCatalogVenue } from "../src/lib/concierge.js";
+import { buildConciergeInstructions, buildFallbackConcierge, parseConciergeOutput, type ConciergeCatalogVenue } from "../src/lib/concierge.js";
 
 const venue: ConciergeCatalogVenue = {
   id: "venue-1",
@@ -35,4 +35,18 @@ test("concierge output removes unknown and duplicate venue ids", () => {
     followUp: "",
   }, new Set(["venue-1"]));
   assert.deepEqual(result.recommendations, [{ venueId: "venue-1", reason: "VIP otağı və şişası var." }]);
+});
+
+test("fallback concierge understands informal Azerbaijani amenity requests", () => {
+  const result = buildFallbackConcierge("az", [venue], "qelyan ve vip otaqli sakit yer axtariram");
+  assert.equal(result.recommendations.length, 1);
+  assert.equal(result.recommendations[0]?.venueId, "venue-1");
+  assert.match(result.recommendations[0]?.reason ?? "", /şişa/);
+  assert.match(result.recommendations[0]?.reason ?? "", /VIP otaq/);
+});
+
+test("fallback concierge does not invent a venue when required amenities are absent", () => {
+  const result = buildFallbackConcierge("az", [{ ...venue, amenities: [] }], "qelyan olan yer");
+  assert.deepEqual(result.recommendations, []);
+  assert.match(result.reply, /tapa bilmədim/);
 });

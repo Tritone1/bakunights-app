@@ -49,43 +49,43 @@ type Copy = {
   prompts: string[];
 };
 
-const STORAGE_KEY = "wheretogo-ai-conversation-v1";
+const STORAGE_KEY = "wheretogo-place-guide-conversation-v2";
 const MAX_SAVED_MESSAGES = 30;
 
 const COPY: Record<"az" | "en" | "ru", Copy> = {
   az: {
-    title: "Hara AI",
-    subtitle: "Bakıda hara gedək?",
-    greeting: "Salam! ✨ Necə bir məkan axtarırsınız? Məsələn, şişalı sakit lounge, VIP otaqlı restoran və ya bu axşam endirimli bir yer deyə bilərsiniz.",
+    title: "Hara Gedək?",
+    subtitle: "Bakı üçün məkan bələdçiniz",
+    greeting: "Salam! Bu gün necə bir yer axtarırsınız? İstəyinizi sadəcə yazın — məsələn, “sakit şişa məkanı” və ya “VIP otaqlı restoran”.",
     placeholder: "Məsələn: qelyan ve VIP otaq olan yer...",
     send: "Göndər",
     thinking: "Uyğun məkanları yoxlayıram...",
     error: "Hazırda cavab verə bilmədim. Bir az sonra yenidən cəhd edin.",
-    open: "AI-dan soruş",
+    open: "Məkan tap",
     newChat: "Yeni söhbət",
     prompts: ["Şişa olan sakit yer", "VIP otaqlı restoran", "Bu axşam endirim harada var?"],
   },
   en: {
-    title: "Hara AI",
-    subtitle: "Where should we go in Baku?",
-    greeting: "Hi! ✨ Tell me what kind of place you want—perhaps a quiet shisha lounge, a restaurant with a VIP room, or somewhere with a live deal tonight.",
+    title: "Hara Gedək?",
+    subtitle: "Your guide to places in Baku",
+    greeting: "Hi! What kind of place are you looking for today? Just describe it—for example, “a quiet shisha place” or “a restaurant with a VIP room”.",
     placeholder: "Ask about a venue, mood, budget...",
     send: "Send",
     thinking: "Checking the best matches...",
     error: "I could not answer just now. Please try again shortly.",
-    open: "Ask the AI",
+    open: "Find a place",
     newChat: "New chat",
     prompts: ["Quiet place with shisha", "Restaurant with a VIP room", "Deals available tonight"],
   },
   ru: {
-    title: "Hara AI",
-    subtitle: "Куда пойти в Баку?",
-    greeting: "Привет! ✨ Расскажите, какое место вы ищете: тихий лаунж с кальяном, ресторан с VIP-комнатой или заведение с акцией сегодня вечером.",
+    title: "Hara Gedək?",
+    subtitle: "Ваш гид по заведениям Баку",
+    greeting: "Привет! Какое место вы ищете сегодня? Просто опишите его — например, «тихое место с кальяном» или «ресторан с VIP-комнатой».",
     placeholder: "Спросите о месте, атмосфере, бюджете...",
     send: "Отправить",
     thinking: "Ищу подходящие места...",
     error: "Сейчас не удалось ответить. Попробуйте ещё раз немного позже.",
-    open: "Спросить AI",
+    open: "Найти место",
     newChat: "Новый чат",
     prompts: ["Тихое место с кальяном", "Ресторан с VIP-комнатой", "Акции на сегодня"],
   },
@@ -163,7 +163,7 @@ export function AiConcierge({ location }: { location?: { lat: number; lng: numbe
       <section className="flex h-[min(760px,100dvh)] w-full flex-col overflow-hidden border border-white/10 bg-[#0d0d15] shadow-2xl sm:h-[min(720px,calc(100dvh-40px))] sm:max-w-[470px] sm:rounded-[28px]">
         <header className="flex items-center gap-3 border-b border-white/10 bg-[#13131e] px-4 py-4">
           <span className="grid h-11 w-11 place-items-center rounded-2xl bg-gold text-[#09090e]"><Bot size={23} /></span>
-          <div className="min-w-0 flex-1"><div className="flex items-center gap-2"><h2 className="font-display text-xl font-bold text-white">{copy.title}</h2><span className="rounded-full bg-cyan/10 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-cyan">GPT</span></div><p className="text-xs text-white/45">{copy.subtitle}</p></div>
+          <div className="min-w-0 flex-1"><h2 className="font-display text-xl font-bold text-white">{copy.title}</h2><p className="text-xs text-white/45">{copy.subtitle}</p></div>
           <button type="button" onClick={newChat} className="grid h-10 w-10 place-items-center rounded-full border border-white/10 text-white/60 transition hover:bg-white/10 hover:text-white" aria-label={copy.newChat} title={copy.newChat}><RotateCcw size={17} /></button>
           <button type="button" onClick={() => setOpen(false)} className="grid h-10 w-10 place-items-center rounded-full border border-white/10 text-white/60 transition hover:bg-white/10 hover:text-white" aria-label="Close"><X size={19} /></button>
         </header>

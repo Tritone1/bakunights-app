@@ -2,7 +2,7 @@ import { Router, type Request } from "express";
 import { z } from "zod";
 import { prisma } from "../db.js";
 import { env } from "../env.js";
-import { buildConciergeInstructions, conciergeLanguages, parseConciergeOutput, type ConciergeCatalogVenue, type ConciergeLanguage } from "../lib/concierge.js";
+import { buildConciergeInstructions, buildFallbackConcierge, conciergeLanguages, parseConciergeOutput, type ConciergeCatalogVenue, type ConciergeLanguage, type ConciergeOutput } from "../lib/concierge.js";
 import { getOfferLanguage, localizeDeal } from "../lib/deal-translation.js";
 import { milesBetween } from "../lib/distance.js";
 import { asyncRoute, HttpError } from "../lib/http.js";
@@ -55,7 +55,6 @@ function outputText(payload: OpenAIResponse) {
 
 conciergeRouter.post("/", asyncRoute(async (req, res) => {
   enforceRateLimit(req);
-  if (!env.OPENAI_API_KEY) throw new HttpError(503, "AI concierge is not configured yet.", "CONCIERGE_NOT_CONFIGURED");
   const input = chatInput.parse(req.body);
   if (input.messages.at(-1)?.role !== "user") throw new HttpError(400, "The latest chat message must be from the user.");
   const language = requestLanguage(req, input.language);
@@ -138,15 +137,55 @@ conciergeRouter.post("/", asyncRoute(async (req, res) => {
       } : null,
     };
   });
+  const venueById = new Map(sorted.map(({ venue, distanceKm }) => [venue.id, { venue, distanceKm }]));
+  const responsePayload = (answer: ConciergeOutput) => ({
+    reply: answer.reply,
+    followUp: answer.followUp,
+    recommendations: answer.recommendations.flatMap(({ venueId, reason }) => {
+      const match = venueById.get(venueId);
+      if (!match) return [];
+      const deal = match.venue.deals[0];
+      const localizedDeal = deal ? localizeDeal(deal, language) : null;
+      return [{
+        reason,
+        venue: {
+          id: match.venue.id,
+          name: match.venue.name,
+          cuisine: match.venue.cuisine,
+          address: match.venue.address,
+          rating: match.venue.rating,
+          priceLevel: match.venue.priceLevel,
+          amenities: match.venue.amenities,
+          photoUrl: match.venue.photoUrl,
+          phone: match.venue.phone,
+          isVerifiedTrusted: match.venue.isVerifiedTrusted,
+          distanceKm: match.distanceKm === null ? null : Number(match.distanceKm.toFixed(1)),
+          liveDeal: localizedDeal ? { id: localizedDeal.id, title: localizedDeal.title } : null,
+        },
+      }];
+    }),
+  });
+  const fallback = () => buildFallbackConcierge(language, catalog, input.messages.filter(({ role }) => role === "user").at(-1)?.content ?? "");
+  const sendAnswer = (answer: ConciergeOutput) => {
+    res.setHeader("Cache-Control", "no-store");
+    res.json(responsePayload(answer));
+  };
+
+  if (!env.OPENAI_API_KEY) {
+    sendAnswer(fallback());
+    return;
+  }
 
   const bakuTime = new Intl.DateTimeFormat("en-GB", {
     timeZone: "Asia/Baku", dateStyle: "full", timeStyle: "short",
   }).format(now);
-  const response = await fetch("https://api.openai.com/v1/responses", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${env.OPENAI_API_KEY}`, "Content-Type": "application/json" },
-    signal: AbortSignal.timeout(35_000),
-    body: JSON.stringify({
+  let response: Response;
+  try {
+    response = await fetch("https://api.openai.com/v1/responses", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${env.OPENAI_API_KEY}`, "Content-Type": "application/json" },
+      signal: AbortSignal.timeout(35_000),
+      body: JSON.stringify({
       model: env.OPENAI_CHAT_MODEL,
       store: false,
       reasoning: { effort: "low" },
@@ -182,49 +221,29 @@ conciergeRouter.post("/", asyncRoute(async (req, res) => {
           },
         },
       },
-    }),
-  }).catch((error: unknown) => {
+      }),
+    });
+  } catch (error: unknown) {
     console.error("OpenAI concierge request failed", error instanceof Error ? error.message : error);
-    throw new HttpError(502, "The AI concierge could not respond right now. Please try again.", "CONCIERGE_UNAVAILABLE");
-  });
+    sendAnswer(fallback());
+    return;
+  }
   if (!response.ok) {
     console.error("OpenAI concierge failed", response.status, (await response.text()).slice(0, 500));
-    throw new HttpError(response.status === 429 ? 429 : 502, "The AI concierge could not respond right now. Please try again.", "CONCIERGE_UNAVAILABLE");
+    sendAnswer(fallback());
+    return;
   }
   const payload = await response.json() as OpenAIResponse;
   const text = outputText(payload);
-  if (!text) throw new HttpError(502, "The AI concierge returned an empty response. Please try again.", "CONCIERGE_EMPTY");
-  let parsedJson: unknown;
-  try { parsedJson = JSON.parse(text); }
-  catch { throw new HttpError(502, "The AI concierge returned an invalid response. Please try again.", "CONCIERGE_INVALID"); }
-  const answer = parseConciergeOutput(parsedJson, new Set(catalog.map((venue) => venue.id)));
-  const venueById = new Map(sorted.map(({ venue, distanceKm }) => [venue.id, { venue, distanceKm }]));
-  res.setHeader("Cache-Control", "no-store");
-  res.json({
-    reply: answer.reply,
-    followUp: answer.followUp,
-    recommendations: answer.recommendations.flatMap(({ venueId, reason }) => {
-      const match = venueById.get(venueId);
-      if (!match) return [];
-      const deal = match.venue.deals[0];
-      const localizedDeal = deal ? localizeDeal(deal, language) : null;
-      return [{
-        reason,
-        venue: {
-          id: match.venue.id,
-          name: match.venue.name,
-          cuisine: match.venue.cuisine,
-          address: match.venue.address,
-          rating: match.venue.rating,
-          priceLevel: match.venue.priceLevel,
-          amenities: match.venue.amenities,
-          photoUrl: match.venue.photoUrl,
-          phone: match.venue.phone,
-          isVerifiedTrusted: match.venue.isVerifiedTrusted,
-          distanceKm: match.distanceKm === null ? null : Number(match.distanceKm.toFixed(1)),
-          liveDeal: localizedDeal ? { id: localizedDeal.id, title: localizedDeal.title } : null,
-        },
-      }];
-    }),
-  });
+  if (!text) {
+    sendAnswer(fallback());
+    return;
+  }
+  try {
+    const answer = parseConciergeOutput(JSON.parse(text), new Set(catalog.map((venue) => venue.id)));
+    sendAnswer(answer);
+  } catch (error) {
+    console.error("OpenAI concierge returned an invalid response", error instanceof Error ? error.message : error);
+    sendAnswer(fallback());
+  }
 }));
